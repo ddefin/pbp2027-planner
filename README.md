@@ -85,28 +85,44 @@ Notifications de groupe (Discord, Slack, ou un point de terminaison à soi en JS
 
 La livraison ne bloque jamais la requête HTTP qui déclenche l'événement (pas d'`await` dans la route) : un webhook lent ou en échec n'affecte jamais l'action de l'utilisateur.
 
+### Parcours (un par BRM personnel)
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/brm/:brmEventId/parcours` | Parcours associé à ce BRM (`null` si aucun) |
+| PUT | `/api/brm/:brmEventId/parcours` | Enregistre `sourceUrl` (tente une récupération automatique immédiate), météo prévue et notes |
+| POST | `/api/brm/:brmEventId/parcours/upload` | Upload un `.gpx` (multipart), en calcule distance/D+/D- |
+| GET | `/api/brm/:brmEventId/parcours/file` | Télécharge le GPX stocké |
+| DELETE | `/api/brm/:brmEventId/parcours/file` | Retire le fichier (garde le reste du parcours) |
+
+La récupération automatique ne marche actuellement que pour OpenRunner : `src/lib/openrunner.ts` lit les stats (distance, dénivelé) directement dans le HTML public de la page du parcours — OpenRunner les y intègre côté serveur, sans authentification. **Important** : ça ne passe jamais par une exécution du JS récupéré (pas de `vm`/`eval`), seulement par du découpage de texte qui résout les valeurs dédupliquées par Nuxt via les arguments de l'IIFE. Si OpenRunner change la forme de cette page, cette extraction casse silencieusement (elle renvoie juste `null`, jamais une erreur) et il faut uploader le GPX manuellement — exactement le repli prévu. Le calcul depuis un GPX uploadé (`src/lib/gpx.ts`) est lui indépendant de la source : distance par sommation haversine, D+/D- avec un seuil de bruit de 2m.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-31 tests : hachage de mot de passe, TOTP (round-trip base32, tolérance de dérive d'horloge),
+39 tests : hachage de mot de passe, TOTP (round-trip base32, tolérance de dérive d'horloge),
 cycle de vie et isolation des BRM entre utilisateurs, calendrier ACP (mock réseau), sorties
 et chat WebSocket (diffusion temps réel, auth au handshake, persistance), webhooks
-(diffusion de groupe filtrée par événement, isolation par propriétaire, signature HMAC).
+(diffusion de groupe filtrée par événement, isolation par propriétaire, signature HMAC),
+parcours (récupération automatique mockée, upload/téléchargement GPX, isolation).
 
 ## Frontend
 
 Le dossier `web/` contient l'app React (Vite) branchée sur ce service : connexion/MFA,
 tableau de bord (compte à rebours + suivi BRM), calendrier des BRM officiels, sorties,
-chat temps réel et webhooks. Voir `web/README.md` pour le détail (notamment le découpage
-front/back qui évite le CORS en gardant tout sous le même domaine en prod).
+chat temps réel, webhooks et parcours (upload GPX, météo, notes). Voir `web/README.md`
+pour le détail (notamment le découpage front/back qui évite le CORS en gardant tout sous
+le même domaine en prod).
 
 ## Pour la suite
 
-- Passer `DATABASE_URL` sur Postgres en production (le schéma Prisma est compatible sans changement de code).
+- Passer `DATABASE_URL` sur Postgres en production (le schéma Prisma est compatible sans changement de code) — pour `Parcours.fileData` (BLOB), vérifier la limite de taille de ligne du moteur choisi si les GPX uploadés sont volumineux.
 - Ajouter l'envoi d'email réel (vérification d'adresse, réinitialisation de mot de passe) — non implémenté ici.
 - Pseudo configurable (actuellement, le nom affiché aux autres utilisateurs est la partie avant le `@` de l'email).
 - Déploiement réel (hébergement, domaine, reverse proxy) — non fait, voir `web/README.md` pour l'architecture prévue.
 - Les webhooks n'ont ni file de retry ni historique des livraisons (un seul essai, timeout 5s, dernier statut seulement) — correct pour un petit groupe, à muscler (délais exponentiels, DLQ) si le volume grossit.
+- Récupération automatique du parcours limitée à OpenRunner pour l'instant ; Komoot/Garmin Connect/Strava nécessiteraient chacun leur propre adaptateur (et souvent une vraie API avec clé, contrairement à OpenRunner).
+- Pas de prévision météo automatique (aucune API branchée) : les champs météo sont à remplir à la main à l'approche de la date.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="test">
+  <trk>
+    <name>Test BRM 200</name>
+    <trkseg>
+      <trkpt lat="48.6440" lon="1.8296"><ele>160</ele></trkpt>
+      <trkpt lat="48.6500" lon="1.8400"><ele>165</ele></trkpt>
+      <trkpt lat="48.6600" lon="1.8600"><ele>180</ele></trkpt>
+      <trkpt lat="48.6700" lon="1.8800"><ele>170</ele></trkpt>
+      <trkpt lat="48.6800" lon="1.9000"><ele>150</ele></trkpt>
+      <trkpt lat="48.7000" lon="1.9500"><ele>200</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

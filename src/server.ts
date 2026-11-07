@@ -1,6 +1,7 @@
 import "./lib/httpProxy.js";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
+import multipart from "@fastify/multipart";
 import websocket from "@fastify/websocket";
 import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
@@ -8,6 +9,7 @@ import { brmRoutes } from "./routes/brm.js";
 import { brmCatalogRoutes } from "./routes/brmCatalog.js";
 import { sortiesRoutes } from "./routes/sorties.js";
 import { webhooksRoutes } from "./routes/webhooks.js";
+import { parcoursRoutes } from "./routes/parcours.js";
 import { chatWsRoutes } from "./ws/chat.js";
 
 export function buildServer() {
@@ -15,6 +17,7 @@ export function buildServer() {
 
   app.register(cookie);
   app.register(websocket);
+  app.register(multipart);
 
   app.addHook("onSend", async (_request, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
@@ -34,6 +37,7 @@ export function buildServer() {
       api.register(brmCatalogRoutes);
       api.register(sortiesRoutes);
       api.register(webhooksRoutes);
+      api.register(parcoursRoutes);
       api.register(chatWsRoutes);
     },
     { prefix: "/api" },

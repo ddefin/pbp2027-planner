@@ -76,8 +76,40 @@ model BrmEvent {
   tempsRealiseMinutes  Int?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+  parcours             Parcours?
 
   @@index([userId])
+}
+
+// Le parcours d'un BRM personnel : fichier GPX (uploadé ou récupéré automatiquement
+// depuis OpenRunner), stats qui en sont dérivées, et les infos pratiques pour l'ultra-
+// distance que personne ne fournit automatiquement (météo prévue, notes de sécurité).
+model Parcours {
+  id                String   @id @default(cuid())
+  brmEventId        String   @unique
+  brmEvent          BrmEvent @relation(fields: [brmEventId], references: [id], onDelete: Cascade)
+
+  sourceUrl         String? // lien OpenRunner (ou autre) d'où les stats ont été récupérées
+  fileName          String?
+  fileData          Bytes? // contenu du GPX, stocké tel quel (petits fichiers, pas de stockage externe pour l'instant)
+  fileMimeType      String?
+
+  distanceKm        Float?
+  elevationGainM    Int?
+  elevationLossM    Int?
+  minAltitudeM      Int?
+  maxAltitudeM      Int?
+
+  windDirection     String? // ex. "NO", "SE" — libre, pas de référentiel strict
+  windSpeedKmh      Int?
+  windGustsKmh      Int?
+  tempMinC          Int?
+  tempMaxC          Int?
+  precipitation     String? // texte libre : "averses en fin de nuit", "sec", etc.
+  notes             String? // ravitos, points de vigilance, tout ce qui aide en ultra-distance
+
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
 }
 
 // Le choix d'un randonneur sur un BRM du calendrier officiel ACP (pas un événement

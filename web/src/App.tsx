@@ -8,6 +8,7 @@ import { SortiesPage } from "./pages/SortiesPage";
 import { CalendrierPage } from "./pages/CalendrierPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
+import { ParcoursPage } from "./pages/ParcoursPage";
 
 function ProtectedLayout({ children }: { children: ReactNode }) {
   const { status, logout } = useAuth();
@@ -87,6 +88,14 @@ export default function App() {
           element={
             <ProtectedLayout>
               <WebhooksPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/brm/:brmEventId/parcours"
+          element={
+            <ProtectedLayout>
+              <ParcoursPage />
             </ProtectedLayout>
           }
         />

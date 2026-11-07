@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import type { BrmDistance, BrmEvent, BrmStatus } from "../api/brm";
 import type { useBrmEvents } from "../hooks/useBrmEvents";
 import { STATUS_LABEL, STATUS_OPTIONS, VALID_DISTANCES, formatMinutes } from "../lib/brmMeta";
@@ -174,6 +175,9 @@ function BrmCard({
           <b className="tabular">{formatMinutes(event.tempsRealiseMinutes)}</b>
         </div>
       )}
+      <Link to={`/brm/${event.id}/parcours`} className="hint" style={{ display: "block", marginTop: 10, textDecoration: "underline" }}>
+        Parcours →
+      </Link>
     </div>
   );
 }
