@@ -1,0 +1,56 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                  String         @id @default(cuid())
+  email                String         @unique
+  passwordHash         String
+  mfaEnabled           Boolean        @default(false)
+  mfaSecretEncrypted   String?
+  mfaPendingEncrypted  String?
+  failedLoginAttempts  Int            @default(0)
+  lockedUntil          DateTime?
+  createdAt            DateTime       @default(now())
+  sessions             Session[]
+  recoveryCodes        RecoveryCode[]
+  mfaChallenges        MfaChallenge[]
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  tokenHash  String   @unique
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+  expiresAt  DateTime
+  userAgent  String?
+  ip         String?
+}
+
+// Jeton temporaire émis entre "mot de passe validé" et "code MFA validé".
+// Ne donne jamais accès à une ressource protégée tant que verified=false.
+model MfaChallenge {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+}
