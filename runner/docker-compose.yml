@@ -1,0 +1,22 @@
+services:
+  runner:
+    build: .
+    image: pbp2027-planner-runner:latest
+    container_name: pbp2027-planner-runner
+    restart: unless-stopped
+    volumes:
+      # Docker CLI du conteneur -> daemon du NAS, pour que le job "deploy" puisse
+      # lancer `docker compose` sur l'app elle-même.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Volume Docker NOMMÉ, pas un bind mount : un bind mount vers un dossier hôte
+      # vide écraserait le contenu de /home/runner installé par le Dockerfile
+      # (config.sh, run.sh, binaires...) dès le premier démarrage. Un volume nommé,
+      # lui, se pré-remplit avec le contenu de l'image à sa création, puis persiste
+      # l'inscription du runner et son dossier _work à travers les redémarrages.
+      - runner-home:/home/runner
+    env_file:
+      # Jamais committé — voir .env.example pour les variables attendues.
+      - .env
+
+volumes:
+  runner-home:

@@ -37,29 +37,53 @@ Dans la zone DNS du domaine (Espace client OVH → Web Cloud → Noms de domaine
      `docker-compose.yml`, premier nombre de la ligne `ports:` — à garder identique
      des deux côtés si tu dois le changer un jour, lui était déjà pris sur ce NAS).
 
-## 3. Runner GitHub Actions (sur le NAS)
+## 3. Runner GitHub Actions (sur le NAS, dans un conteneur)
 
 Le déploiement se fait par un **runner auto-hébergé** : pas d'accès SSH exposé sur
 Internet, pas de clé SSH à stocker comme secret GitHub. Le runner tourne *sur* le
 NAS et c'est lui qui construit l'image Docker et redémarre le conteneur, en local.
 
+**Le runner GitHub officiel ne s'installe pas directement sur DSM** : son
+`config.sh` attend des outils que DSM n'a pas (`ldd` et d'autres bibliothèques),
+même avec les paquets qui semblent nécessaires installés. La solution : le faire
+tourner dans un conteneur Docker (`runner/`), avec le socket Docker du NAS monté
+dedans pour qu'il puisse lancer `docker compose` sur l'hôte.
+
 1. Dans GitHub : Settings du repo → Actions → Runners → **New self-hosted runner** →
-   Linux. GitHub affiche des commandes avec un jeton d'enregistrement à usage unique
-   (ne le partage avec personne, il expire vite).
-2. Connecte-toi en SSH au NAS, crée un dossier dédié (ex. `~/actions-runner`), et
-   lance exactement les commandes que GitHub t'a données (`curl` pour télécharger,
-   puis `./config.sh --url ... --token ...`).
-3. **Ajoute un label** quand `config.sh` le demande (ou via `--labels synology`) :
-   le workflow cible `runs-on: [self-hosted, synology]`, donc ce label doit être
-   présent sur ce runner — sinon le job `deploy` reste bloqué "en attente".
-4. Fais tourner le runner en service (`sudo ./svc.sh install && sudo ./svc.sh start`)
-   pour qu'il survive aux redémarrages du NAS. S'il n'a pas les droits root
-   nécessaires sur ton DSM, utilise plutôt le Planificateur de tâches DSM pour lancer
-   `run.sh` au démarrage.
-5. L'utilisateur qui fait tourner le runner doit pouvoir exécuter `docker compose` —
-   ajoute-le au groupe `docker` (Panneau de configuration → Groupe d'utilisateurs, ou
-   `synogroup --member docker <utilisateur>` en SSH), puis reconnecte-toi pour que ça
-   s'applique.
+   Linux x64. GitHub affiche un jeton d'enregistrement à usage unique (ne le partage
+   avec personne, il expire en une heure environ) — **ignore les commandes `curl`/
+   `config.sh` qu'il te montre**, ce sera fait par le conteneur à la place. Garde
+   juste le jeton sous la main.
+2. Connecte-toi en SSH au NAS, va dans le dossier `runner/` du repo cloné par ailleurs
+   (ou clone juste ce dossier-là si besoin), et crée le fichier d'environnement :
+   ```bash
+   cd pbp2027-planner/runner
+   cp .env.example .env
+   nano .env   # colle le jeton de l'étape 1 dans RUNNER_TOKEN
+   ```
+3. **Ajoute `<utilisateur SSH>` au groupe `docker`** s'il n'y est pas déjà (Panneau de
+   configuration → Groupe d'utilisateurs, ou `synogroup --member docker <utilisateur>`
+   en SSH), puis reconnecte-toi — sinon le conteneur ne pourra pas parler au Docker du
+   NAS malgré le socket monté.
+4. Construit et démarre le conteneur :
+   ```bash
+   docker compose up -d --build
+   ```
+   Au tout premier démarrage, il s'enregistre auprès de GitHub avec le jeton fourni.
+   Vérifie dans GitHub (Settings → Actions → Runners) qu'il apparaît **"Idle"** avec
+   le label `synology` — le workflow cible `runs-on: [self-hosted, synology]`, donc ce
+   label doit y être, sinon le job `deploy` reste bloqué "en attente".
+5. Une fois enregistré, tu peux retirer `RUNNER_TOKEN` de `.env` (il a expiré de toute
+   façon) : l'identité du runner est conservée dans le volume Docker nommé
+   `runner-home` (pas un dossier visible dans `runner/` — `docker volume ls` le liste),
+   qui survit aux redémarrages du conteneur. Ne le supprime pas (`docker volume rm`)
+   sauf si tu veux vraiment ré-enregistrer le runner depuis zéro.
+
+**Première vérification à faire à cette étape** (pas testable depuis l'environnement
+qui a préparé ce repo, bloqué par la détection anti-bot de GitHub) : si
+`docker compose up -d --build` échoue au téléchargement du runner avec une erreur
+du style "404" ou une version vide, le `Dockerfile` n'a pas réussi à résoudre la
+dernière version d'`actions/runner` — dis-le moi, je corrigerai la logique.
 
 ## 4. Première configuration (une fois, à la main sur le NAS)
 
