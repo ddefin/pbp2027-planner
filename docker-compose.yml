@@ -6,10 +6,11 @@ services:
     restart: unless-stopped
     ports:
       # Écoute en local uniquement : c'est le reverse proxy DSM (pas Docker) qui expose
-      # ça en HTTPS sur Internet. Port hôte 3002 (3001 déjà pris sur ce NAS) — le
-      # reverse proxy DSM doit pointer vers localhost:3002. Le conteneur, lui, écoute
-      # toujours en interne sur 3001 (second nombre) : rien à changer côté .env.production.
-      - "127.0.0.1:3002:3001"
+      # ça en HTTPS sur Internet. Port hôte 3202, choisi à l'écart des nombreux autres
+      # conteneurs déjà présents sur ce NAS — le reverse proxy DSM doit pointer vers
+      # localhost:3202. Le conteneur, lui, écoute toujours en interne sur 3001 (second
+      # nombre) : rien à changer côté .env.production.
+      - "127.0.0.1:3202:3001"
     volumes:
       # La base SQLite (et les GPX qu'elle contient) doit survivre aux mises à jour
       # d'image : jamais dans l'image elle-même.
