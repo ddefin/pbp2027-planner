@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { SortiesPage } from "./pages/SortiesPage";
 import { CalendrierPage } from "./pages/CalendrierPage";
 import { SecurityPage } from "./pages/SecurityPage";
+import { WebhooksPage } from "./pages/WebhooksPage";
 
 function ProtectedLayout({ children }: { children: ReactNode }) {
   const { status, logout } = useAuth();
@@ -26,6 +27,7 @@ function ProtectedLayout({ children }: { children: ReactNode }) {
           <Link to="/calendrier">Calendrier BRM</Link>
           <Link to="/sorties">Sorties</Link>
           <Link to="/securite">Sécurité</Link>
+          <Link to="/webhooks">Webhooks</Link>
           <button
             className="ghost"
             onClick={async () => {
@@ -77,6 +79,14 @@ export default function App() {
           element={
             <ProtectedLayout>
               <SecurityPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/webhooks"
+          element={
+            <ProtectedLayout>
+              <WebhooksPage />
             </ProtectedLayout>
           }
         />

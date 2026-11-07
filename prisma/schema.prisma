@@ -25,6 +25,7 @@ model User {
   sortiesCreees        Sortie[]            @relation("SortieCreateur")
   sortieParticipations SortieParticipant[]
   chatMessages         ChatMessage[]
+  webhookSubscriptions WebhookSubscription[]
 }
 
 model Session {
@@ -129,4 +130,24 @@ model ChatMessage {
   createdAt DateTime @default(now())
 
   @@index([sortieId, createdAt])
+}
+
+// Abonnement webhook configuré par un utilisateur, mais déclenché pour TOUT le groupe
+// (ex. un webhook Discord pointant sur le salon du club) : c'est le même modèle que la
+// visibilité des participations BRM, pensé pour la coordination collective plutôt que
+// pour des notifications strictement privées.
+model WebhookSubscription {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url             String
+  format          String // "discord" | "slack" | "generic"
+  events          String // liste d'événements séparés par des virgules (voir src/lib/webhooks.ts)
+  secretEncrypted String? // uniquement pour le format "generic" (signature HMAC), chiffré au repos
+  enabled         Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  lastTriggeredAt DateTime?
+  lastStatus      String? // "ok" | "error"
+
+  @@index([userId])
 }

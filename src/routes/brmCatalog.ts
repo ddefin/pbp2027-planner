@@ -5,6 +5,7 @@ import { getSessionUser } from "../lib/session.js";
 import { fetchFranceBrmCatalog } from "../lib/acpCatalog.js";
 import { CATALOG_STATUSES, VALID_DISTANCES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
+import { triggerWebhooks } from "../lib/webhooks.js";
 
 // Fenêtre de qualification PBP 2027 demandée : saison précédant le départ.
 const CATALOG_FROM = "2027-01-01";
@@ -68,6 +69,22 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
       create: { userId: user.id, catalogEventId: id, status: bodyParsed.data.status },
       update: { status: bodyParsed.data.status },
     });
+
+    // Pas d'await sur l'ensemble : un fetch catalogue (quasi toujours en cache) ne doit
+    // pas retarder la réponse à l'utilisateur qui vient de faire son choix.
+    void fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: VALID_DISTANCES })
+      .then((events) => {
+        const match = events.find((e) => e.id === id);
+        if (!match) return;
+        return triggerWebhooks("brm.participation_changed", {
+          who: publicName(user.email),
+          status: participation.status,
+          distance: match.distance,
+          ville: match.ville,
+          date: match.date,
+        });
+      })
+      .catch(() => undefined);
 
     return reply.send({ status: participation.status });
   });

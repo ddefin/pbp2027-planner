@@ -71,22 +71,37 @@ Le service écoute sur `http://localhost:3001`.
 | GET | `/api/sorties/:id/messages` | Historique du chat de la sortie |
 | WS | `/api/sorties/:id/chat` | Chat temps réel (diffusion à tous les participants connectés, persisté en base) |
 
+### Webhooks
+
+Notifications de groupe (Discord, Slack, ou un point de terminaison à soi en JSON signé HMAC-SHA256) déclenchées sur `sortie.created`, `sortie.participant_joined` et `brm.participation_changed`. Un abonnement est diffusé pour tout le monde dès qu'il écoute l'événement, pas seulement pour celui qui l'a configuré — c'est pensé pour un salon Discord/Slack partagé par le groupe, pas des notifications privées.
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/webhooks` | Liste les webhooks de l'utilisateur |
+| POST | `/api/webhooks` | Crée un webhook (`url` en https, `format` discord/slack/generic, `events[]`). Pour `generic`, renvoie un `secret` une seule fois (signature HMAC des envois suivants) |
+| PATCH | `/api/webhooks/:id` | Active/désactive, change les événements écoutés |
+| DELETE | `/api/webhooks/:id` | Supprime le webhook |
+| POST | `/api/webhooks/:id/test` | Envoie un événement de test à ce seul webhook (jamais une diffusion de groupe) |
+
+La livraison ne bloque jamais la requête HTTP qui déclenche l'événement (pas d'`await` dans la route) : un webhook lent ou en échec n'affecte jamais l'action de l'utilisateur.
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-27 tests : hachage de mot de passe, TOTP (round-trip base32, tolérance de dérive d'horloge),
+31 tests : hachage de mot de passe, TOTP (round-trip base32, tolérance de dérive d'horloge),
 cycle de vie et isolation des BRM entre utilisateurs, calendrier ACP (mock réseau), sorties
-et chat WebSocket (diffusion temps réel, auth au handshake, persistance).
+et chat WebSocket (diffusion temps réel, auth au handshake, persistance), webhooks
+(diffusion de groupe filtrée par événement, isolation par propriétaire, signature HMAC).
 
 ## Frontend
 
 Le dossier `web/` contient l'app React (Vite) branchée sur ce service : connexion/MFA,
-tableau de bord (compte à rebours + suivi BRM), calendrier des BRM officiels, sorties et
-chat temps réel. Voir `web/README.md` pour le détail (notamment le découpage front/back
-qui évite le CORS en gardant tout sous le même domaine en prod).
+tableau de bord (compte à rebours + suivi BRM), calendrier des BRM officiels, sorties,
+chat temps réel et webhooks. Voir `web/README.md` pour le détail (notamment le découpage
+front/back qui évite le CORS en gardant tout sous le même domaine en prod).
 
 ## Pour la suite
 
@@ -94,3 +109,4 @@ qui évite le CORS en gardant tout sous le même domaine en prod).
 - Ajouter l'envoi d'email réel (vérification d'adresse, réinitialisation de mot de passe) — non implémenté ici.
 - Pseudo configurable (actuellement, le nom affiché aux autres utilisateurs est la partie avant le `@` de l'email).
 - Déploiement réel (hébergement, domaine, reverse proxy) — non fait, voir `web/README.md` pour l'architecture prévue.
+- Les webhooks n'ont ni file de retry ni historique des livraisons (un seul essai, timeout 5s, dernier statut seulement) — correct pour un petit groupe, à muscler (délais exponentiels, DLQ) si le volume grossit.

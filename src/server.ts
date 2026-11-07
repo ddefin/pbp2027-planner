@@ -7,6 +7,7 @@ import { authRoutes } from "./routes/auth.js";
 import { brmRoutes } from "./routes/brm.js";
 import { brmCatalogRoutes } from "./routes/brmCatalog.js";
 import { sortiesRoutes } from "./routes/sorties.js";
+import { webhooksRoutes } from "./routes/webhooks.js";
 import { chatWsRoutes } from "./ws/chat.js";
 
 export function buildServer() {
@@ -32,6 +33,7 @@ export function buildServer() {
       api.register(brmRoutes);
       api.register(brmCatalogRoutes);
       api.register(sortiesRoutes);
+      api.register(webhooksRoutes);
       api.register(chatWsRoutes);
     },
     { prefix: "/api" },

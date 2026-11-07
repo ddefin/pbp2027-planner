@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { publicName } from "../lib/publicName.js";
+import { triggerWebhooks } from "../lib/webhooks.js";
 
 const createSchema = z.object({
   titre: z.string().trim().min(1).max(160),
@@ -62,6 +63,15 @@ export async function sortiesRoutes(app: FastifyInstance) {
       },
       include: includeRelations,
     });
+
+    // Pas d'await : une notification Discord/Slack lente ne doit jamais retarder la réponse HTTP.
+    void triggerWebhooks("sortie.created", {
+      titre: sortie.titre,
+      date: sortie.date.toISOString(),
+      lieu: sortie.lieu,
+      createdBy: publicName(user.email),
+    });
+
     return reply.code(201).send({ sortie: serialize(sortie, user.id) });
   });
 
@@ -78,6 +88,9 @@ export async function sortiesRoutes(app: FastifyInstance) {
       create: { sortieId: id, userId: user.id },
       update: {},
     });
+
+    void triggerWebhooks("sortie.participant_joined", { titre: sortie.titre, who: publicName(user.email) });
+
     return reply.send({ status: "joined" });
   });
 
