@@ -1,7 +1,10 @@
 import "./lib/httpProxy.js";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import multipart from "@fastify/multipart";
+import staticFiles from "@fastify/static";
 import websocket from "@fastify/websocket";
 import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
@@ -46,6 +49,20 @@ export function buildServer() {
   );
 
   app.get("/health", async () => ({ status: "ok" }));
+
+  // Sert le frontend déjà construit (web/dist) quand il existe, pour le déploiement en
+  // un seul conteneur (même origine que l'API, conforme à l'architecture /api voulue).
+  // Absent en dev courant (Vite tourne à part) : rien ne se branche, aucun effet de bord.
+  const webDistDir = process.env.WEB_DIST_PATH ?? path.resolve(process.cwd(), "web/dist");
+  if (existsSync(webDistDir)) {
+    app.register(staticFiles, { root: webDistDir });
+    app.setNotFoundHandler((request, reply) => {
+      if (request.raw.url?.startsWith("/api") || request.raw.url === "/health") {
+        return reply.code(404).send({ error: "not_found" });
+      }
+      return reply.sendFile("index.html");
+    });
+  }
 
   return app;
 }

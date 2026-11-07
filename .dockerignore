@@ -1,0 +1,11 @@
+node_modules
+web/node_modules
+dist
+web/dist
+.git
+.env
+prisma/dev.db
+prisma/dev.db-journal
+prisma/test-*.db
+prisma/test-*.db-journal
+*.log

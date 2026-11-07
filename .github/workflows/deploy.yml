@@ -1,0 +1,61 @@
+name: Tests et déploiement
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Installe les dépendances backend
+        run: npm ci
+
+      - name: Génère le client Prisma
+        run: npx prisma generate
+
+      - name: Vérifie les types (backend)
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Tests backend
+        run: npm test
+
+      - name: Installe les dépendances frontend
+        working-directory: web
+        run: npm ci
+
+      - name: Build frontend (inclut la vérification des types)
+        working-directory: web
+        run: npm run build
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: [self-hosted, synology]
+    steps:
+      - uses: actions/checkout@v4
+
+      # .env.production est créé une seule fois, directement sur le NAS — jamais ici,
+      # jamais dans un secret GitHub (voir .env.production.example et web/README.md
+      # pour pourquoi). Ce job échoue volontairement s'il est absent, plutôt que de
+      # démarrer un conteneur avec une config incomplète.
+      - name: Vérifie que .env.production existe sur le NAS
+        run: test -f .env.production || (echo "::error::.env.production manquant — voir .env.production.example" && exit 1)
+
+      - name: Build et redémarre le conteneur
+        run: docker compose up -d --build
+
+      - name: Nettoie les anciennes images
+        run: docker image prune -f

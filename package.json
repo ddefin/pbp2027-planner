@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "test": "vitest run",
     "prisma:generate": "prisma generate",
@@ -16,18 +16,19 @@
   "dependencies": {
     "@fastify/cookie": "^11.1.5",
     "@fastify/multipart": "^10.1.6",
+    "@fastify/static": "^10.1.7",
     "@fastify/websocket": "^11.3.4",
     "@prisma/client": "^5.19.1",
     "dotenv": "^16.4.5",
     "fast-xml-parser": "^5.11.2",
     "fastify": "^5.12.8",
+    "prisma": "^5.19.1",
     "undici": "^8.12.4",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
     "@types/ws": "^8.18.1",
-    "prisma": "^5.19.1",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4",
     "vitest": "^2.0.5"

@@ -1,0 +1,17 @@
+services:
+  pbp2027-planner:
+    build: .
+    image: pbp2027-planner:latest
+    container_name: pbp2027-planner
+    restart: unless-stopped
+    ports:
+      # Écoute en local uniquement : c'est le reverse proxy DSM (pas Docker) qui expose
+      # ça en HTTPS sur Internet. Change le port hôte (le premier nombre) s'il est déjà pris.
+      - "127.0.0.1:3001:3001"
+    volumes:
+      # La base SQLite (et les GPX qu'elle contient) doit survivre aux mises à jour
+      # d'image : jamais dans l'image elle-même.
+      - ./data:/app/data
+    env_file:
+      # Jamais committé — voir .env.production.example pour les clés attendues.
+      - .env.production

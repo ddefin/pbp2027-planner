@@ -128,12 +128,20 @@ chat temps réel, webhooks et parcours (upload GPX, météo live + prévisions, 
 Voir `web/README.md` pour le détail (notamment le découpage front/back qui évite le
 CORS en gardant tout sous le même domaine en prod).
 
+## Déploiement
+
+Un seul conteneur Docker sert le frontend et le backend ensemble (voir `Dockerfile`,
+`docker-compose.yml`). Déployé sur un Synology personnel via un runner GitHub Actions
+auto-hébergé (`.github/workflows/deploy.yml`) — pas de FTP ni d'hébergement mutualisé
+dans cette chaîne, qui ne peuvent pas faire tourner un process Node en continu ni
+relayer le WebSocket du chat. Voir **[DEPLOY.md](./DEPLOY.md)** pour la mise en place
+complète (DNS, reverse proxy DSM, runner).
+
 ## Pour la suite
 
 - Passer `DATABASE_URL` sur Postgres en production (le schéma Prisma est compatible sans changement de code) — pour `Parcours.fileData` (BLOB), vérifier la limite de taille de ligne du moteur choisi si les GPX uploadés sont volumineux.
 - Ajouter l'envoi d'email réel (vérification d'adresse, réinitialisation de mot de passe) — non implémenté ici.
 - Pseudo configurable (actuellement, le nom affiché aux autres utilisateurs est la partie avant le `@` de l'email).
-- Déploiement réel (hébergement, domaine, reverse proxy, et donc un vrai usage pour un secret GitHub Actions) — non fait, voir `web/README.md` pour l'architecture prévue.
 - Les webhooks n'ont ni file de retry ni historique des livraisons (un seul essai, timeout 5s, dernier statut seulement) — correct pour un petit groupe, à muscler (délais exponentiels, DLQ) si le volume grossit.
 - Météo par nom de ville plutôt que par coordonnées précises du parcours — à affiner si `BrmEvent.lieu` ne correspond pas toujours à une ville reconnue par OpenWeatherMap.
 - Récupération automatique du parcours limitée à OpenRunner pour l'instant ; Komoot/Garmin Connect/Strava nécessiteraient chacun leur propre adaptateur (et souvent une vraie API avec clé, contrairement à OpenRunner).
