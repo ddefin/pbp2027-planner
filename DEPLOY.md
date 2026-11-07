@@ -93,6 +93,7 @@ dernière version d'`actions/runner` — dis-le moi, je corrigerai la logique.
 cp .env.production.example .env.production
 nano .env.production   # renseigne MFA_ENCRYPTION_KEY (openssl rand -hex 32),
                         # OPENWEATHER_API_KEY si tu l'utilises, etc.
+mkdir -p data
 ```
 
 Ce fichier n'est **jamais** commité ni poussé sur GitHub (il est dans
@@ -100,9 +101,14 @@ Ce fichier n'est **jamais** commité ni poussé sur GitHub (il est dans
 Actions, qui ne serait injecté que dans les workflows CI, jamais sur le
 serveur qui tourne en continu.
 
-Le dossier `./data` (créé automatiquement à côté, par `docker-compose.yml`)
-contient la base SQLite — à inclure dans tes sauvegardes NAS (Hyper Backup,
-par exemple), c'est la seule donnée qui ne se régénère pas en redéployant.
+Le `mkdir -p data` est nécessaire : `./data:/app/data` dans `docker-compose.yml`
+est un *bind mount* (pas un volume Docker nommé), et Docker ne crée jamais le
+dossier côté hôte lui-même — `docker compose up` échoue sinon avec `Bind mount
+failed: '...' does not exist`. C'est une étape unique, à faire une seule fois.
+
+Ce dossier `./data` contient la base SQLite — à inclure dans tes sauvegardes
+NAS (Hyper Backup, par exemple), c'est la seule donnée qui ne se régénère pas
+en redéployant.
 
 ## 5. Déploiement
 
@@ -128,3 +134,6 @@ docker compose up -d --build
   WebSocket" est bien cochée dans la règle de reverse proxy DSM.
 - **`.env.production manquant`** : étape 4 pas encore faite, ou faite dans le mauvais
   dossier (celui où le runner clone réellement le repo, pas ton `$HOME`).
+- **`Bind mount failed: '.../data' does not exist`** : le dossier `data` n'a pas été
+  créé côté hôte avant le premier `docker compose up` — `mkdir -p data` dans le
+  dossier du repo (étape 4), puis relance.
