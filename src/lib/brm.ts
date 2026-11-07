@@ -13,3 +13,7 @@ export type BrmDistance = (typeof VALID_DISTANCES)[number];
 
 export const VALID_STATUSES = ["a-venir", "inscrit", "fait", "homologue"] as const;
 export type BrmStatus = (typeof VALID_STATUSES)[number];
+
+// Statuts pour le choix d'un randonneur sur un BRM du calendrier officiel (catalogue ACP).
+export const CATALOG_STATUSES = ["prevu", "inscrit", "fait", "homologue"] as const;
+export type CatalogStatus = (typeof CATALOG_STATUSES)[number];

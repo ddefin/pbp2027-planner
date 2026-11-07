@@ -1,8 +1,10 @@
+import "./lib/httpProxy.js";
 import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { brmRoutes } from "./routes/brm.js";
+import { brmCatalogRoutes } from "./routes/brmCatalog.js";
 
 export function buildServer() {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
@@ -18,6 +20,7 @@ export function buildServer() {
 
   app.register(authRoutes);
   app.register(brmRoutes);
+  app.register(brmCatalogRoutes);
 
   app.get("/health", async () => ({ status: "ok" }));
 

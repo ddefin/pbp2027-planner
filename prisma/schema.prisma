@@ -21,6 +21,7 @@ model User {
   recoveryCodes        RecoveryCode[]
   mfaChallenges        MfaChallenge[]
   brmEvents            BrmEvent[]
+  brmParticipations    BrmParticipation[]
 }
 
 model Session {
@@ -73,4 +74,20 @@ model BrmEvent {
   updatedAt            DateTime  @updatedAt
 
   @@index([userId])
+}
+
+// Le choix d'un randonneur sur un BRM du calendrier officiel ACP (pas un événement
+// qu'on stocke nous-mêmes : catalogEventId est dérivé de manière stable des champs
+// ACP, voir src/lib/acpCatalog.ts). Visible par tous les utilisateurs connectés.
+model BrmParticipation {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalogEventId String
+  status         String   @default("prevu")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, catalogEventId])
+  @@index([catalogEventId])
 }

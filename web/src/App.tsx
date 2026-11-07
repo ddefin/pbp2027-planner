@@ -5,6 +5,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { SortiesPage } from "./pages/SortiesPage";
+import { CalendrierPage } from "./pages/CalendrierPage";
 import { SecurityPage } from "./pages/SecurityPage";
 
 function ProtectedLayout({ children }: { children: ReactNode }) {
@@ -22,6 +23,7 @@ function ProtectedLayout({ children }: { children: ReactNode }) {
         </strong>
         <nav style={{ display: "flex", gap: 16, alignItems: "center" }}>
           <Link to="/">Tableau de bord</Link>
+          <Link to="/calendrier">Calendrier BRM</Link>
           <Link to="/sorties">Sorties</Link>
           <Link to="/securite">Sécurité</Link>
           <button
@@ -51,6 +53,14 @@ export default function App() {
           element={
             <ProtectedLayout>
               <DashboardPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/calendrier"
+          element={
+            <ProtectedLayout>
+              <CalendrierPage />
             </ProtectedLayout>
           }
         />
