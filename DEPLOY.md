@@ -9,7 +9,7 @@ déploiement (le widget météo existant sur `lameteoducyclo.fr` n'est pas touch
 
 ```
 Internet → DNS (pbp2027.lameteoducyclo.fr) → ton IP/DDNS → reverse proxy DSM (HTTPS)
-         → conteneur Docker sur le NAS (port 3001, écoute en local uniquement)
+         → conteneur Docker sur le NAS (port 3002, écoute en local uniquement)
 ```
 
 ## 1. DNS (chez OVH)
@@ -33,8 +33,9 @@ Dans la zone DNS du domaine (Espace client OVH → Web Cloud → Noms de domaine
    Avancé → Reverse Proxy → Créer.
    - Source : `pbp2027.lameteoducyclo.fr`, HTTPS, port 443, **coche "Activer HSTS" et
      "Prise en charge de WebSocket"** (indispensable pour le chat temps réel).
-   - Destination : `localhost`, HTTP, port `3001` (celui publié par
-     `docker-compose.yml` — change-le des deux côtés si tu dois le changer).
+   - Destination : `localhost`, HTTP, port `3002` (le port **hôte** publié par
+     `docker-compose.yml`, premier nombre de la ligne `ports:` — à garder identique
+     des deux côtés si tu dois le changer un jour, lui était déjà pris sur ce NAS).
 
 ## 3. Runner GitHub Actions (sur le NAS)
 
