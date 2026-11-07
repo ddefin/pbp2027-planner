@@ -11,12 +11,6 @@ export interface Parcours {
   elevationLossM: number | null;
   minAltitudeM: number | null;
   maxAltitudeM: number | null;
-  windDirection: string | null;
-  windSpeedKmh: number | null;
-  windGustsKmh: number | null;
-  tempMinC: number | null;
-  tempMaxC: number | null;
-  precipitation: string | null;
   notes: string | null;
   updatedAt: string;
   createdAt: string;
@@ -24,12 +18,6 @@ export interface Parcours {
 
 export interface ParcoursUpdateInput {
   sourceUrl?: string | null;
-  windDirection?: string | null;
-  windSpeedKmh?: number | null;
-  windGustsKmh?: number | null;
-  tempMinC?: number | null;
-  tempMaxC?: number | null;
-  precipitation?: string | null;
   notes?: string | null;
 }
 

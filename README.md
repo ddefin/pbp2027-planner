@@ -90,7 +90,7 @@ La livraison ne bloque jamais la requête HTTP qui déclenche l'événement (pas
 | Méthode | Route | Description |
 |---|---|---|
 | GET | `/api/brm/:brmEventId/parcours` | Parcours associé à ce BRM (`null` si aucun) |
-| PUT | `/api/brm/:brmEventId/parcours` | Enregistre `sourceUrl` (tente une récupération automatique immédiate), météo prévue et notes |
+| PUT | `/api/brm/:brmEventId/parcours` | Enregistre `sourceUrl` (tente une récupération automatique immédiate) et les notes |
 | POST | `/api/brm/:brmEventId/parcours/upload` | Upload un `.gpx` (multipart), en calcule distance/D+/D- |
 | GET | `/api/brm/:brmEventId/parcours/file` | Télécharge le GPX stocké |
 | DELETE | `/api/brm/:brmEventId/parcours/file` | Retire le fichier (garde le reste du parcours) |
@@ -137,4 +137,3 @@ CORS en gardant tout sous le même domaine en prod).
 - Les webhooks n'ont ni file de retry ni historique des livraisons (un seul essai, timeout 5s, dernier statut seulement) — correct pour un petit groupe, à muscler (délais exponentiels, DLQ) si le volume grossit.
 - Météo par nom de ville plutôt que par coordonnées précises du parcours — à affiner si `BrmEvent.lieu` ne correspond pas toujours à une ville reconnue par OpenWeatherMap.
 - Récupération automatique du parcours limitée à OpenRunner pour l'instant ; Komoot/Garmin Connect/Strava nécessiteraient chacun leur propre adaptateur (et souvent une vraie API avec clé, contrairement à OpenRunner).
-- Pas de prévision météo automatique (aucune API branchée) : les champs météo sont à remplir à la main à l'approche de la date.

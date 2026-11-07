@@ -9,12 +9,6 @@ const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 Mo : largement suffisant pour un GP
 
 const updateSchema = z.object({
   sourceUrl: z.string().url().optional().nullable(),
-  windDirection: z.string().trim().max(20).optional().nullable(),
-  windSpeedKmh: z.number().int().min(0).max(300).optional().nullable(),
-  windGustsKmh: z.number().int().min(0).max(300).optional().nullable(),
-  tempMinC: z.number().int().min(-60).max(60).optional().nullable(),
-  tempMaxC: z.number().int().min(-60).max(60).optional().nullable(),
-  precipitation: z.string().trim().max(500).optional().nullable(),
   notes: z.string().trim().max(4000).optional().nullable(),
 });
 
@@ -29,12 +23,6 @@ type ParcoursRecord = {
   elevationLossM: number | null;
   minAltitudeM: number | null;
   maxAltitudeM: number | null;
-  windDirection: string | null;
-  windSpeedKmh: number | null;
-  windGustsKmh: number | null;
-  tempMinC: number | null;
-  tempMaxC: number | null;
-  precipitation: string | null;
   notes: string | null;
   updatedAt: Date;
   createdAt: Date;
@@ -52,12 +40,6 @@ function serialize(p: ParcoursRecord) {
     elevationLossM: p.elevationLossM,
     minAltitudeM: p.minAltitudeM,
     maxAltitudeM: p.maxAltitudeM,
-    windDirection: p.windDirection,
-    windSpeedKmh: p.windSpeedKmh,
-    windGustsKmh: p.windGustsKmh,
-    tempMinC: p.tempMinC,
-    tempMaxC: p.tempMaxC,
-    precipitation: p.precipitation,
     notes: p.notes,
     updatedAt: p.updatedAt.toISOString(),
     createdAt: p.createdAt.toISOString(),
@@ -105,12 +87,6 @@ export async function parcoursRoutes(app: FastifyInstance) {
       create: {
         brmEventId,
         ...(data.sourceUrl !== undefined ? { sourceUrl: data.sourceUrl } : {}),
-        ...(data.windDirection !== undefined ? { windDirection: data.windDirection } : {}),
-        ...(data.windSpeedKmh !== undefined ? { windSpeedKmh: data.windSpeedKmh } : {}),
-        ...(data.windGustsKmh !== undefined ? { windGustsKmh: data.windGustsKmh } : {}),
-        ...(data.tempMinC !== undefined ? { tempMinC: data.tempMinC } : {}),
-        ...(data.tempMaxC !== undefined ? { tempMaxC: data.tempMaxC } : {}),
-        ...(data.precipitation !== undefined ? { precipitation: data.precipitation } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
         ...(autoStats ? {
           distanceKm: autoStats.distanceKm,
@@ -122,12 +98,6 @@ export async function parcoursRoutes(app: FastifyInstance) {
       },
       update: {
         ...(data.sourceUrl !== undefined ? { sourceUrl: data.sourceUrl } : {}),
-        ...(data.windDirection !== undefined ? { windDirection: data.windDirection } : {}),
-        ...(data.windSpeedKmh !== undefined ? { windSpeedKmh: data.windSpeedKmh } : {}),
-        ...(data.windGustsKmh !== undefined ? { windGustsKmh: data.windGustsKmh } : {}),
-        ...(data.tempMinC !== undefined ? { tempMinC: data.tempMinC } : {}),
-        ...(data.tempMaxC !== undefined ? { tempMaxC: data.tempMaxC } : {}),
-        ...(data.precipitation !== undefined ? { precipitation: data.precipitation } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
         ...(autoStats ? {
           distanceKm: autoStats.distanceKm,

@@ -99,7 +99,7 @@ describe("API Parcours", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("n'a pas de parcours au départ, puis enregistre les infos manuelles (météo, notes)", async () => {
+  it("n'a pas de parcours au départ, puis enregistre les notes", async () => {
     const cookie = await registerAndLogin(server, `pc-${Date.now()}@example.com`);
     const brmId = await createBrmEvent(server, cookie);
 
@@ -111,18 +111,11 @@ describe("API Parcours", () => {
       url: `/api/brm/${brmId}/parcours`,
       headers: { cookie },
       payload: {
-        windDirection: "NO",
-        windSpeedKmh: 20,
-        windGustsKmh: 45,
-        tempMinC: 8,
-        tempMaxC: 16,
-        precipitation: "averses possibles en fin de nuit",
         notes: "Ravito à Mortagne-au-Perche km 95, portion exposée au vent après le bois.",
       },
     });
     expect(updated.statusCode).toBe(200);
     const p = updated.json().parcours;
-    expect(p.windGustsKmh).toBe(45);
     expect(p.notes).toContain("Mortagne");
     expect(p.hasFile).toBe(false);
   });

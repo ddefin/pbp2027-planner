@@ -82,8 +82,9 @@ model BrmEvent {
 }
 
 // Le parcours d'un BRM personnel : fichier GPX (uploadé ou récupéré automatiquement
-// depuis OpenRunner), stats qui en sont dérivées, et les infos pratiques pour l'ultra-
-// distance que personne ne fournit automatiquement (météo prévue, notes de sécurité).
+// depuis OpenRunner), stats qui en sont dérivées, et les notes pratiques pour
+// l'ultra-distance. La météo n'est plus saisie ici : voir GET /brm/:id/meteo
+// (OpenWeatherMap, live + prévisions), aucune donnée manuelle à maintenir à jour.
 model Parcours {
   id                String   @id @default(cuid())
   brmEventId        String   @unique
@@ -100,12 +101,6 @@ model Parcours {
   minAltitudeM      Int?
   maxAltitudeM      Int?
 
-  windDirection     String? // ex. "NO", "SE" — libre, pas de référentiel strict
-  windSpeedKmh      Int?
-  windGustsKmh      Int?
-  tempMinC          Int?
-  tempMaxC          Int?
-  precipitation     String? // texte libre : "averses en fin de nuit", "sec", etc.
   notes             String? // ravitos, points de vigilance, tout ce qui aide en ultra-distance
 
   updatedAt         DateTime @updatedAt
