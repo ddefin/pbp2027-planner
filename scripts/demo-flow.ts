@@ -9,14 +9,14 @@ async function main() {
   const password = "mot-de-passe-de-demo-123";
 
   console.log("1) Inscription");
-  await fetch(`${base}/auth/register`, {
+  await fetch(`${base}/api/auth/register`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
 
   console.log("2) Login sans MFA (encore désactivée)");
-  const loginRes = await fetch(`${base}/auth/login`, {
+  const loginRes = await fetch(`${base}/api/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ email, password }),
@@ -25,7 +25,7 @@ async function main() {
   console.log(await loginRes.json(), "cookie:", cookie);
 
   console.log("3) Setup MFA (nécessite d'être connecté)");
-  const setupRes = await fetch(`${base}/auth/mfa/setup`, {
+  const setupRes = await fetch(`${base}/api/auth/mfa/setup`, {
     method: "POST",
     headers: { cookie: cookie ?? "" },
   });

@@ -33,10 +33,10 @@ export interface UpdateBrmInput {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(`/api${path}`, {
     ...init,
     credentials: "include",
-    headers: { "content-type": "application/json", ...init?.headers },
+    headers: init?.body !== undefined ? { "content-type": "application/json", ...init?.headers } : init?.headers,
   });
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => ({}));

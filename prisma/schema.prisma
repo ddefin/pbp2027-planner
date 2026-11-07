@@ -22,6 +22,9 @@ model User {
   mfaChallenges        MfaChallenge[]
   brmEvents            BrmEvent[]
   brmParticipations    BrmParticipation[]
+  sortiesCreees        Sortie[]            @relation("SortieCreateur")
+  sortieParticipations SortieParticipant[]
+  chatMessages         ChatMessage[]
 }
 
 model Session {
@@ -90,4 +93,40 @@ model BrmParticipation {
 
   @@unique([userId, catalogEventId])
   @@index([catalogEventId])
+}
+
+// Une sortie d'entraînement coordonnée par le groupe (distincte des BRM officiels).
+model Sortie {
+  id           String              @id @default(cuid())
+  titre        String
+  date         DateTime
+  lieu         String
+  createdById  String
+  createdBy    User                @relation("SortieCreateur", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt    DateTime            @default(now())
+  participants SortieParticipant[]
+  messages     ChatMessage[]
+}
+
+model SortieParticipant {
+  id       String   @id @default(cuid())
+  sortieId String
+  sortie   Sortie   @relation(fields: [sortieId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt DateTime @default(now())
+
+  @@unique([sortieId, userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  sortieId  String
+  sortie    Sortie   @relation(fields: [sortieId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([sortieId, createdAt])
 }

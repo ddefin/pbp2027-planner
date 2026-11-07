@@ -76,8 +76,8 @@ function extractCookie(setCookieHeader: string | string[] | undefined): string {
 
 async function registerAndLogin(server: ReturnType<typeof buildServer>, email: string) {
   const password = "mot-de-passe-de-test-123";
-  await server.inject({ method: "POST", url: "/auth/register", payload: { email, password } });
-  const loginRes = await server.inject({ method: "POST", url: "/auth/login", payload: { email, password } });
+  await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password } });
+  const loginRes = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
   return extractCookie(loginRes.headers["set-cookie"]);
 }
 
@@ -101,7 +101,7 @@ describe("API catalogue BRM (ACP)", () => {
 
   it("ne garde que les BRM France 200-600km, avec un id stable", async () => {
     const cookie = await registerAndLogin(server, `catalog-${Date.now()}@example.com`);
-    const res = await server.inject({ method: "GET", url: "/brm/catalog", headers: { cookie } });
+    const res = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } });
     expect(res.statusCode).toBe(200);
 
     const { events } = res.json();
@@ -115,12 +115,12 @@ describe("API catalogue BRM (ACP)", () => {
     const cookieA = await registerAndLogin(server, `catalog-a-${Date.now()}@example.com`);
     const cookieB = await registerAndLogin(server, `catalog-b-${Date.now()}@example.com`);
 
-    const listRes = await server.inject({ method: "GET", url: "/brm/catalog", headers: { cookie: cookieA } });
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: cookieA } });
     const eventId = listRes.json().events.find((e: { ville: string }) => e.ville === "Rambouillet").id;
 
     const putRes = await server.inject({
       method: "PUT",
-      url: `/brm/catalog/${eventId}/participation`,
+      url: `/api/brm/catalog/${eventId}/participation`,
       headers: { cookie: cookieA },
       payload: { status: "prevu" },
     });
@@ -128,13 +128,13 @@ describe("API catalogue BRM (ACP)", () => {
     expect(putRes.json().status).toBe("prevu");
 
     // Vu par A : son propre statut.
-    const listA = await server.inject({ method: "GET", url: "/brm/catalog", headers: { cookie: cookieA } });
+    const listA = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: cookieA } });
     const eventForA = listA.json().events.find((e: { id: string }) => e.id === eventId);
     expect(eventForA.myStatus).toBe("prevu");
     expect(eventForA.participants).toHaveLength(1);
 
     // Vu par B : le choix de A est visible, mais myStatus reste null pour B.
-    const listB = await server.inject({ method: "GET", url: "/brm/catalog", headers: { cookie: cookieB } });
+    const listB = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: cookieB } });
     const eventForB = listB.json().events.find((e: { id: string }) => e.id === eventId);
     expect(eventForB.myStatus).toBeNull();
     expect(eventForB.participants).toEqual([{ displayName: eventForB.participants[0].displayName, status: "prevu" }]);
@@ -142,39 +142,39 @@ describe("API catalogue BRM (ACP)", () => {
     // A change d'avis -> "inscrit"
     await server.inject({
       method: "PUT",
-      url: `/brm/catalog/${eventId}/participation`,
+      url: `/api/brm/catalog/${eventId}/participation`,
       headers: { cookie: cookieA },
       payload: { status: "inscrit" },
     });
-    const listA2 = await server.inject({ method: "GET", url: "/brm/catalog", headers: { cookie: cookieA } });
+    const listA2 = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: cookieA } });
     expect(listA2.json().events.find((e: { id: string }) => e.id === eventId).myStatus).toBe("inscrit");
 
     // A retire son choix
     const delRes = await server.inject({
       method: "DELETE",
-      url: `/brm/catalog/${eventId}/participation`,
+      url: `/api/brm/catalog/${eventId}/participation`,
       headers: { cookie: cookieA },
     });
     expect(delRes.statusCode).toBe(204);
-    const listA3 = await server.inject({ method: "GET", url: "/brm/catalog", headers: { cookie: cookieA } });
+    const listA3 = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: cookieA } });
     const eventAfterDelete = listA3.json().events.find((e: { id: string }) => e.id === eventId);
     expect(eventAfterDelete.myStatus).toBeNull();
     expect(eventAfterDelete.participants).toEqual([]);
   });
 
   it("refuse l'accès sans session", async () => {
-    const res = await server.inject({ method: "GET", url: "/brm/catalog" });
+    const res = await server.inject({ method: "GET", url: "/api/brm/catalog" });
     expect(res.statusCode).toBe(401);
   });
 
   it("rejette un statut invalide", async () => {
     const cookie = await registerAndLogin(server, `catalog-bad-${Date.now()}@example.com`);
-    const listRes = await server.inject({ method: "GET", url: "/brm/catalog", headers: { cookie } });
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } });
     const eventId = listRes.json().events[0].id;
 
     const res = await server.inject({
       method: "PUT",
-      url: `/brm/catalog/${eventId}/participation`,
+      url: `/api/brm/catalog/${eventId}/participation`,
       headers: { cookie },
       payload: { status: "pas-un-statut" },
     });

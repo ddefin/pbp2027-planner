@@ -4,19 +4,16 @@ App React (Vite) branchée sur le service d'authentification du dossier parent (
 
 ## Pourquoi ce découpage front/back
 
-Tout passe par des chemins **relatifs** (`/auth/...`), jamais par une URL absolue vers le backend :
+Tout passe par des chemins **relatifs** sous `/api/...` (jamais une URL absolue vers le backend), et ce préfixe `/api` est délibéré : sans lui, une route backend comme `/sorties` entrerait directement en collision avec la route client React `/sorties` — un rechargement complet de page sur cette URL serait intercepté par le proxy et renverrait la réponse JSON de l'API au lieu de l'app.
 
-- **En dev**, `vite.config.ts` proxifie `/auth/*` et `/brm/*` vers `http://localhost:3001`. Le navigateur voit une seule origine (`localhost:5173`), donc pas de CORS et le cookie de session (`SameSite=Strict`) part normalement. Toute nouvelle route backend doit être ajoutée aux deux endroits (proxy Vite + reverse proxy prod).
-- **En prod**, le reverse proxy (Caddy/Nginx/Traefik) doit faire la même chose : servir les fichiers statiques de `dist/` ET relayer `/auth/*` et `/brm/*` vers le service backend, sous le **même domaine**. C'est ce qui permet de garder `SameSite=Strict` sur le cookie plutôt que de devoir l'affaiblir en `SameSite=None` + CORS pour un vrai cross-origin.
+- **En dev**, `vite.config.ts` proxifie tout `/api/*` vers `http://localhost:3001`, avec `ws: true` (nécessaire car `/api/sorties/:id/chat` est une connexion WebSocket, pas du HTTP classique). Le navigateur voit une seule origine (`localhost:5173`), donc pas de CORS et le cookie de session (`SameSite=Strict`) part normalement.
+- **En prod**, le reverse proxy (Caddy/Nginx/Traefik) doit faire la même chose : servir les fichiers statiques de `dist/` ET relayer `/api/*` vers le service backend, sous le **même domaine**. C'est ce qui permet de garder `SameSite=Strict` sur le cookie plutôt que de devoir l'affaiblir en `SameSite=None` + CORS pour un vrai cross-origin. `reverse_proxy` de Caddy relaie les upgrades WebSocket automatiquement, sans option particulière ; avec Nginx il faut explicitement `proxy_set_header Upgrade $http_upgrade;` et `proxy_set_header Connection "upgrade";` sur ce bloc.
 
 Exemple Caddy minimal :
 
 ```
 lameteoducyclo.fr/pbp {
-  handle /auth/* {
-    reverse_proxy localhost:3001
-  }
-  handle /brm/* {
+  handle /api/* {
     reverse_proxy localhost:3001
   }
   handle {

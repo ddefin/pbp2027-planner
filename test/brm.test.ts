@@ -44,8 +44,8 @@ function extractCookie(setCookieHeader: string | string[] | undefined): string {
 
 async function registerAndLogin(app: Awaited<ReturnType<typeof buildServer>>, email: string) {
   const password = "mot-de-passe-de-test-123";
-  await app.inject({ method: "POST", url: "/auth/register", payload: { email, password } });
-  const loginRes = await app.inject({ method: "POST", url: "/auth/login", payload: { email, password } });
+  await app.inject({ method: "POST", url: "/api/auth/register", payload: { email, password } });
+  const loginRes = await app.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
   return extractCookie(loginRes.headers["set-cookie"]);
 }
 
@@ -57,20 +57,20 @@ describe("API BRM", () => {
   });
 
   it("refuse l'accès sans session", async () => {
-    const res = await server.inject({ method: "GET", url: "/brm" });
+    const res = await server.inject({ method: "GET", url: "/api/brm" });
     expect(res.statusCode).toBe(401);
   });
 
   it("couvre le cycle de vie complet d'un BRM", async () => {
     const cookie = await registerAndLogin(server, `brm-${Date.now()}@example.com`);
 
-    const empty = await server.inject({ method: "GET", url: "/brm", headers: { cookie } });
+    const empty = await server.inject({ method: "GET", url: "/api/brm", headers: { cookie } });
     expect(empty.statusCode).toBe(200);
     expect(empty.json().events).toEqual([]);
 
     const created = await server.inject({
       method: "POST",
-      url: "/brm",
+      url: "/api/brm",
       headers: { cookie },
       payload: { distance: 200, date: "2027-02-14T06:00:00.000Z", lieu: "Rambouillet" },
     });
@@ -79,12 +79,12 @@ describe("API BRM", () => {
     expect(event.status).toBe("a-venir");
     expect(event.limiteMinutes).toBe(810); // barème officiel 200km = 13h30
 
-    const afterCreate = await server.inject({ method: "GET", url: "/brm", headers: { cookie } });
+    const afterCreate = await server.inject({ method: "GET", url: "/api/brm", headers: { cookie } });
     expect(afterCreate.json().events).toHaveLength(1);
 
     const updated = await server.inject({
       method: "PATCH",
-      url: `/brm/${event.id}`,
+      url: `/api/brm/${event.id}`,
       headers: { cookie },
       payload: { status: "fait", tempsRealiseMinutes: 492 },
     });
@@ -92,10 +92,10 @@ describe("API BRM", () => {
     expect(updated.json().event.status).toBe("fait");
     expect(updated.json().event.tempsRealiseMinutes).toBe(492);
 
-    const deleted = await server.inject({ method: "DELETE", url: `/brm/${event.id}`, headers: { cookie } });
+    const deleted = await server.inject({ method: "DELETE", url: `/api/brm/${event.id}`, headers: { cookie } });
     expect(deleted.statusCode).toBe(204);
 
-    const afterDelete = await server.inject({ method: "GET", url: "/brm", headers: { cookie } });
+    const afterDelete = await server.inject({ method: "GET", url: "/api/brm", headers: { cookie } });
     expect(afterDelete.json().events).toEqual([]);
   });
 
@@ -103,7 +103,7 @@ describe("API BRM", () => {
     const cookie = await registerAndLogin(server, `brm-invalid-${Date.now()}@example.com`);
     const res = await server.inject({
       method: "POST",
-      url: "/brm",
+      url: "/api/brm",
       headers: { cookie },
       payload: { distance: 250, date: "2027-02-14T06:00:00.000Z", lieu: "Rambouillet" },
     });
@@ -116,24 +116,24 @@ describe("API BRM", () => {
 
     const created = await server.inject({
       method: "POST",
-      url: "/brm",
+      url: "/api/brm",
       headers: { cookie: cookieA },
       payload: { distance: 300, date: "2027-03-21T06:00:00.000Z", lieu: "Longny-au-Perche" },
     });
     const eventId = created.json().event.id;
 
-    const listB = await server.inject({ method: "GET", url: "/brm", headers: { cookie: cookieB } });
+    const listB = await server.inject({ method: "GET", url: "/api/brm", headers: { cookie: cookieB } });
     expect(listB.json().events).toEqual([]);
 
     const patchB = await server.inject({
       method: "PATCH",
-      url: `/brm/${eventId}`,
+      url: `/api/brm/${eventId}`,
       headers: { cookie: cookieB },
       payload: { status: "fait" },
     });
     expect(patchB.statusCode).toBe(404);
 
-    const deleteB = await server.inject({ method: "DELETE", url: `/brm/${eventId}`, headers: { cookie: cookieB } });
+    const deleteB = await server.inject({ method: "DELETE", url: `/api/brm/${eventId}`, headers: { cookie: cookieB } });
     expect(deleteB.statusCode).toBe(404);
   });
 });

@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { fetchFranceBrmCatalog } from "../lib/acpCatalog.js";
 import { CATALOG_STATUSES, VALID_DISTANCES } from "../lib/brm.js";
+import { publicName } from "../lib/publicName.js";
 
 // Fenêtre de qualification PBP 2027 demandée : saison précédant le départ.
 const CATALOG_FROM = "2027-01-01";
@@ -11,12 +12,6 @@ const CATALOG_TO = "2027-06-30";
 
 const statusSchema = z.enum(CATALOG_STATUSES);
 const catalogIdSchema = z.string().regex(/^[0-9a-f]{16}$/);
-
-// L'email n'est jamais exposé aux autres utilisateurs : seule la partie avant
-// le "@" sert de nom affiché. Pas encore de vrai pseudo configurable (à ajouter).
-function publicName(email: string): string {
-  return email.split("@")[0];
-}
 
 export async function brmCatalogRoutes(app: FastifyInstance) {
   app.get("/brm/catalog", async (request, reply) => {

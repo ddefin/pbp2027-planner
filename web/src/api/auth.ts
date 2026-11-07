@@ -9,10 +9,12 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(`/api${path}`, {
     ...init,
     credentials: "include",
-    headers: { "content-type": "application/json", ...init?.headers },
+    // Ne force le content-type JSON que si on envoie vraiment un corps : sinon Fastify
+    // rejette la requête ("Body cannot be empty when content-type is set to 'application/json'").
+    headers: init?.body !== undefined ? { "content-type": "application/json", ...init?.headers } : init?.headers,
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
