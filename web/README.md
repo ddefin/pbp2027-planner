@@ -6,14 +6,17 @@ App React (Vite) branchée sur le service d'authentification du dossier parent (
 
 Tout passe par des chemins **relatifs** (`/auth/...`), jamais par une URL absolue vers le backend :
 
-- **En dev**, `vite.config.ts` proxifie `/auth/*` vers `http://localhost:3001`. Le navigateur voit une seule origine (`localhost:5173`), donc pas de CORS et le cookie de session (`SameSite=Strict`) part normalement.
-- **En prod**, le reverse proxy (Caddy/Nginx/Traefik) doit faire la même chose : servir les fichiers statiques de `dist/` ET relayer `/auth/*` vers le service backend, sous le **même domaine**. C'est ce qui permet de garder `SameSite=Strict` sur le cookie plutôt que de devoir l'affaiblir en `SameSite=None` + CORS pour un vrai cross-origin.
+- **En dev**, `vite.config.ts` proxifie `/auth/*` et `/brm/*` vers `http://localhost:3001`. Le navigateur voit une seule origine (`localhost:5173`), donc pas de CORS et le cookie de session (`SameSite=Strict`) part normalement. Toute nouvelle route backend doit être ajoutée aux deux endroits (proxy Vite + reverse proxy prod).
+- **En prod**, le reverse proxy (Caddy/Nginx/Traefik) doit faire la même chose : servir les fichiers statiques de `dist/` ET relayer `/auth/*` et `/brm/*` vers le service backend, sous le **même domaine**. C'est ce qui permet de garder `SameSite=Strict` sur le cookie plutôt que de devoir l'affaiblir en `SameSite=None` + CORS pour un vrai cross-origin.
 
 Exemple Caddy minimal :
 
 ```
 lameteoducyclo.fr/pbp {
   handle /auth/* {
+    reverse_proxy localhost:3001
+  }
+  handle /brm/* {
     reverse_proxy localhost:3001
   }
   handle {

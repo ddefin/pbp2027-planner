@@ -1,9 +1,13 @@
-import { BRM_PLAN, PBP_DATE } from "../lib/brmPlan";
+import type { BrmEvent } from "../api/brm";
+import { PBP_DATE, VALID_DISTANCES } from "../lib/brmMeta";
 import { Countdown } from "./Countdown";
 
-export function DashboardHero() {
-  const done = BRM_PLAN.filter((b) => b.status === "homologue" || b.status === "fait").length;
-  const pct = Math.round((done / BRM_PLAN.length) * 100);
+export function DashboardHero({ events }: { events: BrmEvent[] | null }) {
+  const homologatedDistances = new Set((events ?? []).filter((e) => e.status === "homologue").map((e) => e.distance));
+  const done = homologatedDistances.size;
+  const total = VALID_DISTANCES.length;
+  const pct = Math.round((done / total) * 100);
+
   return (
     <div className="hero">
       <div>
@@ -15,13 +19,13 @@ export function DashboardHero() {
       <div className="quali">
         <div className="label">Qualification BRM</div>
         <div className="quali-pct">
-          {done} / {BRM_PLAN.length}
+          {done} / {total}
         </div>
         <div className="quali-bar">
           <div style={{ width: `${pct}%` }} />
         </div>
         <div className="meta" style={{ margin: 0 }}>
-          {pct}% des brevets requis homologués
+          {pct}% des distances requises homologuées
         </div>
       </div>
     </div>

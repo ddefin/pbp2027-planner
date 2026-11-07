@@ -1,32 +1,6 @@
-// Données de planification en dur pour l'instant — à remplacer par un appel API
-// (GET /brm, GET /sorties) une fois le backend de suivi BRM en place.
-
-export const PBP_DATE = new Date("2027-08-17T05:00:00");
-
-export type BrmStatus = "a-venir" | "inscrit" | "fait" | "homologue";
-
-export interface BrmEntry {
-  dist: 200 | 300 | 400 | 600;
-  date: string;
-  lieu: string;
-  status: BrmStatus;
-  temps: string | null;
-  limite: string;
-}
-
-export const STATUS_LABEL: Record<BrmStatus, string> = {
-  "a-venir": "À venir",
-  inscrit: "Inscrit",
-  fait: "Fait",
-  homologue: "Homologué",
-};
-
-export const BRM_PLAN: BrmEntry[] = [
-  { dist: 200, date: "2027-02-14", lieu: "Rambouillet", status: "homologue", temps: "8h12", limite: "13h30" },
-  { dist: 300, date: "2027-03-21", lieu: "Longny-au-Perche", status: "inscrit", temps: null, limite: "20h00" },
-  { dist: 400, date: "2027-04-18", lieu: "Chartres", status: "a-venir", temps: null, limite: "27h00" },
-  { dist: 600, date: "2027-05-16", lieu: "Gacé", status: "a-venir", temps: null, limite: "40h00" },
-];
+// Données de sorties/chat en dur pour l'instant — à remplacer par un appel API
+// (GET /sorties, WebSocket pour le chat) une fois ce backend en place.
+// Les BRM, elles, viennent déjà de la vraie API : voir web/src/api/brm.ts.
 
 export interface Sortie {
   id: string;

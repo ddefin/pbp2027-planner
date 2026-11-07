@@ -20,6 +20,7 @@ model User {
   sessions             Session[]
   recoveryCodes        RecoveryCode[]
   mfaChallenges        MfaChallenge[]
+  brmEvents            BrmEvent[]
 }
 
 model Session {
@@ -53,4 +54,23 @@ model RecoveryCode {
   codeHash  String
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+}
+
+// Un BRM (Brevet Randonneur Mondial) de qualification pour le PBP.
+// distance en km (200/300/400/600, validé côté application) ; les durées
+// sont stockées en minutes pour éviter l'ambiguïté de parsing de chaînes "Xh YY".
+model BrmEvent {
+  id                  String    @id @default(cuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  distance             Int
+  date                 DateTime
+  lieu                 String
+  status               String    @default("a-venir")
+  limiteMinutes        Int
+  tempsRealiseMinutes  Int?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([userId])
 }
