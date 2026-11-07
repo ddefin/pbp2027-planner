@@ -47,8 +47,12 @@ npm test
 
 Couvre le hachage de mot de passe et la génération/vérification TOTP (dont le round-trip base32 et la tolérance de dérive d'horloge).
 
+## Frontend
+
+Le dossier `web/` contient l'app React (Vite) branchée sur ce service : pages de connexion, inscription, MFA (setup/enable/disable), tableau de bord. Voir `web/README.md` pour le détail (notamment le découpage front/back qui évite le CORS en gardant tout sous le même domaine en prod).
+
 ## Pour la suite
 
 - Passer `DATABASE_URL` sur Postgres en production (le schéma Prisma est compatible sans changement de code).
 - Ajouter l'envoi d'email réel (vérification d'adresse, réinitialisation de mot de passe) — non implémenté ici.
-- Relier ce service au frontend du dashboard PBP 2027 (page de login/MFA, gestion de session côté React).
+- Compléter `web/src/pages/DashboardPage.tsx` avec le compte à rebours, le suivi des BRM et la coordination des sorties (voir le prototype Artifact).
