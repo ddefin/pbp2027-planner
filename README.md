@@ -97,32 +97,44 @@ La livraison ne bloque jamais la requête HTTP qui déclenche l'événement (pas
 
 La récupération automatique ne marche actuellement que pour OpenRunner : `src/lib/openrunner.ts` lit les stats (distance, dénivelé) directement dans le HTML public de la page du parcours — OpenRunner les y intègre côté serveur, sans authentification. **Important** : ça ne passe jamais par une exécution du JS récupéré (pas de `vm`/`eval`), seulement par du découpage de texte qui résout les valeurs dédupliquées par Nuxt via les arguments de l'IIFE. Si OpenRunner change la forme de cette page, cette extraction casse silencieusement (elle renvoie juste `null`, jamais une erreur) et il faut uploader le GPX manuellement — exactement le repli prévu. Le calcul depuis un GPX uploadé (`src/lib/gpx.ts`) est lui indépendant de la source : distance par sommation haversine, D+/D- avec un seuil de bruit de 2m.
 
+### Météo (OpenWeatherMap)
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/brm/:brmEventId/meteo` | Météo actuelle + prévisions (jusqu'à 5 jours) pour la ville du BRM |
+
+Nécessite `OPENWEATHER_API_KEY` (clé gratuite sur [openweathermap.org](https://openweathermap.org/api), endpoints `/data/2.5/weather` et `/data/2.5/forecast`). Sans elle, la route répond `503 not_configured` plutôt que d'empêcher le serveur de démarrer. Résultat caché 15 minutes par ville (`src/lib/openWeather.ts`) pour ne pas cogner l'API à chaque chargement de page. La ville interrogée est `BrmEvent.lieu` tel quel (pas de coordonnées stockées) — fonctionne bien pour une ville française reconnue par OpenWeatherMap, moins précis pour un lieu-dit.
+
+**Cette clé est une variable d'environnement du serveur qui fait tourner le backend, pas un secret GitHub Actions** : un secret GitHub n'est injecté que dans les workflows CI, jamais automatiquement dans le process qui tourne en prod. Pose `OPENWEATHER_API_KEY` directement dans l'environnement d'exécution (fichier `.env` non committé en dev, variable d'environnement de l'hébergeur en prod). Un secret GitHub Actions n'aurait de sens ici que si un pipeline de déploiement existait et écrivait explicitement cette valeur sur le serveur au moment du déploiement — ce n'est pas encore le cas (voir "Pour la suite").
+
 ## Tests
 
 ```bash
 npm test
 ```
 
-39 tests : hachage de mot de passe, TOTP (round-trip base32, tolérance de dérive d'horloge),
+45 tests : hachage de mot de passe, TOTP (round-trip base32, tolérance de dérive d'horloge),
 cycle de vie et isolation des BRM entre utilisateurs, calendrier ACP (mock réseau), sorties
 et chat WebSocket (diffusion temps réel, auth au handshake, persistance), webhooks
 (diffusion de groupe filtrée par événement, isolation par propriétaire, signature HMAC),
-parcours (récupération automatique mockée, upload/téléchargement GPX, isolation).
+parcours (récupération automatique mockée, upload/téléchargement GPX, isolation), météo
+(conversions d'unités, cache par ville, 503 propre sans clé configurée).
 
 ## Frontend
 
 Le dossier `web/` contient l'app React (Vite) branchée sur ce service : connexion/MFA,
 tableau de bord (compte à rebours + suivi BRM), calendrier des BRM officiels, sorties,
-chat temps réel, webhooks et parcours (upload GPX, météo, notes). Voir `web/README.md`
-pour le détail (notamment le découpage front/back qui évite le CORS en gardant tout sous
-le même domaine en prod).
+chat temps réel, webhooks et parcours (upload GPX, météo live + prévisions, notes).
+Voir `web/README.md` pour le détail (notamment le découpage front/back qui évite le
+CORS en gardant tout sous le même domaine en prod).
 
 ## Pour la suite
 
 - Passer `DATABASE_URL` sur Postgres en production (le schéma Prisma est compatible sans changement de code) — pour `Parcours.fileData` (BLOB), vérifier la limite de taille de ligne du moteur choisi si les GPX uploadés sont volumineux.
 - Ajouter l'envoi d'email réel (vérification d'adresse, réinitialisation de mot de passe) — non implémenté ici.
 - Pseudo configurable (actuellement, le nom affiché aux autres utilisateurs est la partie avant le `@` de l'email).
-- Déploiement réel (hébergement, domaine, reverse proxy) — non fait, voir `web/README.md` pour l'architecture prévue.
+- Déploiement réel (hébergement, domaine, reverse proxy, et donc un vrai usage pour un secret GitHub Actions) — non fait, voir `web/README.md` pour l'architecture prévue.
 - Les webhooks n'ont ni file de retry ni historique des livraisons (un seul essai, timeout 5s, dernier statut seulement) — correct pour un petit groupe, à muscler (délais exponentiels, DLQ) si le volume grossit.
+- Météo par nom de ville plutôt que par coordonnées précises du parcours — à affiner si `BrmEvent.lieu` ne correspond pas toujours à une ville reconnue par OpenWeatherMap.
 - Récupération automatique du parcours limitée à OpenRunner pour l'instant ; Komoot/Garmin Connect/Strava nécessiteraient chacun leur propre adaptateur (et souvent une vraie API avec clé, contrairement à OpenRunner).
 - Pas de prévision météo automatique (aucune API branchée) : les champs météo sont à remplir à la main à l'approche de la date.

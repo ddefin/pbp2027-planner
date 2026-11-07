@@ -2,10 +2,29 @@ import { useRef, useState, type FormEvent } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useParcours } from "../hooks/useParcours";
 import { useBrmEvents } from "../hooks/useBrmEvents";
+import { useMeteo } from "../hooks/useMeteo";
 import { parcoursFileDownloadUrl } from "../api/parcours";
 import { formatMinutes } from "../lib/brmMeta";
 
+interface WindOverride {
+  windDirection: string;
+  windSpeedKmh: string;
+  windGustsKmh: string;
+  tempMinC: string;
+  tempMaxC: string;
+}
+
 const WIND_DIRECTIONS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+
+// La météo live donne un point cardinal sur 16 positions (ex. "SSE") ; le select
+// manuel n'en propose que 8 — on arrondit au plus proche pour que la valeur
+// pré-remplie corresponde bien à une option du menu.
+function snapTo8Points(direction16: string): string {
+  const order16 = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+  const idx = order16.indexOf(direction16);
+  if (idx === -1) return "";
+  return WIND_DIRECTIONS[Math.round(idx / 2) % 8];
+}
 
 export function ParcoursPage() {
   const { brmEventId } = useParams<{ brmEventId: string }>();
@@ -13,6 +32,8 @@ export function ParcoursPage() {
   const { parcours, loading, error, save, uploadFile, removeFile } = useParcours(id);
   const brm = useBrmEvents();
   const event = brm.events?.find((e) => e.id === id);
+  const [override, setOverride] = useState<WindOverride | null>(null);
+  const [formKey, setFormKey] = useState(0);
 
   return (
     <div className="wrap-wide">
@@ -38,7 +59,14 @@ export function ParcoursPage() {
           <>
             <SourceSection parcours={parcours ?? null} onSave={save} onUpload={uploadFile} onRemoveFile={removeFile} brmEventId={id} />
             <StatsSection parcours={parcours ?? null} />
-            <WeatherSection parcours={parcours ?? null} onSave={save} />
+            <LiveMeteoSection
+              brmEventId={id}
+              onUse={(o) => {
+                setOverride(o);
+                setFormKey((k) => k + 1);
+              }}
+            />
+            <WeatherSection key={formKey} parcours={parcours ?? null} override={override} onSave={save} />
           </>
         )}
       </section>
@@ -183,18 +211,92 @@ function StatsSection({ parcours }: { parcours: ReturnType<typeof useParcours>["
   );
 }
 
+function LiveMeteoSection({ brmEventId, onUse }: { brmEventId: string; onUse: (o: WindOverride) => void }) {
+  const { weather, status } = useMeteo(brmEventId);
+
+  if (status === "loading") return null; // pas de flash de contenu vide le temps du chargement
+  if (status === "not_configured") return null; // météo live pas activée sur ce serveur — rien à montrer
+  if (status === "unavailable" || status === "error") {
+    return (
+      <div className="panel" style={{ background: "var(--bg)" }}>
+        <p className="hint" style={{ margin: 0 }}>Météo en direct indisponible pour l'instant.</p>
+      </div>
+    );
+  }
+  if (!weather) return null;
+
+  const next24h = weather.forecast.filter((_, i) => i % 2 === 0).slice(0, 6); // ~toutes les 6h sur 36h
+
+  return (
+    <div className="panel" style={{ background: "var(--bg)" }}>
+      <div className="t" style={{ fontWeight: 700, marginBottom: 10 }}>Météo en direct — {weather.city}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", marginBottom: 14 }}>
+        <div className="dist" style={{ fontSize: 28 }}>{weather.current.tempC}°C</div>
+        <div className="hint" style={{ margin: 0 }}>
+          Ressenti {weather.current.feelsLikeC}°C · {weather.current.description}
+          <br />
+          Vent {weather.current.windDirection} {weather.current.windSpeedKmh} km/h
+          {weather.current.windGustsKmh != null && ` · rafales ${weather.current.windGustsKmh} km/h`}
+        </div>
+        <button
+          type="button"
+          className="ghost"
+          onClick={() =>
+            onUse({
+              windDirection: snapTo8Points(weather.current.windDirection),
+              windSpeedKmh: String(weather.current.windSpeedKmh),
+              windGustsKmh: weather.current.windGustsKmh != null ? String(weather.current.windGustsKmh) : "",
+              tempMinC: String(weather.current.tempC),
+              tempMaxC: String(weather.current.tempC),
+            })
+          }
+        >
+          Utiliser ces valeurs
+        </button>
+      </div>
+
+      {next24h.length > 0 && (
+        <div style={{ display: "flex", gap: 10, overflowX: "auto" }}>
+          {next24h.map((slot) => (
+            <div key={slot.at} style={{ flexShrink: 0, minWidth: 90, border: "1px solid var(--line)", borderRadius: 8, padding: "8px 10px", textAlign: "center" }}>
+              <div className="hint" style={{ margin: 0 }}>
+                {new Date(slot.at).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit" })}
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 15, margin: "4px 0" }}>{slot.tempC}°C</div>
+              <div className="hint" style={{ margin: 0, fontSize: 11 }}>
+                {slot.windDirection} {slot.windSpeedKmh} km/h
+              </div>
+              {slot.precipitationProbability > 0.2 && (
+                <div className="hint" style={{ margin: 0, fontSize: 11, color: "var(--accent)" }}>
+                  {Math.round(slot.precipitationProbability * 100)}% pluie
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="hint" style={{ marginTop: 10, marginBottom: 0 }}>
+        Prévisions à 5 jours maximum (limite de l'API) — utile à l'approche du BRM, pas pour une planification à des
+        mois d'avance.
+      </p>
+    </div>
+  );
+}
+
 function WeatherSection({
   parcours,
+  override,
   onSave,
 }: {
   parcours: ReturnType<typeof useParcours>["parcours"];
+  override: WindOverride | null;
   onSave: ReturnType<typeof useParcours>["save"];
 }) {
-  const [windDirection, setWindDirection] = useState(parcours?.windDirection ?? "");
-  const [windSpeedKmh, setWindSpeedKmh] = useState(parcours?.windSpeedKmh?.toString() ?? "");
-  const [windGustsKmh, setWindGustsKmh] = useState(parcours?.windGustsKmh?.toString() ?? "");
-  const [tempMinC, setTempMinC] = useState(parcours?.tempMinC?.toString() ?? "");
-  const [tempMaxC, setTempMaxC] = useState(parcours?.tempMaxC?.toString() ?? "");
+  const [windDirection, setWindDirection] = useState(override?.windDirection ?? parcours?.windDirection ?? "");
+  const [windSpeedKmh, setWindSpeedKmh] = useState(override?.windSpeedKmh ?? parcours?.windSpeedKmh?.toString() ?? "");
+  const [windGustsKmh, setWindGustsKmh] = useState(override?.windGustsKmh ?? parcours?.windGustsKmh?.toString() ?? "");
+  const [tempMinC, setTempMinC] = useState(override?.tempMinC ?? parcours?.tempMinC?.toString() ?? "");
+  const [tempMaxC, setTempMaxC] = useState(override?.tempMaxC ?? parcours?.tempMaxC?.toString() ?? "");
   const [precipitation, setPrecipitation] = useState(parcours?.precipitation ?? "");
   const [notes, setNotes] = useState(parcours?.notes ?? "");
   const [busy, setBusy] = useState(false);
