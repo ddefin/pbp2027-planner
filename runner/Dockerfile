@@ -19,6 +19,13 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
+# Le conteneur tourne en root (nécessaire pour accéder à /var/run/docker.sock du NAS
+# tel que monté, sans jongler avec le GID du groupe docker de l'hôte, qui varie d'un
+# NAS à l'autre). Le runner GitHub refuse par défaut de s'exécuter en root — il faut
+# le lui autoriser explicitement, sinon config.sh/run.sh échouent avec
+# "Must not run with sudo" à chaque lancement.
+ENV RUNNER_ALLOW_RUNASROOT=1
+
 WORKDIR /home/runner
 
 # Version résolue au build plutôt que figée en dur : évite de se retrouver avec un
