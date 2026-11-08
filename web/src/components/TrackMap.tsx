@@ -11,10 +11,11 @@ import { bearing } from "../lib/gpxAnalysis";
 const TRACK_COLOR = "#ff3b30";
 const TRACK_CASING = "#ffffff";
 
-// Un repère tous les 10km, et une flèche de sens tous les ~12 échantillons (assez
-// pour voir le sens du parcours sans surcharger la carte — "discret" comme demandé).
+// Un repère et une flèche de sens tous les 10km (en distance réelle, pas un nombre
+// fixe d'échantillons — sinon un trajet court très échantillonné se retrouve avec
+// une flèche tous les kilomètres, illisible en zigzag continu).
 const KM_MARK_INTERVAL = 10;
-const ARROW_SAMPLE_STRIDE = 12;
+const ARROW_INTERVAL_KM = 10;
 
 function kmMarkerIcon(label: string): L.DivIcon {
   return L.divIcon({
@@ -90,16 +91,16 @@ export function TrackMap({ points, highlight }: { points: TrackPoint[]; highligh
     L.polyline(latLngs, { color: TRACK_CASING, weight: 7, opacity: 0.9 }).addTo(map);
     const polyline = L.polyline(latLngs, { color: TRACK_COLOR, weight: 4 }).addTo(map);
 
-    // Flèches de sens du parcours.
-    for (let i = 0; i < points.length - 1; i += ARROW_SAMPLE_STRIDE) {
-      const a = points[i];
-      const b = points[Math.min(i + 1, points.length - 1)];
-      L.marker([a.lat, a.lon], { icon: arrowIcon(bearing(a, b)), interactive: false }).addTo(map);
-    }
-
-    // Repères tous les 10km.
+    // Flèches de sens et repères kilométriques, tous les deux espacés par distance
+    // réelle (pas par index d'échantillon).
+    let nextArrow = 0;
     let nextMark = KM_MARK_INTERVAL;
-    for (const p of points) {
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      if (p.distKm >= nextArrow && i < points.length - 1) {
+        L.marker([p.lat, p.lon], { icon: arrowIcon(bearing(p, points[i + 1])), interactive: false }).addTo(map);
+        nextArrow += ARROW_INTERVAL_KM;
+      }
       if (p.distKm >= nextMark) {
         L.marker([p.lat, p.lon], { icon: kmMarkerIcon(`${nextMark} km`), interactive: false }).addTo(map);
         nextMark += KM_MARK_INTERVAL;
