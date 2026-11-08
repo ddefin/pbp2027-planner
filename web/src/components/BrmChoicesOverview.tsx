@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
+import { useCatalogMeteo } from "../hooks/useCatalogMeteo";
+import { WeatherPanel } from "./WeatherPanel";
 import { CATALOG_STATUS_LABEL, daysUntil } from "../lib/brmMeta";
 
 // Vue collective des BRM choisis par les randonneurs sur le calendrier (plutôt
@@ -66,6 +69,8 @@ export function BrmChoicesOverview() {
                   </div>
                 )}
 
+                <MeteoToggle catalogEventId={e.id} />
+
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                   {e.participants.map((p, i) => (
                     <span key={i} className="hint" style={{ margin: 0 }}>
@@ -79,5 +84,25 @@ export function BrmChoicesOverview() {
         </div>
       )}
     </section>
+  );
+}
+
+// Chargée seulement au clic : éviter un appel météo par BRM affiché à chaque visite
+// du tableau de bord (quota limité côté OpenWeatherMap).
+function MeteoToggle({ catalogEventId }: { catalogEventId: string }) {
+  const [open, setOpen] = useState(false);
+  const { weather, status } = useCatalogMeteo(open ? catalogEventId : null);
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button type="button" className="ghost" onClick={() => setOpen((v) => !v)} style={{ padding: "4px 10px", fontSize: 11.5 }}>
+        {open ? "Masquer la météo" : "Voir la météo"}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <WeatherPanel status={status} weather={weather} />
+        </div>
+      )}
+    </div>
   );
 }

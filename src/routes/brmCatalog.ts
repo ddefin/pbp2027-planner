@@ -6,6 +6,8 @@ import { fetchFranceBrmCatalog } from "../lib/acpCatalog.js";
 import { CATALOG_STATUSES, VALID_DISTANCES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
 import { triggerWebhooks } from "../lib/webhooks.js";
+import { fetchCityWeather } from "../lib/openWeather.js";
+import { config } from "../config.js";
 
 // Fenêtre de qualification PBP 2027 demandée : saison précédant le départ.
 const CATALOG_FROM = "2027-01-01";
@@ -98,5 +100,33 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
 
     await prisma.brmParticipation.deleteMany({ where: { userId: user.id, catalogEventId: id } });
     return reply.code(204).send();
+  });
+
+  // Météo pour un BRM du calendrier ACP : basée sur la ville de l'événement (déjà
+  // fournie par l'ACP), pas sur un tracé GPX — même mécanisme que la météo "Parcours"
+  // d'un BRM saisi manuellement (voir src/routes/meteo.ts), juste une source d'id
+  // différente puisque ces événements ne sont pas stockés en base.
+  app.get("/brm/catalog/:id/meteo", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!config.openWeatherApiKey) return reply.code(503).send({ error: "not_configured" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    let events;
+    try {
+      events = await fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: VALID_DISTANCES });
+    } catch {
+      return reply.code(502).send({ error: "catalog_unavailable" });
+    }
+
+    const match = events.find((e) => e.id === id);
+    if (!match) return reply.code(404).send({ error: "not_found" });
+
+    const weather = await fetchCityWeather(match.ville);
+    if (!weather) return reply.code(502).send({ error: "meteo_unavailable" });
+
+    return reply.send({ weather });
   });
 }

@@ -37,3 +37,7 @@ async function request<T>(path: string): Promise<T> {
 export function getMeteo(brmEventId: string) {
   return request<{ weather: CityWeather }>(`/brm/${brmEventId}/meteo`).then((r) => r.weather);
 }
+
+export function getCatalogMeteo(catalogEventId: string) {
+  return request<{ weather: CityWeather }>(`/brm/catalog/${catalogEventId}/meteo`).then((r) => r.weather);
+}

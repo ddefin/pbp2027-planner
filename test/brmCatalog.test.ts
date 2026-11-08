@@ -52,11 +52,24 @@ const FAKE_ACP_RESPONSE = [
   { Date: "05/04/2027", Distance: 1000, Pays: "France", SiteWeb: "", Ville: "Paris", Departement: "", Region: "", RoadMap: "", Denivele: 0, Contact: "", NomClub: "Club 1000" },
 ];
 
+const FAKE_CURRENT = {
+  name: "Rambouillet",
+  main: { temp: 8.9, feels_like: 7.2, humidity: 90 },
+  wind: { speed: 5.5, deg: 225, gust: 9.2 },
+  weather: [{ description: "couvert" }],
+  dt: 1700000000,
+};
+
+const FAKE_FORECAST = {
+  list: [{ dt: 1700003600, main: { temp: 7.1 }, wind: { speed: 4.1, deg: 180 }, weather: [{ description: "nuageux" }], pop: 0.2 }],
+};
+
 beforeAll(async () => {
   cleanupDbFiles();
   process.env.DATABASE_URL = `file:${dbPath}`;
   process.env.MFA_ENCRYPTION_KEY = "22".repeat(32);
   process.env.COOKIE_SECURE = "false";
+  process.env.OPENWEATHER_API_KEY = "test-key";
   execSync("npx prisma migrate deploy", { cwd: repoRoot, stdio: "pipe" });
 
   ({ buildServer } = await import("../src/server.js"));
@@ -91,7 +104,11 @@ describe("API catalogue BRM (ACP)", () => {
   beforeEach(() => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify(FAKE_ACP_RESPONSE), { status: 200 })),
+      vi.fn(async (url: string) => {
+        if (url.includes("/forecast")) return new Response(JSON.stringify(FAKE_FORECAST), { status: 200 });
+        if (url.includes("openweathermap")) return new Response(JSON.stringify(FAKE_CURRENT), { status: 200 });
+        return new Response(JSON.stringify(FAKE_ACP_RESPONSE), { status: 200 });
+      }),
     );
   });
 
@@ -179,5 +196,21 @@ describe("API catalogue BRM (ACP)", () => {
       payload: { status: "pas-un-statut" },
     });
     expect(res.statusCode).toBe(400);
+  });
+
+  it("renvoie la météo d'un BRM du calendrier, basée sur sa ville", async () => {
+    const cookie = await registerAndLogin(server, `catalog-meteo-${Date.now()}@example.com`);
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } });
+    const eventId = listRes.json().events.find((e: { ville: string }) => e.ville === "Rambouillet").id;
+
+    const res = await server.inject({ method: "GET", url: `/api/brm/catalog/${eventId}/meteo`, headers: { cookie } });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().weather.city).toBe("Rambouillet");
+  });
+
+  it("renvoie 404 pour une météo demandée sur un id de catalogue inconnu", async () => {
+    const cookie = await registerAndLogin(server, `catalog-meteo-404-${Date.now()}@example.com`);
+    const res = await server.inject({ method: "GET", url: `/api/brm/catalog/${"0".repeat(16)}/meteo`, headers: { cookie } });
+    expect(res.statusCode).toBe(404);
   });
 });
