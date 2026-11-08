@@ -67,7 +67,7 @@ export function SortiesPanel() {
             ))}
           </div>
 
-          {current && <ChatPanel key={current.id} sortieId={current.id} titre={current.titre} joined={current.joined} onToggleJoin={() => toggleJoin(current.id, current.joined)} myEmail={user?.email} />}
+          {current && <ChatPanel key={current.id} sortieId={current.id} titre={current.titre} joined={current.joined} onToggleJoin={() => toggleJoin(current.id, current.joined)} myName={user?.prenom} />}
         </div>
       )}
     </section>
@@ -122,18 +122,17 @@ function ChatPanel({
   titre,
   joined,
   onToggleJoin,
-  myEmail,
+  myName,
 }: {
   sortieId: string;
   titre: string;
   joined: boolean;
   onToggleJoin: () => void;
-  myEmail: string | undefined;
+  myName: string | undefined;
 }) {
   const { messages, status, send } = useChat(sortieId);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  const myName = myEmail?.split("@")[0];
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

@@ -1,29 +1,26 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { BrmDistance, BrmEvent, BrmStatus } from "../api/brm";
+import type { BrmEvent, BrmStatus } from "../api/brm";
 import type { useBrmEvents } from "../hooks/useBrmEvents";
-import { STATUS_LABEL, STATUS_OPTIONS, VALID_DISTANCES, formatMinutes } from "../lib/brmMeta";
+import { STATUS_LABEL, STATUS_OPTIONS, formatMinutes } from "../lib/brmMeta";
 
+// La saisie manuelle (création) a été retirée : les BRM suivis ici viennent
+// désormais des choix faits sur le calendrier (voir BrmChoicesOverview). Cette
+// liste reste affichée pour les BRM déjà enregistrés par ce biais auparavant,
+// avec leur suivi GPX/temps (voir ParcoursPage), le temps que cette fonctionnalité
+// soit éventuellement reliée au calendrier.
 export function BrmTracker({ brm }: { brm: ReturnType<typeof useBrmEvents> }) {
-  const { events, loading, error, create, update, remove } = brm;
-  const [showForm, setShowForm] = useState(false);
+  const { events, loading, error, update, remove } = brm;
+
+  if (!loading && (!events || events.length === 0)) return null;
 
   return (
     <section className="panel">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h2 style={{ marginBottom: 0 }}>Suivi des BRM de qualification</h2>
-        <button type="button" className="ghost" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Annuler" : "Ajouter un BRM"}
-        </button>
-      </div>
+      <h2 style={{ marginBottom: 16 }}>Suivi GPX / temps réalisé</h2>
 
       {error && <div className="error-banner">{error}</div>}
-      {showForm && <BrmForm onSubmit={async (input) => { await create(input); setShowForm(false); }} />}
 
       {loading && <p className="hint">Chargement…</p>}
-      {!loading && events && events.length === 0 && !showForm && (
-        <p className="hint">Aucun BRM enregistré pour l'instant. Ajoute ta première inscription.</p>
-      )}
 
       {!loading && events && events.length > 0 && (
         <div className="brm-grid">
@@ -33,66 +30,6 @@ export function BrmTracker({ brm }: { brm: ReturnType<typeof useBrmEvents> }) {
         </div>
       )}
     </section>
-  );
-}
-
-function BrmForm({ onSubmit }: { onSubmit: (input: { distance: BrmDistance; date: string; lieu: string }) => Promise<void> }) {
-  const [distance, setDistance] = useState<BrmDistance>(200);
-  const [date, setDate] = useState("");
-  const [lieu, setLieu] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    if (!date || !lieu.trim()) return;
-    setBusy(true);
-    try {
-      await onSubmit({ distance, date: new Date(date).toISOString(), lieu: lieu.trim() });
-      setDate("");
-      setLieu("");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="panel" style={{ background: "var(--bg)", marginBottom: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="brm-distance">Distance</label>
-          <select
-            id="brm-distance"
-            value={distance}
-            onChange={(e) => setDistance(Number(e.target.value) as BrmDistance)}
-            style={{
-              background: "var(--panel)",
-              border: "1px solid var(--line)",
-              borderRadius: 8,
-              padding: "10px 12px",
-              color: "var(--fg)",
-              fontFamily: "inherit",
-            }}
-          >
-            {VALID_DISTANCES.map((d) => (
-              <option key={d} value={d}>
-                {d} km
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="brm-date">Date</label>
-          <input id="brm-date" type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-        </div>
-        <div className="field" style={{ marginBottom: 0 }}>
-          <label htmlFor="brm-lieu">Lieu</label>
-          <input id="brm-lieu" type="text" required value={lieu} onChange={(e) => setLieu(e.target.value)} placeholder="Rambouillet" />
-        </div>
-      </div>
-      <button className="primary" type="submit" disabled={busy} style={{ marginTop: 14, width: "auto", padding: "10px 20px" }}>
-        {busy ? "Ajout…" : "Ajouter"}
-      </button>
-    </form>
   );
 }
 

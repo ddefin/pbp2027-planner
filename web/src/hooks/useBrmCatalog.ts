@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { clearParticipation, listCatalog, setParticipation, type CatalogEvent } from "../api/brmCatalog";
 import { useAuth } from "../context/AuthContext";
 
-function publicNameOf(email: string | undefined): string {
-  return email?.split("@")[0] ?? "Moi";
+function publicNameOf(prenom: string | undefined): string {
+  return prenom ?? "Moi";
 }
 
 export function useBrmCatalog() {
@@ -31,8 +31,8 @@ export function useBrmCatalog() {
       setEvents((prev) =>
         (prev ?? []).map((e) => {
           if (e.id !== id) return e;
-          const others = e.participants.filter((p) => p.displayName !== publicNameOf(user?.email));
-          return { ...e, myStatus: status, participants: [...others, { displayName: publicNameOf(user?.email), status }] };
+          const others = e.participants.filter((p) => p.displayName !== publicNameOf(user?.prenom));
+          return { ...e, myStatus: status, participants: [...others, { displayName: publicNameOf(user?.prenom), status }] };
         }),
       );
       try {
@@ -49,7 +49,7 @@ export function useBrmCatalog() {
       setEvents((prev) =>
         (prev ?? []).map((e) =>
           e.id === id
-            ? { ...e, myStatus: null, participants: e.participants.filter((p) => p.displayName !== publicNameOf(user?.email)) }
+            ? { ...e, myStatus: null, participants: e.participants.filter((p) => p.displayName !== publicNameOf(user?.prenom)) }
             : e,
         ),
       );

@@ -15,8 +15,9 @@ const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
 
 const emailSchema = z.string().email().max(254).toLowerCase();
 const passwordSchema = z.string().min(10).max(256);
+const prenomSchema = z.string().trim().min(1).max(60);
 
-const registerSchema = z.object({ email: emailSchema, password: passwordSchema });
+const registerSchema = z.object({ email: emailSchema, password: passwordSchema, prenom: prenomSchema });
 const loginSchema = z.object({ email: emailSchema, password: passwordSchema });
 const mfaVerifySchema = z.object({ challengeToken: z.string().min(1), code: z.string().min(6).max(16) });
 const mfaEnableSchema = z.object({ code: z.string().length(6) });
@@ -25,7 +26,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/register", async (request, reply) => {
     const parsed = registerSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
-    const { email, password } = parsed.data;
+    const { email, password, prenom } = parsed.data;
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -34,7 +35,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const passwordHash = await hashPassword(password);
-    await prisma.user.create({ data: { email, passwordHash } });
+    await prisma.user.create({ data: { email, prenom, passwordHash } });
     return reply.code(202).send({ status: "check_email_if_new" });
   });
 
@@ -175,7 +176,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.get("/auth/session", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
-    return reply.send({ email: user.email, mfaEnabled: user.mfaEnabled });
+    return reply.send({ email: user.email, prenom: user.prenom, mfaEnabled: user.mfaEnabled });
   });
 
   app.post("/auth/logout", async (request, reply) => {

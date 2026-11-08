@@ -42,9 +42,10 @@ function extractCookie(setCookieHeader: string | string[] | undefined): string {
 
 async function registerAndLogin(server: ReturnType<typeof buildServer>, email: string) {
   const password = "mot-de-passe-de-test-123";
-  await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password } });
+  const prenom = email.split("@")[0];
+  await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password, prenom } });
   const loginRes = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
-  return { cookie: extractCookie(loginRes.headers["set-cookie"]), publicName: email.split("@")[0] };
+  return { cookie: extractCookie(loginRes.headers["set-cookie"]), publicName: prenom };
 }
 
 describe("API Sorties", () => {

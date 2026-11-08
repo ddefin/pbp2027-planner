@@ -43,7 +43,7 @@ function extractCookie(setCookieHeader: string | string[] | undefined): string {
 
 async function registerAndLogin(server: ReturnType<typeof buildServer>, email: string) {
   const password = "mot-de-passe-de-test-123";
-  await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password } });
+  await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password, prenom: "Test" } });
   const loginRes = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
   return extractCookie(loginRes.headers["set-cookie"]);
 }

@@ -4,6 +4,7 @@ import { register } from "../api/auth";
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const [prenom, setPrenom] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
@@ -13,7 +14,7 @@ export function RegisterPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      await register(email, password);
+      await register(email, password, prenom.trim());
       setDone(true);
     } finally {
       setBusy(false);
@@ -42,6 +43,17 @@ export function RegisterPage() {
         </div>
         <form onSubmit={handleSubmit}>
           <h1>Créer un compte</h1>
+          <div className="field">
+            <label htmlFor="prenom">Prénom</label>
+            <input
+              id="prenom"
+              type="text"
+              required
+              maxLength={60}
+              value={prenom}
+              onChange={(e) => setPrenom(e.target.value)}
+            />
+          </div>
           <div className="field">
             <label htmlFor="email">Email</label>
             <input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />

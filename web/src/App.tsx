@@ -11,7 +11,7 @@ import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 
 function ProtectedLayout({ children }: { children: ReactNode }) {
-  const { status, logout } = useAuth();
+  const { status, user, logout } = useAuth();
   const navigate = useNavigate();
 
   if (status === "loading") return null;
@@ -29,6 +29,7 @@ function ProtectedLayout({ children }: { children: ReactNode }) {
           <Link to="/sorties">Sorties</Link>
           <Link to="/securite">Sécurité</Link>
           <Link to="/webhooks">Webhooks</Link>
+          {user && <span className="hint">Bonjour, {user.prenom}</span>}
           <button
             className="ghost"
             onClick={async () => {

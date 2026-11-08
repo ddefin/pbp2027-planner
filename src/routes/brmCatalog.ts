@@ -30,14 +30,14 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
     const participations = ids.length
       ? await prisma.brmParticipation.findMany({
           where: { catalogEventId: { in: ids } },
-          include: { user: { select: { email: true } } },
+          include: { user: { select: { prenom: true } } },
         })
       : [];
 
     const byEvent = new Map<string, { displayName: string; status: string; mine: boolean }[]>();
     for (const p of participations) {
       const list = byEvent.get(p.catalogEventId) ?? [];
-      list.push({ displayName: publicName(p.user.email), status: p.status, mine: p.userId === user.id });
+      list.push({ displayName: publicName(p.user), status: p.status, mine: p.userId === user.id });
       byEvent.set(p.catalogEventId, list);
     }
 
@@ -77,7 +77,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
         const match = events.find((e) => e.id === id);
         if (!match) return;
         return triggerWebhooks("brm.participation_changed", {
-          who: publicName(user.email),
+          who: publicName(user),
           status: participation.status,
           distance: match.distance,
           ville: match.ville,

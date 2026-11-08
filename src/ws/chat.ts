@@ -78,7 +78,7 @@ export async function chatWsRoutes(app: FastifyInstance) {
         broadcast(sortieId, {
           type: "message",
           id: message.id,
-          who: publicName(user.email),
+          who: publicName(user),
           text: message.text,
           createdAt: message.createdAt.toISOString(),
         });

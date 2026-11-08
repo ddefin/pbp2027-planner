@@ -25,15 +25,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface SessionInfo {
   email: string;
+  prenom: string;
   mfaEnabled: boolean;
 }
 
 export type LoginResult = { status: "authenticated" } | { status: "mfa_required"; challengeToken: string };
 
-export function register(email: string, password: string) {
+export function register(email: string, password: string, prenom: string) {
   return request<{ status: string }>("/auth/register", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, prenom }),
   });
 }
 

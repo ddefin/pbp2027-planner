@@ -49,7 +49,7 @@ describe("API Météo sans clé configurée", () => {
     const server = buildServer();
     const password = "mot-de-passe-de-test-123";
     const email = `mt-noconf-${Date.now()}@example.com`;
-    await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password } });
+    await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password, prenom: "Test" } });
     const loginRes = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
     const cookie = extractCookie(loginRes.headers["set-cookie"]);
 

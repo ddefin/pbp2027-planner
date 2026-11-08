@@ -16,8 +16,8 @@ type SortieWithRelations = {
   titre: string;
   date: Date;
   lieu: string;
-  createdBy: { email: string };
-  participants: { userId: string; user: { email: string } }[];
+  createdBy: { prenom: string };
+  participants: { userId: string; user: { prenom: string } }[];
 };
 
 function serialize(sortie: SortieWithRelations, currentUserId: string) {
@@ -26,15 +26,15 @@ function serialize(sortie: SortieWithRelations, currentUserId: string) {
     titre: sortie.titre,
     date: sortie.date.toISOString(),
     lieu: sortie.lieu,
-    createdBy: publicName(sortie.createdBy.email),
-    participants: sortie.participants.map((p) => publicName(p.user.email)),
+    createdBy: publicName(sortie.createdBy),
+    participants: sortie.participants.map((p) => publicName(p.user)),
     joined: sortie.participants.some((p) => p.userId === currentUserId),
   };
 }
 
 const includeRelations = {
-  createdBy: { select: { email: true } },
-  participants: { include: { user: { select: { email: true } } } },
+  createdBy: { select: { prenom: true } },
+  participants: { include: { user: { select: { prenom: true } } } },
 } as const;
 
 export async function sortiesRoutes(app: FastifyInstance) {
@@ -69,7 +69,7 @@ export async function sortiesRoutes(app: FastifyInstance) {
       titre: sortie.titre,
       date: sortie.date.toISOString(),
       lieu: sortie.lieu,
-      createdBy: publicName(user.email),
+      createdBy: publicName(user),
     });
 
     return reply.code(201).send({ sortie: serialize(sortie, user.id) });
@@ -89,7 +89,7 @@ export async function sortiesRoutes(app: FastifyInstance) {
       update: {},
     });
 
-    void triggerWebhooks("sortie.participant_joined", { titre: sortie.titre, who: publicName(user.email) });
+    void triggerWebhooks("sortie.participant_joined", { titre: sortie.titre, who: publicName(user) });
 
     return reply.send({ status: "joined" });
   });
@@ -115,12 +115,12 @@ export async function sortiesRoutes(app: FastifyInstance) {
       where: { sortieId: id },
       orderBy: { createdAt: "asc" },
       take: 200,
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { prenom: true } } },
     });
     return reply.send({
       messages: messages.map((m) => ({
         id: m.id,
-        who: publicName(m.user.email),
+        who: publicName(m.user),
         text: m.text,
         createdAt: m.createdAt.toISOString(),
       })),
