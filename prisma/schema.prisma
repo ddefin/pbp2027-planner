@@ -188,11 +188,20 @@ model WebhookSubscription {
 // Salon général : un seul fil, visible par tous les randonneurs connectés
 // (pas de notion de membres, contrairement au chat d'une Sortie).
 model GroupMessage {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  text      String
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text         String
+  // "text" | "location" | "file" — lat/lon renseignés seulement pour "location",
+  // fileName/fileMimeType/fileData seulement pour "file" (contenu stocké tel quel,
+  // comme les GPX de Parcours/CatalogTrack — pas de stockage externe pour l'instant).
+  kind         String   @default("text")
+  lat          Float?
+  lon          Float?
+  fileName     String?
+  fileMimeType String?
+  fileData     Bytes?
+  createdAt    DateTime @default(now())
 
   @@index([createdAt])
 }
@@ -201,14 +210,20 @@ model GroupMessage {
 // lus dans la liste des conversations (jamais renvoyé comme preuve de lecture
 // à l'expéditeur pour l'instant, juste utilisé côté destinataire).
 model DirectMessage {
-  id          String    @id @default(cuid())
-  senderId    String
-  sender      User      @relation("DmSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipientId String
-  recipient   User      @relation("DmRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
-  text        String
-  createdAt   DateTime  @default(now())
-  readAt      DateTime?
+  id           String    @id @default(cuid())
+  senderId     String
+  sender       User      @relation("DmSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId  String
+  recipient    User      @relation("DmRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  text         String
+  kind         String    @default("text")
+  lat          Float?
+  lon          Float?
+  fileName     String?
+  fileMimeType String?
+  fileData     Bytes?
+  createdAt    DateTime  @default(now())
+  readAt       DateTime?
 
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, senderId, createdAt])

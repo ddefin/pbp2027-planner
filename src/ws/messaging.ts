@@ -10,7 +10,10 @@ type DmRequest = FastifyRequest & { pbpUser?: Awaited<ReturnType<typeof getSessi
 // une seule instance du serveur, pas de pub/sub partagé nécessaire ici.
 const rooms = new Map<string, Set<WebSocket>>();
 
-function broadcast(roomKey: string, payload: unknown) {
+// Exporté : les routes REST (upload de pièce jointe, partage de position,
+// suppression — src/routes/messaging.ts) doivent aussi pousser leurs événements aux
+// sockets déjà connectés, pas seulement les messages texte envoyés en direct via WS.
+export function broadcast(roomKey: string, payload: unknown) {
   const sockets = rooms.get(roomKey);
   if (!sockets) return;
   const data = JSON.stringify(payload);
@@ -35,12 +38,12 @@ function join(roomKey: string, socket: WebSocket): Set<WebSocket> {
 
 // Clé stable pour la room d'une conversation privée : indépendante de qui des deux
 // se connecte en premier, pour que A→B et B→A rejoignent la même room.
-function dmRoomKey(a: string, b: string): string {
+export function dmRoomKey(a: string, b: string): string {
   return ["dm", ...[a, b].sort()].join(":");
 }
 
 const MAX_MESSAGE_LENGTH = 2000;
-const GENERAL_ROOM_KEY = "general";
+export const GENERAL_ROOM_KEY = "general";
 
 export async function messagingWsRoutes(app: FastifyInstance) {
   // Salon général : accessible à tout utilisateur connecté, pas de vérification
@@ -80,7 +83,9 @@ export async function messagingWsRoutes(app: FastifyInstance) {
           type: "message",
           id: message.id,
           who: publicName(user),
+          fromUserId: user.id,
           text: message.text,
+          kind: "text",
           createdAt: message.createdAt.toISOString(),
         });
       });
@@ -143,6 +148,7 @@ export async function messagingWsRoutes(app: FastifyInstance) {
           fromUserId: user.id,
           who: publicName(user),
           text: message.text,
+          kind: "text",
           createdAt: message.createdAt.toISOString(),
         });
       });

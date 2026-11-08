@@ -457,9 +457,40 @@ button.link {
   grid-template-columns: 1fr 1.3fr;
   gap: 18px;
 }
+.mobile-back {
+  display: none;
+}
 @media (max-width: 700px) {
   .sorties-grid {
     grid-template-columns: 1fr;
+  }
+  /* En dessous de 700px, une seule colonne à la fois (liste des conversations OU
+     fil actif), pas les deux empilées — sinon il faut faire défiler toute la liste
+     pour atteindre le chat. .has-active (posé quand une conversation est ouverte)
+     bascule vers le fil, avec un bouton retour pour revenir à la liste. */
+  .sorties-grid.has-active .sortie-list {
+    display: none;
+  }
+  .sorties-grid:not(.has-active) .chat-wrap {
+    display: none;
+  }
+  .sorties-grid.has-active .chat {
+    height: calc(100vh - 260px);
+    min-height: 320px;
+  }
+  .mobile-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--fg);
+    font-size: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
   }
 }
 
@@ -558,6 +589,9 @@ button.link {
   font-weight: 700;
   color: var(--accent);
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .msg .bubble {
   background: var(--bg);
@@ -565,6 +599,7 @@ button.link {
   border-radius: 10px;
   padding: 8px 11px;
   word-wrap: break-word;
+  position: relative;
 }
 .msg.me {
   align-self: flex-end;
@@ -576,6 +611,24 @@ button.link {
 }
 .msg.me .who {
   text-align: right;
+  justify-content: flex-end;
+}
+
+/* Bouton "×" de suppression : discret, visible seulement sur ses propres messages
+   (voir MessagesPanel.tsx), toujours accessible plutôt qu'au survol seul — un survol
+   n'existe pas sur mobile, qui est justement le cas d'usage visé ici. */
+.msg-delete {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.msg-delete:hover {
+  opacity: 1;
 }
 .chat-input {
   display: flex;
@@ -598,7 +651,28 @@ button.link {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
-.chat-input button {
+/* Boutons pièce jointe / position : .chat-input button (ci-dessous) a la même
+   spécificité que button.ghost et le suivrait dans l'ordre du fichier — une classe
+   dédiée évite ce conflit plutôt que de dépendre de l'ordre des règles. */
+.chat-icon-btn {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--fg-muted);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 15px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.chat-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.chat-icon-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chat-input button:not(.chat-icon-btn) {
   background: var(--accent);
   color: var(--accent-fg);
   border: none;

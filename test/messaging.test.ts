@@ -10,6 +10,9 @@ const dbPath = path.resolve(repoRoot, "prisma/test-messaging.db");
 
 let buildServer: typeof import("../src/server.js").buildServer;
 let prisma: typeof import("../src/db.js").prisma;
+let generateOpaqueToken: typeof import("../src/lib/tokens.js").generateOpaqueToken;
+let hashToken: typeof import("../src/lib/tokens.js").hashToken;
+let SESSION_COOKIE: typeof import("../src/lib/session.js").SESSION_COOKIE;
 
 function cleanupDbFiles() {
   for (const suffix of ["", "-journal", "-wal", "-shm"]) {
@@ -27,6 +30,8 @@ beforeAll(async () => {
 
   ({ buildServer } = await import("../src/server.js"));
   ({ prisma } = await import("../src/db.js"));
+  ({ generateOpaqueToken, hashToken } = await import("../src/lib/tokens.js"));
+  ({ SESSION_COOKIE } = await import("../src/lib/session.js"));
 });
 
 afterAll(async () => {
@@ -40,12 +45,29 @@ function extractCookie(setCookieHeader: string | string[] | undefined): string {
   return raw.split(";")[0];
 }
 
+function buildMultipartBody(fieldName: string, filename: string, contentType: string, content: Buffer) {
+  const boundary = "----testBoundary" + Date.now();
+  const pre = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+  );
+  const post = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return { body: Buffer.concat([pre, content, post]), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
+// Session créée directement en base plutôt que via /api/auth/login : cette suite
+// enregistre largement plus de comptes que le rate limit de /auth/login n'autorise
+// par IP sur la durée du test (voir src/lib/rateLimit.ts) — passer par la route
+// ferait échouer les derniers tests du fichier.
 async function registerAndLogin(server: ReturnType<typeof buildServer>, email: string) {
   const password = "mot-de-passe-de-test-123";
   const prenom = email.split("@")[0];
   await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password, prenom } });
-  const loginRes = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
-  return { cookie: extractCookie(loginRes.headers["set-cookie"]), publicName: prenom };
+  const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+  const token = generateOpaqueToken();
+  await prisma.session.create({
+    data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 60 * 60 * 1000) },
+  });
+  return { cookie: `${SESSION_COOKIE}=${token}`, publicName: prenom };
 }
 
 describe("messagerie", () => {
@@ -161,5 +183,87 @@ describe("messagerie", () => {
     const self = await prisma.user.findFirst({ where: { email: { contains: `dm-self-` } }, orderBy: { createdAt: "desc" } });
 
     await expect(server.injectWS(`/api/messaging/dm/${self!.id}/chat`, { headers: { cookie: a.cookie } })).rejects.toThrow();
+  });
+
+  it("partage une position dans le salon général, visible par tous", async () => {
+    const a = await registerAndLogin(server, `loc-a-${Date.now()}@example.com`);
+    const b = await registerAndLogin(server, `loc-b-${Date.now()}@example.com`);
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/messaging/general/location",
+      headers: { cookie: a.cookie },
+      payload: { lat: 48.8566, lon: 2.3522 },
+    });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().message.kind).toBe("location");
+
+    const history = await server.inject({ method: "GET", url: "/api/messaging/general/messages", headers: { cookie: b.cookie } });
+    const loc = history.json().messages.find((m: { kind: string }) => m.kind === "location");
+    expect(loc.lat).toBe(48.8566);
+    expect(loc.lon).toBe(2.3522);
+  });
+
+  it("upload une pièce jointe dans le salon général, téléchargeable ensuite", async () => {
+    const a = await registerAndLogin(server, `file-a-${Date.now()}@example.com`);
+
+    const multipart = buildMultipartBody("file", "photo.jpg", "image/jpeg", Buffer.from("fake-jpeg-bytes"));
+    const uploadRes = await server.inject({
+      method: "POST",
+      url: "/api/messaging/general/files",
+      headers: { cookie: a.cookie, "content-type": multipart.contentType },
+      payload: multipart.body,
+    });
+    expect(uploadRes.statusCode).toBe(201);
+    const message = uploadRes.json().message;
+    expect(message.kind).toBe("file");
+    expect(message.fileName).toBe("photo.jpg");
+
+    const downloadRes = await server.inject({ method: "GET", url: `/api/messaging/general/files/${message.id}`, headers: { cookie: a.cookie } });
+    expect(downloadRes.statusCode).toBe(200);
+    expect(downloadRes.body).toBe("fake-jpeg-bytes");
+  });
+
+  it("supprime son propre message du salon général, mais pas celui d'un autre", async () => {
+    const a = await registerAndLogin(server, `del-a-${Date.now()}@example.com`);
+    const b = await registerAndLogin(server, `del-b-${Date.now()}@example.com`);
+
+    const res = await server.inject({
+      method: "POST",
+      url: "/api/messaging/general/location",
+      headers: { cookie: a.cookie },
+      payload: { lat: 1, lon: 1 },
+    });
+    const id = res.json().message.id;
+
+    const deleteByB = await server.inject({ method: "DELETE", url: `/api/messaging/general/messages/${id}`, headers: { cookie: b.cookie } });
+    expect(deleteByB.statusCode).toBe(403);
+
+    const deleteByA = await server.inject({ method: "DELETE", url: `/api/messaging/general/messages/${id}`, headers: { cookie: a.cookie } });
+    expect(deleteByA.statusCode).toBe(204);
+
+    const history = await server.inject({ method: "GET", url: "/api/messaging/general/messages", headers: { cookie: a.cookie } });
+    expect(history.json().messages.find((m: { id: string }) => m.id === id)).toBeUndefined();
+  });
+
+  it("supprime son propre message privé, mais pas celui du correspondant", async () => {
+    const a = await registerAndLogin(server, `del-dm-a-${Date.now()}@example.com`);
+    const b = await registerAndLogin(server, `del-dm-b-${Date.now()}@example.com`);
+    const usersRes = await server.inject({ method: "GET", url: "/api/messaging/users", headers: { cookie: a.cookie } });
+    const bId = (usersRes.json().users as { id: string; prenom: string }[]).find((u) => u.prenom === b.publicName)!.id;
+
+    const res = await server.inject({
+      method: "POST",
+      url: `/api/messaging/dm/${bId}/location`,
+      headers: { cookie: a.cookie },
+      payload: { lat: 2, lon: 2 },
+    });
+    const id = res.json().message.id;
+
+    const deleteByB = await server.inject({ method: "DELETE", url: `/api/messaging/dm/${bId}/messages/${id}`, headers: { cookie: b.cookie } });
+    expect(deleteByB.statusCode).toBe(403);
+
+    const deleteByA = await server.inject({ method: "DELETE", url: `/api/messaging/dm/${bId}/messages/${id}`, headers: { cookie: a.cookie } });
+    expect(deleteByA.statusCode).toBe(204);
   });
 });
