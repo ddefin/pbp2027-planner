@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { TrackPoint } from "../api/brmCatalog";
-import { cumulativeGain, findClimbs } from "../lib/gpxAnalysis";
+import { cumulativeGain, findClimbs, withProfile } from "../lib/gpxAnalysis";
 
 const VB_W = 600;
 const VB_H = 170;
@@ -17,7 +17,7 @@ export function ElevationProfile({ points }: { points: TrackPoint[] }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
-  const withEle = useMemo(() => points.filter((p) => p.ele !== null), [points]);
+  const withEle = useMemo(() => withProfile(points), [points]);
   const gain = useMemo(() => cumulativeGain(withEle), [withEle]);
   const climbs = useMemo(() => findClimbs(withEle), [withEle]);
 

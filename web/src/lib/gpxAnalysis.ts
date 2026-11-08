@@ -48,6 +48,14 @@ export const WIND_RELATION_LABEL: Record<WindRelation, string> = {
   travers: "Vent de travers",
 };
 
+// Garde seulement les points avec une altitude et une distance cumulée exploitables
+// (nombres, pas juste "pas null") — un ancien tracé uploadé avant l'ajout du profil
+// n'a ni l'un ni l'autre (undefined), ce qui plantait silencieusement plus loin
+// (ex. totalKm.toFixed sur undefined) sans ce filtre strict.
+export function withProfile(points: TrackPoint[]): (TrackPoint & { ele: number })[] {
+  return points.filter((p): p is TrackPoint & { ele: number } => typeof p.ele === "number" && typeof p.distKm === "number");
+}
+
 export interface Climb {
   startKm: number;
   endKm: number;
@@ -66,7 +74,7 @@ const MIN_LENGTH_KM = 0.8;
 const GAP_TOLERANCE_KM = 0.3;
 
 export function findClimbs(points: TrackPoint[]): Climb[] {
-  const withEle = points.filter((p) => p.ele !== null);
+  const withEle = withProfile(points);
   if (withEle.length < 2) return [];
 
   // Pente instantanée (lissée sur le pas d'échantillonnage réel, déjà assez espacé
@@ -124,7 +132,7 @@ export function cumulativeGain(points: TrackPoint[]): number[] {
   let gain = 0;
   let lastEle: number | null = null;
   for (const p of points) {
-    if (p.ele !== null) {
+    if (typeof p.ele === "number") {
       if (lastEle !== null) {
         const delta = p.ele - lastEle;
         if (delta >= ELEVATION_NOISE_THRESHOLD_M) {
