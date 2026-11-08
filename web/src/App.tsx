@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useNavigate } from "react-router-dom";
+import { useState, type ReactNode } from "react";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -14,10 +14,21 @@ import { ParcoursPage } from "./pages/ParcoursPage";
 function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
   const { status, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   if (status === "loading") return null;
   if (status === "anonymous") return <Navigate to="/login" replace />;
   if (adminOnly && !user?.isAdmin) return <Navigate to="/" replace />;
+
+  const links = [
+    { to: "/", label: "Tableau de bord" },
+    { to: "/calendrier", label: "Calendrier BRM" },
+    { to: "/sorties", label: "Sorties" },
+    { to: "/messagerie", label: "Messagerie" },
+    { to: "/securite", label: "Sécurité" },
+    ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }] : []),
+  ];
 
   return (
     <div>
@@ -25,17 +36,28 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
         <strong>
           PBP<span style={{ color: "var(--accent)" }}>2027</span>
         </strong>
-        <nav style={{ display: "flex", gap: 16, alignItems: "center" }}>
-          <Link to="/">Tableau de bord</Link>
-          <Link to="/calendrier">Calendrier BRM</Link>
-          <Link to="/sorties">Sorties</Link>
-          <Link to="/messagerie">Messagerie</Link>
-          <Link to="/securite">Sécurité</Link>
-          {user?.isAdmin && <Link to="/webhooks">Webhooks</Link>}
-          {user && <span className="hint">Bonjour, {user.prenom}</span>}
+        <button
+          type="button"
+          className="menu-toggle"
+          aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <nav className={menuOpen ? "nav-open" : undefined}>
+          {links.map((l) => (
+            <Link key={l.to} to={l.to} className={location.pathname === l.to ? "active" : undefined} onClick={() => setMenuOpen(false)}>
+              {l.label}
+            </Link>
+          ))}
+          {user && <span className="hint nav-greeting">Bonjour, {user.prenom}</span>}
           <button
             className="ghost"
             onClick={async () => {
+              setMenuOpen(false);
               await logout();
               navigate("/login", { replace: true });
             }}

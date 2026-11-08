@@ -1,16 +1,18 @@
 :root {
-  /* "Route du jour" : gris de pierre froid + vert sapin, plutôt que le
-     crème/terracotta qu'on voit sur beaucoup d'interfaces générées. */
-  --bg: #eef0ec;
+  /* Couleurs du site officiel paris-brest-paris.org : fond blanc, texte
+     quasi-noir, accent corail/rose (titres, icônes) — leur navy profond
+     (utilisé pour leurs blocs de mise en avant) devient naturellement le
+     fond du mode sombre ci-dessous plutôt que d'être dupliqué ici. */
+  --bg: #f7f8fa;
   --panel: #ffffff;
-  --fg: #1b231c;
-  --fg-muted: #5c6659;
-  --line: #d5d9d0;
-  --accent: #1f5c3f;
-  --accent-fg: #f2f6f0;
-  --ok: #1f6f8a;
-  --warn: #b4791a;
-  --bad: #a3291a;
+  --fg: #0c1420;
+  --fg-muted: #5c6672;
+  --line: #e1e4e8;
+  --accent: #e8536a;
+  --accent-fg: #ffffff;
+  --ok: #2f8f5b;
+  --warn: #c97a1a;
+  --bad: #c2410c;
   --font-display: "Oswald", sans-serif;
   --font-body: "Source Sans 3", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
@@ -18,19 +20,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Contrepartie sombre de "Route du jour" — un vert plus clair et plus
-       saturé pour rester lisible sur fond sombre, pas juste l'inverse des
-       valeurs claires. */
-    --bg: #12161a;
-    --panel: #1a2019;
-    --fg: #e7ebe4;
-    --fg-muted: #93a08f;
-    --line: #2b332a;
-    --accent: #6fcf9b;
-    --accent-fg: #0d2016;
-    --ok: #49b8d8;
-    --warn: #e0a83a;
-    --bad: #e25a43;
+    /* Le navy de paris-brest-paris.org comme fond (c'est déjà leur propre
+       traitement "sombre" pour les blocs mis en avant du site), corail
+       éclairci pour rester lisible dessus.*/
+    --bg: #0f2a4f;
+    --panel: #16335c;
+    --fg: #eef2f7;
+    --fg-muted: #9fb0c4;
+    --line: #28456f;
+    --accent: #ff6b81;
+    --accent-fg: #1a0a10;
+    --ok: #3fcf8a;
+    --warn: #f0b429;
+    --bad: #ff7a5c;
   }
 }
 
@@ -44,6 +46,14 @@ a:hover {
 
 * {
   box-sizing: border-box;
+}
+
+html, body {
+  /* Filet de sécurité : empêche tout élément qui déborderait par erreur de
+     faire défiler la page entière horizontalement (le symptôme "ça bouge sur
+     les côtés" en mobile). */
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -189,11 +199,100 @@ button.link {
 }
 
 .topbar {
+  position: relative;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
   border-bottom: 1px solid var(--line);
+  gap: 12px;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.topbar nav a {
+  color: var(--fg);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.topbar nav a:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+.topbar nav a.active {
+  color: var(--accent);
+}
+
+.nav-greeting {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.menu-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.menu-toggle span {
+  display: block;
+  height: 2px;
+  margin: 0 7px;
+  background: var(--fg);
+  border-radius: 1px;
+}
+
+/* En dessous de 700px (même seuil que les autres mises en page de l'app — voir
+   .sorties-grid, .cal-row…) : le menu plein passerait en overflow horizontal sur un
+   téléphone (6 liens + salutation + déconnexion ne tiennent pas sur une largeur de
+   poche). Bascule en menu déroulant déclenché par un bouton hamburger. */
+@media (max-width: 700px) {
+  .menu-toggle {
+    display: flex;
+  }
+  .topbar nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
+    z-index: 20;
+  }
+  .topbar nav.nav-open {
+    display: flex;
+  }
+  .topbar nav a,
+  .topbar nav button,
+  .nav-greeting {
+    width: 100%;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--line);
+    border-radius: 0;
+    text-align: left;
+  }
+  .topbar nav button {
+    background: none;
+    color: var(--fg);
+  }
 }
 
 .wrap {
