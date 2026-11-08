@@ -25,6 +25,15 @@ export const CATALOG_STATUS_LABEL: Record<CatalogStatus, string> = {
   homologue: "Homologué",
 };
 
+// Jours restants jusqu'à une date "yyyy-mm-dd", arrondi au jour près (pas de ticking
+// temps réel ici, contrairement à Countdown — utilisé pour un J-N dans une liste).
+export function daysUntil(dateStr: string): number {
+  const target = new Date(`${dateStr}T00:00:00`);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - now.getTime()) / 86400000);
+}
+
 export function formatMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;

@@ -147,6 +147,18 @@ function CatalogRow({
         <div className="cal-sub">
           {event.club}
           {event.departement ? ` · ${event.departement}` : ""}
+          {event.roadMap && (
+            <>
+              {" · "}
+              <a href={event.roadMap} target="_blank" rel="noreferrer">Parcours</a>
+            </>
+          )}
+          {event.siteWeb && (
+            <>
+              {" · "}
+              <a href={event.siteWeb} target="_blank" rel="noreferrer">Inscription</a>
+            </>
+          )}
         </div>
       </div>
       <div className="cal-participants">

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
-import { CATALOG_STATUS_LABEL } from "../lib/brmMeta";
+import { CATALOG_STATUS_LABEL, daysUntil } from "../lib/brmMeta";
+import { OpenRunnerEmbed } from "./OpenRunnerEmbed";
 
 // Vue collective des BRM choisis par les randonneurs sur le calendrier (plutôt
 // qu'une saisie manuelle individuelle) : qui part sur quel brevet, visible par
@@ -28,28 +29,55 @@ export function BrmChoicesOverview() {
 
       {!loading && chosen.length > 0 && (
         <div className="brm-grid">
-          {chosen.map((e) => (
-            <div className="brm-card" key={e.id}>
-              <div className="dist">
-                {e.distance} <small>km</small>
+          {chosen.map((e) => {
+            const remaining = daysUntil(e.date);
+            return (
+              <div className="brm-card" key={e.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div className="dist">
+                    {e.distance} <small>km</small>
+                  </div>
+                  {remaining >= 0 && (
+                    <span className="hint" style={{ margin: 0, fontWeight: 700 }}>
+                      {remaining === 0 ? "Aujourd'hui" : `J-${remaining}`}
+                    </span>
+                  )}
+                </div>
+                <div className="row">
+                  <span>Date</span>
+                  <b className="tabular">{e.date.slice(8, 10)}/{e.date.slice(5, 7)}/{e.date.slice(0, 4)}</b>
+                </div>
+                <div className="row">
+                  <span>Lieu</span>
+                  <b>{e.ville}</b>
+                </div>
+
+                {(e.roadMap || e.siteWeb) && (
+                  <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    {e.roadMap && (
+                      <a href={e.roadMap} target="_blank" rel="noreferrer" className="hint" style={{ margin: 0, textDecoration: "underline" }}>
+                        Parcours →
+                      </a>
+                    )}
+                    {e.siteWeb && (
+                      <a href={e.siteWeb} target="_blank" rel="noreferrer" className="hint" style={{ margin: 0, textDecoration: "underline" }}>
+                        Inscription →
+                      </a>
+                    )}
+                  </div>
+                )}
+                {e.roadMap && <OpenRunnerEmbed url={e.roadMap} />}
+
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+                  {e.participants.map((p, i) => (
+                    <span key={i} className="hint" style={{ margin: 0 }}>
+                      {p.displayName} · {CATALOG_STATUS_LABEL[p.status as keyof typeof CATALOG_STATUS_LABEL] ?? p.status}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="row">
-                <span>Date</span>
-                <b className="tabular">{e.date.slice(8, 10)}/{e.date.slice(5, 7)}/{e.date.slice(0, 4)}</b>
-              </div>
-              <div className="row">
-                <span>Lieu</span>
-                <b>{e.ville}</b>
-              </div>
-              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-                {e.participants.map((p, i) => (
-                  <span key={i} className="hint" style={{ margin: 0 }}>
-                    {p.displayName} · {CATALOG_STATUS_LABEL[p.status as keyof typeof CATALOG_STATUS_LABEL] ?? p.status}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
