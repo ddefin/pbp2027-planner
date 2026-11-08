@@ -7,13 +7,13 @@ import "leaflet/dist/leaflet.css";
 // Leaflet manipule le DOM lui-même, donc instance impérative dans un useEffect
 // plutôt qu'un rendu déclaratif React classique.
 //
-// Fond de carte OpenTopoMap : tile.openstreetmap.org a bloqué nos requêtes ("App is
-// not following the tile usage policy" — pas prévu pour une app en production), et
-// CARTO (essayé ensuite) exige désormais une clé API sur ses fonds gratuits.
-// OpenTopoMap reste accessible sans clé et son usage policy encourage justement ce
-// genre d'intégration externe à volume modéré. Pas de variante sombre officielle :
-// en mode sombre, un filtre CSS inverse les tuiles (technique standard pour donner
-// un rendu nocturne à un fond de carte qui n'en propose pas).
+// Fond de carte CyclOSM : dédié au vélo (pistes cyclables, itinéraires numérotés),
+// bien plus lisible pour ce qu'on affiche ici qu'OpenTopoMap (essayé avant, jugé
+// peu lisible) — tile.openstreetmap.org bloquait nos requêtes et CARTO exige
+// désormais une clé API sur ses fonds gratuits. CyclOSM tourne sur l'infrastructure
+// OpenStreetMap France, pensée pour ce genre d'intégration externe, sans clé. Pas
+// de variante sombre officielle : en mode sombre, un filtre CSS inverse les tuiles
+// (technique standard pour donner un rendu nocturne à un fond qui n'en propose pas).
 export function TrackMap({ points }: { points: { lat: number; lon: number }[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -25,10 +25,10 @@ export function TrackMap({ points }: { points: { lat: number; lon: number }[] })
     const map = L.map(containerRef.current, { attributionControl: true });
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
-      maxZoom: 17,
+    L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", {
+      maxZoom: 19,
       subdomains: "abc",
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | © <a href="https://www.cyclosm.org">CyclOSM</a>',
     }).addTo(map);
 
     // Le filtre s'applique uniquement aux tuiles (pas au conteneur entier) : sinon il
