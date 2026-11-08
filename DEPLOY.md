@@ -126,6 +126,14 @@ SMTP_PASSWORD="le mot de passe de cette boîte mail"
 (Les identifiants et le port exacts dépendent de ton hébergeur mail — pour OVH,
 vérifie dans Espace client → Emails → le mode de connexion SMTP proposé.)
 
+### Mode hors-ligne (PWA)
+
+L'app peut être "installée" (Chrome/Android : bouton d'installation dans la barre
+d'adresse ; iOS/Safari : "Partager" → "Sur l'écran d'accueil"). Une fois une carte
+de BRM déjà consultée avec du réseau, ses tuiles restent affichables avec une
+connexion coupée ou très mauvaise (utile en plein brevet) — rien à configurer côté
+serveur, c'est un service worker généré au build (`web/dist/sw.js`).
+
 ### Alerte vent fort (optionnel, nécessite OPENWEATHER_API_KEY)
 
 Si `OPENWEATHER_API_KEY` est renseignée, l'app vérifie automatiquement (toutes
