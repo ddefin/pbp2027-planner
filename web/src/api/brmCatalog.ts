@@ -47,3 +47,34 @@ export function setParticipation(id: string, status: string) {
 export function clearParticipation(id: string) {
   return request<void>(`/brm/catalog/${id}/participation`, { method: "DELETE" });
 }
+
+export interface CatalogTrack {
+  fileName: string;
+  points: { lat: number; lon: number }[];
+  distanceKm: number | null;
+  elevationGainM: number | null;
+  elevationLossM: number | null;
+}
+
+export async function getCatalogTrack(id: string): Promise<CatalogTrack | null> {
+  try {
+    const res = await request<{ track: CatalogTrack }>(`/brm/catalog/${id}/track`);
+    return res.track;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+export async function uploadCatalogTrack(id: string, file: File): Promise<CatalogTrack> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`/api/brm/catalog/${id}/track`, { method: "POST", credentials: "include", body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? "unknown_error");
+  return (body as { track: CatalogTrack }).track;
+}
+
+export function deleteCatalogTrack(id: string) {
+  return request<void>(`/brm/catalog/${id}/track`, { method: "DELETE" });
+}

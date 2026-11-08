@@ -31,6 +31,7 @@ model User {
   groupMessages        GroupMessage[]
   sentDirectMessages     DirectMessage[] @relation("DmSender")
   receivedDirectMessages DirectMessage[] @relation("DmRecipient")
+  catalogTracks          CatalogTrack[]
 }
 
 model Session {
@@ -211,4 +212,23 @@ model DirectMessage {
 
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, senderId, createdAt])
+}
+
+// Tracé GPX pour un BRM du calendrier ACP (pas un BrmEvent saisi manuellement, voir
+// Parcours) : un seul tracé par événement, partagé par tout le groupe — n'importe
+// quel randonneur peut l'ajouter ou le remplacer, comme pour les autres informations
+// collectives de l'app (participations, sorties). points est un tableau JSON
+// [{lat,lon}, ...] déjà décimé (voir src/lib/gpx.ts), prêt pour l'affichage Leaflet.
+model CatalogTrack {
+  id               String   @id @default(cuid())
+  catalogEventId   String   @unique
+  uploadedByUserId String
+  uploadedBy       User     @relation(fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  fileName         String
+  points           String
+  distanceKm       Float?
+  elevationGainM   Int?
+  elevationLossM   Int?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }

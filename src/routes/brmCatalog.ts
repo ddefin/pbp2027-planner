@@ -8,6 +8,7 @@ import { publicName } from "../lib/publicName.js";
 import { triggerWebhooks } from "../lib/webhooks.js";
 import { fetchCityWeather } from "../lib/openWeather.js";
 import { config } from "../config.js";
+import { parseGpxStats, parseGpxTrack } from "../lib/gpx.js";
 
 // Fenêtre de qualification PBP 2027 demandée : saison précédant le départ.
 const CATALOG_FROM = "2027-01-01";
@@ -15,6 +16,7 @@ const CATALOG_TO = "2027-06-30";
 
 const statusSchema = z.enum(CATALOG_STATUSES);
 const catalogIdSchema = z.string().regex(/^[0-9a-f]{16}$/);
+const MAX_TRACK_FILE_BYTES = 5 * 1024 * 1024; // 5 Mo : largement suffisant pour un GPX de 1200km
 
 export async function brmCatalogRoutes(app: FastifyInstance) {
   app.get("/brm/catalog", async (request, reply) => {
@@ -128,5 +130,97 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
     if (!weather) return reply.code(502).send({ error: "meteo_unavailable" });
 
     return reply.send({ weather });
+  });
+
+  // Tracé GPX d'un BRM du calendrier : un seul par événement, partagé par tout le
+  // groupe (voir le commentaire du modèle CatalogTrack) — n'importe quel randonneur
+  // connecté peut l'ajouter ou le remplacer.
+  app.get("/brm/catalog/:id/track", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    const track = await prisma.catalogTrack.findUnique({ where: { catalogEventId: id } });
+    if (!track) return reply.code(404).send({ error: "not_found" });
+
+    return reply.send({
+      track: {
+        fileName: track.fileName,
+        points: JSON.parse(track.points),
+        distanceKm: track.distanceKm,
+        elevationGainM: track.elevationGainM,
+        elevationLossM: track.elevationLossM,
+      },
+    });
+  });
+
+  app.post("/brm/catalog/:id/track", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    const file = await request.file({ limits: { fileSize: MAX_TRACK_FILE_BYTES } });
+    if (!file) return reply.code(400).send({ error: "no_file" });
+    if (!/\.gpx$/i.test(file.filename)) return reply.code(400).send({ error: "invalid_file_type" });
+
+    const buffer = await file.toBuffer();
+    if (buffer.length > MAX_TRACK_FILE_BYTES) return reply.code(413).send({ error: "file_too_large" });
+
+    const xml = buffer.toString("utf8");
+    const points = parseGpxTrack(xml);
+    if (!points) return reply.code(422).send({ error: "unreadable_gpx" });
+    const stats = parseGpxStats(xml);
+
+    const track = await prisma.catalogTrack.upsert({
+      where: { catalogEventId: id },
+      create: {
+        catalogEventId: id,
+        uploadedByUserId: user.id,
+        fileName: file.filename,
+        points: JSON.stringify(points),
+        distanceKm: stats?.distanceKm ?? null,
+        elevationGainM: stats?.elevationGainM ?? null,
+        elevationLossM: stats?.elevationLossM ?? null,
+      },
+      update: {
+        uploadedByUserId: user.id,
+        fileName: file.filename,
+        points: JSON.stringify(points),
+        distanceKm: stats?.distanceKm ?? null,
+        elevationGainM: stats?.elevationGainM ?? null,
+        elevationLossM: stats?.elevationLossM ?? null,
+      },
+    });
+
+    return reply.send({
+      track: {
+        fileName: track.fileName,
+        points,
+        distanceKm: track.distanceKm,
+        elevationGainM: track.elevationGainM,
+        elevationLossM: track.elevationLossM,
+      },
+    });
+  });
+
+  app.delete("/brm/catalog/:id/track", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    const existing = await prisma.catalogTrack.findUnique({ where: { catalogEventId: id } });
+    if (!existing) return reply.code(404).send({ error: "not_found" });
+    // Seul celui qui l'a ajouté peut le retirer — évite qu'un randonneur supprime par
+    // erreur (ou mégarde) le tracé qu'un autre vient de partager au groupe.
+    if (existing.uploadedByUserId !== user.id) return reply.code(403).send({ error: "forbidden" });
+
+    await prisma.catalogTrack.delete({ where: { catalogEventId: id } });
+    return reply.code(204).send();
   });
 }

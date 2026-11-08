@@ -70,6 +70,39 @@ function collectPoints(parsed: unknown): TrackPoint[] {
   return points;
 }
 
+export interface TrackLatLon {
+  lat: number;
+  lon: number;
+}
+
+// Tracé décimé pour l'affichage carte (Leaflet) : un GPX de 1200km peut contenir des
+// dizaines de milliers de points, bien plus que nécessaire pour un rendu lisible —
+// on garde un point sur N pour rester sous maxPoints, toujours le premier et le
+// dernier pour ne pas raccourcir visuellement le tracé.
+export function parseGpxTrack(xml: string, maxPoints = 500): TrackLatLon[] | null {
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+  let parsed: unknown;
+  try {
+    parsed = parser.parse(xml);
+  } catch {
+    return null;
+  }
+
+  const points = collectPoints(parsed);
+  if (points.length < 2) return null;
+
+  if (points.length <= maxPoints) return points.map(({ lat, lon }) => ({ lat, lon }));
+
+  const stride = (points.length - 1) / (maxPoints - 1);
+  const decimated: TrackLatLon[] = [];
+  for (let i = 0; i < maxPoints; i++) {
+    const idx = Math.round(i * stride);
+    const p = points[idx];
+    decimated.push({ lat: p.lat, lon: p.lon });
+  }
+  return decimated;
+}
+
 export function parseGpxStats(xml: string): GpxStats | null {
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
   let parsed: unknown;

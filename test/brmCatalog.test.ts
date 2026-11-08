@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,16 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 const dbPath = path.resolve(repoRoot, "prisma/test-brm-catalog.db");
+const sampleGpxPath = path.resolve(__dirname, "fixtures/sample.gpx");
+
+function buildMultipartBody(fieldName: string, filename: string, contentType: string, content: Buffer) {
+  const boundary = "----testBoundary" + Date.now();
+  const pre = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+  );
+  const post = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return { body: Buffer.concat([pre, content, post]), contentType: `multipart/form-data; boundary=${boundary}` };
+}
 
 let buildServer: typeof import("../src/server.js").buildServer;
 let prisma: typeof import("../src/db.js").prisma;
@@ -212,5 +222,54 @@ describe("API catalogue BRM (ACP)", () => {
     const cookie = await registerAndLogin(server, `catalog-meteo-404-${Date.now()}@example.com`);
     const res = await server.inject({ method: "GET", url: `/api/brm/catalog/${"0".repeat(16)}/meteo`, headers: { cookie } });
     expect(res.statusCode).toBe(404);
+  });
+
+  it("upload un tracé GPX pour un BRM du calendrier, visible par tout le groupe", async () => {
+    const a = await registerAndLogin(server, `catalog-track-a-${Date.now()}@example.com`);
+    const b = await registerAndLogin(server, `catalog-track-b-${Date.now()}@example.com`);
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: a } });
+    const eventId = listRes.json().events.find((e: { ville: string }) => e.ville === "Rambouillet").id;
+
+    expect((await server.inject({ method: "GET", url: `/api/brm/catalog/${eventId}/track`, headers: { cookie: a } })).statusCode).toBe(404);
+
+    const gpx = readFileSync(sampleGpxPath);
+    const multipart = buildMultipartBody("file", "mon-brm.gpx", "application/gpx+xml", gpx);
+    const uploadRes = await server.inject({
+      method: "POST",
+      url: `/api/brm/catalog/${eventId}/track`,
+      headers: { cookie: a, "content-type": multipart.contentType },
+      payload: multipart.body,
+    });
+    expect(uploadRes.statusCode).toBe(200);
+    const uploaded = uploadRes.json().track;
+    expect(uploaded.fileName).toBe("mon-brm.gpx");
+    expect(uploaded.points.length).toBeGreaterThan(1);
+    expect(uploaded.distanceKm).toBeGreaterThan(0);
+
+    // Visible par un autre utilisateur du groupe, pas seulement par celui qui l'a uploadé.
+    const getRes = await server.inject({ method: "GET", url: `/api/brm/catalog/${eventId}/track`, headers: { cookie: b } });
+    expect(getRes.statusCode).toBe(200);
+    expect(getRes.json().track.points.length).toBe(uploaded.points.length);
+  });
+
+  it("refuse qu'un autre utilisateur que celui qui a uploadé le tracé le supprime", async () => {
+    const a = await registerAndLogin(server, `catalog-track-del-a-${Date.now()}@example.com`);
+    const b = await registerAndLogin(server, `catalog-track-del-b-${Date.now()}@example.com`);
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: a } });
+    const eventId = listRes.json().events.find((e: { ville: string }) => e.ville === "Gacé").id;
+
+    const multipart = buildMultipartBody("file", "trace.gpx", "application/gpx+xml", readFileSync(sampleGpxPath));
+    await server.inject({
+      method: "POST",
+      url: `/api/brm/catalog/${eventId}/track`,
+      headers: { cookie: a, "content-type": multipart.contentType },
+      payload: multipart.body,
+    });
+
+    const deleteByB = await server.inject({ method: "DELETE", url: `/api/brm/catalog/${eventId}/track`, headers: { cookie: b } });
+    expect(deleteByB.statusCode).toBe(403);
+
+    const deleteByA = await server.inject({ method: "DELETE", url: `/api/brm/catalog/${eventId}/track`, headers: { cookie: a } });
+    expect(deleteByA.statusCode).toBe(204);
   });
 });

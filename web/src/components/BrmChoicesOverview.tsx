@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
 import { useCatalogMeteo } from "../hooks/useCatalogMeteo";
+import { useCatalogTrack } from "../hooks/useCatalogTrack";
 import { WeatherPanel } from "./WeatherPanel";
+import { TrackMap } from "./TrackMap";
 import { CATALOG_STATUS_LABEL, daysUntil } from "../lib/brmMeta";
 
 // Vue collective des BRM choisis par les randonneurs sur le calendrier (plutôt
@@ -70,6 +72,7 @@ export function BrmChoicesOverview() {
                 )}
 
                 <MeteoToggle catalogEventId={e.id} />
+                <TrackToggle catalogEventId={e.id} />
 
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                   {e.participants.map((p, i) => (
@@ -101,6 +104,65 @@ function MeteoToggle({ catalogEventId }: { catalogEventId: string }) {
       {open && (
         <div style={{ marginTop: 8 }}>
           <WeatherPanel status={status} weather={weather} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Carte du tracé GPX : chargée au clic, comme la météo. Si personne n'a encore
+// partagé de tracé pour ce BRM, affiche un import — partagé avec tout le groupe une
+// fois uploadé (voir CatalogTrack côté serveur), pas seulement visible par soi-même.
+function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
+  const [open, setOpen] = useState(false);
+  const { track, loading, error, upload } = useCatalogTrack(open ? catalogEventId : null);
+  const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      await upload(file);
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button type="button" className="ghost" onClick={() => setOpen((v) => !v)} style={{ padding: "4px 10px", fontSize: 11.5 }}>
+        {open ? "Masquer la carte" : "Voir la carte du parcours"}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          {loading && <p className="hint" style={{ margin: 0 }}>Chargement…</p>}
+          {error && <div className="error-banner">{error}</div>}
+
+          {!loading && track && (
+            <>
+              <TrackMap points={track.points.map((p) => ({ lat: p.lat, lon: p.lon }))} />
+              <p className="hint" style={{ marginTop: 8, marginBottom: 0 }}>
+                {track.fileName}
+                {track.distanceKm != null && ` · ${track.distanceKm} km`}
+                {track.elevationGainM != null && ` · D+ ${track.elevationGainM} m`}
+              </p>
+            </>
+          )}
+
+          {!loading && !track && (
+            <div>
+              <p className="hint" style={{ marginTop: 0 }}>
+                Personne n'a encore partagé de tracé GPX pour ce BRM.
+              </p>
+              <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()} disabled={busy} style={{ padding: "4px 10px", fontSize: 11.5 }}>
+                {busy ? "Import…" : "Uploader un fichier GPX"}
+              </button>
+              <input ref={fileInputRef} type="file" accept=".gpx" hidden onChange={handleFileChange} />
+            </div>
+          )}
         </div>
       )}
     </div>
