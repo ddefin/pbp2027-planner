@@ -28,7 +28,12 @@ export function buildServer() {
   app.addHook("onSend", async (_request, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
     reply.header("X-Frame-Options", "DENY");
-    reply.header("Referrer-Policy", "same-origin");
+    // "same-origin" bloquait aussi le referer vers les tuiles OpenStreetMap
+    // (carte Leaflet) — leur politique d'usage des tuiles refuse les requêtes qui
+    // n'identifient pas le site appelant. "strict-origin-when-cross-origin" (le
+    // défaut des navigateurs modernes) n'envoie que l'origine, pas le chemin, aux
+    // sites tiers : reste prudent côté confidentialité tout en débloquant la carte.
+    reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
     return payload;
   });
 
