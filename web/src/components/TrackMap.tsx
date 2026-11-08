@@ -2,22 +2,20 @@ import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Carte Leaflet minimale : juste le tracé (polyline), pas de marqueurs (évite le
-// souci classique des icônes par défaut de Leaflet cassées par les bundlers).
-// Leaflet manipule le DOM lui-même, donc instance impérative dans un useEffect
-// plutôt qu'un rendu déclaratif React classique.
+// Carte Leaflet minimale : le tracé (polyline) plus un sélecteur de fond de carte,
+// pas de marqueurs (évite le souci classique des icônes par défaut de Leaflet
+// cassées par les bundlers). Leaflet manipule le DOM lui-même, donc instance
+// impérative dans un useEffect plutôt qu'un rendu déclaratif React classique.
 //
-// Fond de carte CyclOSM : dédié au vélo (pistes cyclables, itinéraires numérotés),
-// bien plus lisible pour ce qu'on affiche ici qu'OpenTopoMap (essayé avant, jugé
-// peu lisible) — tile.openstreetmap.org bloquait nos requêtes et CARTO exige
-// désormais une clé API sur ses fonds gratuits. CyclOSM tourne sur l'infrastructure
-// OpenStreetMap France, pensée pour ce genre d'intégration externe, sans clé. Pas
-// de variante sombre officielle : en mode sombre, un filtre CSS inverse les tuiles
-// (technique standard pour donner un rendu nocturne à un fond qui n'en propose pas).
+// Plusieurs fonds au choix plutôt qu'un seul imposé : tile.openstreetmap.org
+// bloquait nos requêtes, CARTO exige désormais une clé API sur ses fonds gratuits,
+// OpenTopoMap puis CyclOSM seuls se sont révélés peu lisibles selon les cas (et
+// inverser les couleurs de CyclOSM en mode sombre rendait la carte illisible —
+// abandonné). On laisse maintenant choisir : Vélo (CyclOSM), Satellite (Esri, sans
+// clé) et Relief (OpenTopoMap), toutes affichées dans leurs couleurs réelles.
 export function TrackMap({ points }: { points: { lat: number; lon: number }[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
-  const dark = typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
 
   useEffect(() => {
     if (!containerRef.current || points.length < 2) return;
@@ -25,18 +23,25 @@ export function TrackMap({ points }: { points: { lat: number; lon: number }[] })
     const map = L.map(containerRef.current, { attributionControl: true });
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", {
+    const velo = L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", {
       maxZoom: 19,
       subdomains: "abc",
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | © <a href="https://www.cyclosm.org">CyclOSM</a>',
-    }).addTo(map);
+    });
 
-    // Le filtre s'applique uniquement aux tuiles (pas au conteneur entier) : sinon il
-    // inverserait aussi la couleur du tracé tracé par-dessus.
-    if (dark) {
-      const tilePane = map.getPane("tilePane");
-      if (tilePane) tilePane.style.filter = "invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9)";
-    }
+    const satellite = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 19, attribution: "© Esri — World Imagery" },
+    );
+
+    const relief = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      maxZoom: 17,
+      subdomains: "abc",
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
+    });
+
+    velo.addTo(map);
+    L.control.layers({ "Vélo": velo, "Satellite": satellite, "Relief": relief }).addTo(map);
 
     const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#1f5c3f";
     const latLngs = points.map((p) => L.latLng(p.lat, p.lon));
