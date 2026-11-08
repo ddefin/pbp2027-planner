@@ -48,9 +48,16 @@ export function clearParticipation(id: string) {
   return request<void>(`/brm/catalog/${id}/participation`, { method: "DELETE" });
 }
 
+export interface TrackPoint {
+  lat: number;
+  lon: number;
+  ele: number | null;
+  distKm: number;
+}
+
 export interface CatalogTrack {
   fileName: string;
-  points: { lat: number; lon: number }[];
+  points: TrackPoint[];
   distanceKm: number | null;
   elevationGainM: number | null;
   elevationLossM: number | null;

@@ -70,16 +70,22 @@ function collectPoints(parsed: unknown): TrackPoint[] {
   return points;
 }
 
-export interface TrackLatLon {
+export interface TrackProfilePoint {
   lat: number;
   lon: number;
+  ele: number | null;
+  distKm: number; // cumulé depuis le départ
 }
 
-// Tracé décimé pour l'affichage carte (Leaflet) : un GPX de 1200km peut contenir des
-// dizaines de milliers de points, bien plus que nécessaire pour un rendu lisible —
-// on garde un point sur N pour rester sous maxPoints, toujours le premier et le
-// dernier pour ne pas raccourcir visuellement le tracé.
-export function parseGpxTrack(xml: string, maxPoints = 500): TrackLatLon[] | null {
+// Tracé décimé pour l'affichage carte + profil (Leaflet + graphique dénivelé) : un
+// GPX de 1200km peut contenir des dizaines de milliers de points, bien plus que
+// nécessaire pour un rendu lisible. Décimation par distance plutôt que par index :
+// des points espacés régulièrement en km (plutôt qu'un point sur N, qui donnerait
+// des échantillons plus denses là où le GPS a enregistré plus souvent) — important
+// ici puisque distKm sert ensuite d'axe à un graphique et à placer des repères
+// kilométriques. Toujours le premier et le dernier point, pour ne pas raccourcir le
+// tracé.
+export function parseGpxProfile(xml: string, maxPoints = 600): TrackProfilePoint[] | null {
   const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
   let parsed: unknown;
   try {
@@ -91,15 +97,28 @@ export function parseGpxTrack(xml: string, maxPoints = 500): TrackLatLon[] | nul
   const points = collectPoints(parsed);
   if (points.length < 2) return null;
 
-  if (points.length <= maxPoints) return points.map(({ lat, lon }) => ({ lat, lon }));
-
-  const stride = (points.length - 1) / (maxPoints - 1);
-  const decimated: TrackLatLon[] = [];
-  for (let i = 0; i < maxPoints; i++) {
-    const idx = Math.round(i * stride);
-    const p = points[idx];
-    decimated.push({ lat: p.lat, lon: p.lon });
+  const cumKm: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    cumKm.push(cumKm[i - 1] + haversineMeters(points[i - 1], points[i]) / 1000);
   }
+  const totalKm = cumKm[cumKm.length - 1];
+
+  if (points.length <= maxPoints) {
+    return points.map((p, i) => ({ lat: p.lat, lon: p.lon, ele: p.ele, distKm: Math.round(cumKm[i] * 100) / 100 }));
+  }
+
+  const stepKm = totalKm / (maxPoints - 1);
+  const decimated: TrackProfilePoint[] = [];
+  let nextIdx = 0;
+  for (let k = 0; k < maxPoints; k++) {
+    const targetKm = k * stepKm;
+    while (nextIdx < points.length - 1 && cumKm[nextIdx] < targetKm) nextIdx++;
+    const p = points[nextIdx];
+    decimated.push({ lat: p.lat, lon: p.lon, ele: p.ele, distKm: Math.round(cumKm[nextIdx] * 100) / 100 });
+  }
+  // Le dernier échantillon doit être le vrai point final (pas une approximation).
+  const last = points[points.length - 1];
+  decimated[decimated.length - 1] = { lat: last.lat, lon: last.lon, ele: last.ele, distKm: Math.round(totalKm * 100) / 100 };
   return decimated;
 }
 

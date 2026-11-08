@@ -8,7 +8,7 @@ import { publicName } from "../lib/publicName.js";
 import { triggerWebhooks } from "../lib/webhooks.js";
 import { fetchCityWeather } from "../lib/openWeather.js";
 import { config } from "../config.js";
-import { parseGpxStats, parseGpxTrack } from "../lib/gpx.js";
+import { parseGpxStats, parseGpxProfile } from "../lib/gpx.js";
 
 // Fenêtre de qualification PBP 2027 demandée : saison précédant le départ.
 const CATALOG_FROM = "2027-01-01";
@@ -171,7 +171,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
     if (buffer.length > MAX_TRACK_FILE_BYTES) return reply.code(413).send({ error: "file_too_large" });
 
     const xml = buffer.toString("utf8");
-    const points = parseGpxTrack(xml);
+    const points = parseGpxProfile(xml);
     if (!points) return reply.code(422).send({ error: "unreadable_gpx" });
     const stats = parseGpxStats(xml);
 

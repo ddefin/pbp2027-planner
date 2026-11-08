@@ -5,7 +5,10 @@ import { useCatalogMeteo } from "../hooks/useCatalogMeteo";
 import { useCatalogTrack } from "../hooks/useCatalogTrack";
 import { WeatherPanel } from "./WeatherPanel";
 import { TrackMap } from "./TrackMap";
+import { ElevationProfile } from "./ElevationProfile";
 import { CATALOG_STATUS_LABEL, daysUntil } from "../lib/brmMeta";
+import { compassToDeg, overallBearing, windRelation, WIND_RELATION_LABEL } from "../lib/gpxAnalysis";
+import type { TrackPoint } from "../api/brmCatalog";
 
 // Vue collective des BRM choisis par les randonneurs sur le calendrier (plutôt
 // qu'une saisie manuelle individuelle) : qui part sur quel brevet, visible par
@@ -116,6 +119,9 @@ function MeteoToggle({ catalogEventId }: { catalogEventId: string }) {
 function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
   const [open, setOpen] = useState(false);
   const { track, loading, error, upload } = useCatalogTrack(open ? catalogEventId : null);
+  // Météo déjà mise en cache côté serveur par ville (15 min, voir openWeather.ts) :
+  // ce second appel indépendant du bouton météo n'ajoute pas de coût réel.
+  const { weather } = useCatalogMeteo(open ? catalogEventId : null);
   const [busy, setBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -143,13 +149,18 @@ function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
 
           {!loading && track && (
             <>
-              <TrackMap points={track.points.map((p) => ({ lat: p.lat, lon: p.lon }))} />
+              <TrackMap points={track.points} />
               <p className="hint" style={{ marginTop: 8, marginBottom: 6 }}>
                 {track.fileName}
                 {track.distanceKm != null && ` · ${track.distanceKm} km`}
                 {track.elevationGainM != null && ` · D+ ${track.elevationGainM} m`}
               </p>
-              <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()} disabled={busy} style={{ padding: "4px 10px", fontSize: 11.5 }}>
+
+              <WindHint points={track.points} windDirection={weather?.current.windDirection} windSpeedKmh={weather?.current.windSpeedKmh} />
+
+              <ElevationProfile points={track.points} />
+
+              <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()} disabled={busy} style={{ padding: "4px 10px", fontSize: 11.5, marginTop: 10 }}>
                 {busy ? "Import…" : "Remplacer le GPX"}
               </button>
               <input ref={fileInputRef} type="file" accept=".gpx" hidden onChange={handleFileChange} />
@@ -173,5 +184,33 @@ function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+// Vent actuel (météo déjà récupérée pour ce BRM) comparé au cap général du parcours
+// (départ → arrivée). Une approximation assumée : un BRM repart souvent du même
+// point qu'il y arrive, donc ce n'est pas le vent sur chaque portion du trajet, pas
+// plus que le vent prévu le jour J — juste un repère utile, pas une prévision de
+// route précise par segment.
+function WindHint({
+  points,
+  windDirection,
+  windSpeedKmh,
+}: {
+  points: TrackPoint[];
+  windDirection: string | undefined;
+  windSpeedKmh: number | undefined;
+}) {
+  if (!windDirection || windSpeedKmh === undefined) return null;
+  const windDeg = compassToDeg(windDirection);
+  const routeBearing = overallBearing(points);
+  if (windDeg === null || routeBearing === null) return null;
+
+  const relation = windRelation(windDeg, routeBearing);
+
+  return (
+    <p className="hint" style={{ marginTop: 6, marginBottom: 0 }}>
+      Vent actuel {windDirection} {windSpeedKmh} km/h · {WIND_RELATION_LABEL[relation]} sur le cap général du parcours
+    </p>
   );
 }
