@@ -144,10 +144,17 @@ function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
           {!loading && track && (
             <>
               <TrackMap points={track.points.map((p) => ({ lat: p.lat, lon: p.lon }))} />
-              <p className="hint" style={{ marginTop: 8, marginBottom: 0 }}>
+              <p className="hint" style={{ marginTop: 8, marginBottom: 6 }}>
                 {track.fileName}
                 {track.distanceKm != null && ` · ${track.distanceKm} km`}
                 {track.elevationGainM != null && ` · D+ ${track.elevationGainM} m`}
+              </p>
+              <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()} disabled={busy} style={{ padding: "4px 10px", fontSize: 11.5 }}>
+                {busy ? "Import…" : "Remplacer le GPX"}
+              </button>
+              <input ref={fileInputRef} type="file" accept=".gpx" hidden onChange={handleFileChange} />
+              <p className="hint" style={{ marginTop: 4, marginBottom: 0 }}>
+                Utile si l'organisateur modifie le tracé — le nouveau fichier remplace celui-ci pour tout le groupe.
               </p>
             </>
           )}
