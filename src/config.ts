@@ -16,4 +16,20 @@ export const config = {
   // d'empêcher le serveur de démarrer — la météo live n'est pas une fonctionnalité
   // critique.
   openWeatherApiKey: process.env.OPENWEATHER_API_KEY || null,
+  // Optionnelle elle aussi : sans elle, /auth/forgot-password répond "non configuré"
+  // plutôt que d'empêcher le serveur de démarrer — réinitialiser son mot de passe par
+  // email n'est pas requis pour que le reste de l'app fonctionne. Une boîte mail
+  // existante (ex. SMTP OVH), pas un service tiers à créer.
+  smtp: process.env.SMTP_HOST
+    ? {
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT ?? 587),
+        user: process.env.SMTP_USER ?? "",
+        password: process.env.SMTP_PASSWORD ?? "",
+        from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
+      }
+    : null,
+  // D'où partent les liens de réinitialisation (ex. https://pbp2027.lameteoducyclo.fr) :
+  // sans elle, dérivé de l'en-tête Host de la requête (voir src/routes/auth.ts).
+  publicUrl: process.env.PUBLIC_URL || null,
 };

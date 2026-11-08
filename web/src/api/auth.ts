@@ -79,3 +79,17 @@ export function disableMfa() {
 export function revokeOtherSessions() {
   return request<{ status: string }>("/auth/sessions/revoke-others", { method: "POST" });
 }
+
+export function forgotPassword(email: string) {
+  return request<{ status: string }>("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPassword(token: string, password: string) {
+  return request<{ status: string }>("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+}

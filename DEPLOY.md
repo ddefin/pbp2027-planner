@@ -110,6 +110,22 @@ Ce dossier `./data` contient la base SQLite — à inclure dans tes sauvegardes
 NAS (Hyper Backup, par exemple), c'est la seule donnée qui ne se régénère pas
 en redéployant.
 
+### Mot de passe oublié (optionnel)
+
+Sans configuration, "mot de passe oublié" répond juste "non disponible" — le
+reste de l'app fonctionne normalement. Pour l'activer, renseigne dans
+`.env.production` une boîte mail existante (ex. SMTP OVH) :
+
+```
+SMTP_HOST="ssl0.ovh.net"
+SMTP_PORT=465
+SMTP_USER="ton-adresse@tondomaine.fr"
+SMTP_PASSWORD="le mot de passe de cette boîte mail"
+```
+
+(Les identifiants et le port exacts dépendent de ton hébergeur mail — pour OVH,
+vérifie dans Espace client → Emails → le mode de connexion SMTP proposé.)
+
 ## 5. Déploiement
 
 Pousser sur `main` suffit : le workflow `.github/workflows/deploy.yml` fait tourner

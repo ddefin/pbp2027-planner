@@ -6,9 +6,11 @@ import { hashPassword, verifyPassword } from "../lib/password.js";
 import { buildOtpauthUri, generateTotpSecret, verifyTotp } from "../lib/totp.js";
 import { encryptSecret, decryptSecret } from "../lib/secretCrypto.js";
 import { generateRecoveryCode, hashToken } from "../lib/tokens.js";
-import { createSession, destroySession, destroyOtherSessions, getSessionUser } from "../lib/session.js";
+import { createSession, destroySession, destroyOtherSessions, destroyAllSessions, getSessionUser } from "../lib/session.js";
 import { createMfaChallenge, consumeMfaChallenge, recordFailedAttempt, deleteChallenge } from "../lib/mfaChallenge.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
+import { generateOpaqueToken } from "../lib/tokens.js";
+import { sendPasswordResetEmail } from "../lib/mailer.js";
 
 const LOCKOUT_THRESHOLD = 8;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
@@ -21,6 +23,10 @@ const registerSchema = z.object({ email: emailSchema, password: passwordSchema, 
 const loginSchema = z.object({ email: emailSchema, password: passwordSchema });
 const mfaVerifySchema = z.object({ challengeToken: z.string().min(1), code: z.string().min(6).max(16) });
 const mfaEnableSchema = z.object({ code: z.string().length(6) });
+const forgotPasswordSchema = z.object({ email: emailSchema });
+const resetPasswordSchema = z.object({ token: z.string().min(1), password: passwordSchema });
+
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 heure
 
 export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/register", async (request, reply) => {
@@ -37,6 +43,63 @@ export async function authRoutes(app: FastifyInstance) {
     const passwordHash = await hashPassword(password);
     await prisma.user.create({ data: { email, prenom, passwordHash } });
     return reply.code(202).send({ status: "check_email_if_new" });
+  });
+
+  app.post("/auth/forgot-password", async (request, reply) => {
+    const parsed = forgotPasswordSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
+    if (!config.smtp) return reply.code(503).send({ error: "not_configured" });
+
+    const limited = checkRateLimit(`forgot-password:${request.ip}`, 5, 15 * 60 * 1000);
+    if (!limited.allowed) return reply.code(429).send({ error: "too_many_requests" });
+
+    const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+    // Même réponse qu'il existe un compte ou non, pour ne pas révéler les comptes
+    // existants — l'email n'est envoyé que si le compte existe vraiment.
+    if (user) {
+      const token = generateOpaqueToken();
+      await prisma.passwordResetToken.create({
+        data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
+      });
+
+      const base = config.publicUrl || `${request.protocol}://${request.headers.host}`;
+      const resetUrl = `${base}/reinitialiser-mot-de-passe?token=${token}`;
+      void sendPasswordResetEmail(user.email, resetUrl);
+    }
+
+    return reply.code(202).send({ status: "check_email_if_account_exists" });
+  });
+
+  app.post("/auth/reset-password", async (request, reply) => {
+    const parsed = resetPasswordSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
+
+    const limited = checkRateLimit(`reset-password:${request.ip}`, 10, 15 * 60 * 1000);
+    if (!limited.allowed) return reply.code(429).send({ error: "too_many_requests" });
+
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash: hashToken(parsed.data.token) },
+    });
+    if (!resetToken || resetToken.expiresAt < new Date()) {
+      return reply.code(401).send({ error: "invalid_or_expired_token" });
+    }
+
+    const passwordHash = await hashPassword(parsed.data.password);
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash, failedLoginAttempts: 0, lockedUntil: null },
+      }),
+      // À usage unique : tous les jetons de cet utilisateur sont invalidés, pas
+      // seulement celui utilisé (évite qu'un lien par email resté ouvert ailleurs
+      // reste valable).
+      prisma.passwordResetToken.deleteMany({ where: { userId: resetToken.userId } }),
+    ]);
+    // Si le compte a été compromis, un mot de passe réinitialisé doit aussi
+    // déconnecter toute session déjà ouverte ailleurs.
+    await destroyAllSessions(resetToken.userId);
+
+    return reply.send({ status: "password_reset" });
   });
 
   app.post("/auth/login", async (request, reply) => {

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError, login, verifyMfa } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
 
@@ -102,6 +102,9 @@ export function LoginPage() {
             <button className="primary" type="submit" disabled={busy}>
               {busy ? "Connexion…" : "Se connecter"}
             </button>
+            <p className="hint" style={{ marginTop: 14, marginBottom: 0 }}>
+              <Link to="/mot-de-passe-oublie">Mot de passe oublié ?</Link>
+            </p>
           </form>
         ) : (
           <form onSubmit={handleMfaSubmit}>

@@ -63,3 +63,10 @@ export async function destroyOtherSessions(userId: string, request: FastifyReque
     where: { userId, ...(keepHash ? { tokenHash: { not: keepHash } } : {}) },
   });
 }
+
+// Utilisé après une réinitialisation de mot de passe (pas de session active à
+// exclure, contrairement à destroyOtherSessions) : si le compte a été compromis,
+// réinitialiser le mot de passe doit aussi déconnecter tout le monde ailleurs.
+export async function destroyAllSessions(userId: string) {
+  await prisma.session.deleteMany({ where: { userId } });
+}

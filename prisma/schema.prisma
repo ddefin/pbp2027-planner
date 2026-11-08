@@ -21,6 +21,7 @@ model User {
   createdAt            DateTime       @default(now())
   sessions             Session[]
   recoveryCodes        RecoveryCode[]
+  passwordResetTokens  PasswordResetToken[]
   mfaChallenges        MfaChallenge[]
   brmEvents            BrmEvent[]
   brmParticipations    BrmParticipation[]
@@ -65,6 +66,18 @@ model RecoveryCode {
   codeHash  String
   usedAt    DateTime?
   createdAt DateTime  @default(now())
+}
+
+// Jeton de réinitialisation de mot de passe oublié, envoyé par email. À usage
+// unique (supprimé dès utilisation) et de courte durée de vie — voir
+// src/routes/auth.ts, même logique que MfaChallenge.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 // Un BRM (Brevet Randonneur Mondial) de qualification pour le PBP.
