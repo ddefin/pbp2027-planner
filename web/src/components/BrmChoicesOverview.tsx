@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
 import { CATALOG_STATUS_LABEL, daysUntil } from "../lib/brmMeta";
-import { OpenRunnerEmbed } from "./OpenRunnerEmbed";
 
 // Vue collective des BRM choisis par les randonneurs sur le calendrier (plutôt
 // qu'une saisie manuelle individuelle) : qui part sur quel brevet, visible par
@@ -66,7 +65,6 @@ export function BrmChoicesOverview() {
                     )}
                   </div>
                 )}
-                {e.roadMap && <OpenRunnerEmbed url={e.roadMap} />}
 
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
                   {e.participants.map((p, i) => (
