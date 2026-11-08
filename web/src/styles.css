@@ -141,6 +141,12 @@ button.ghost {
   cursor: pointer;
 }
 
+button.ghost.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
 button.link {
   background: none;
   border: none;

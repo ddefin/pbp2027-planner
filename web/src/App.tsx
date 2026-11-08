@@ -5,6 +5,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { SortiesPage } from "./pages/SortiesPage";
+import { MessagesPage } from "./pages/MessagesPage";
 import { CalendrierPage } from "./pages/CalendrierPage";
 import { SecurityPage } from "./pages/SecurityPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
@@ -27,6 +28,7 @@ function ProtectedLayout({ children }: { children: ReactNode }) {
           <Link to="/">Tableau de bord</Link>
           <Link to="/calendrier">Calendrier BRM</Link>
           <Link to="/sorties">Sorties</Link>
+          <Link to="/messagerie">Messagerie</Link>
           <Link to="/securite">Sécurité</Link>
           <Link to="/webhooks">Webhooks</Link>
           {user && <span className="hint">Bonjour, {user.prenom}</span>}
@@ -73,6 +75,14 @@ export default function App() {
           element={
             <ProtectedLayout>
               <SortiesPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/messagerie"
+          element={
+            <ProtectedLayout>
+              <MessagesPage />
             </ProtectedLayout>
           }
         />

@@ -27,6 +27,9 @@ model User {
   sortieParticipations SortieParticipant[]
   chatMessages         ChatMessage[]
   webhookSubscriptions WebhookSubscription[]
+  groupMessages        GroupMessage[]
+  sentDirectMessages     DirectMessage[] @relation("DmSender")
+  receivedDirectMessages DirectMessage[] @relation("DmRecipient")
 }
 
 model Session {
@@ -178,4 +181,33 @@ model WebhookSubscription {
   lastStatus      String? // "ok" | "error"
 
   @@index([userId])
+}
+
+// Salon général : un seul fil, visible par tous les randonneurs connectés
+// (pas de notion de membres, contrairement au chat d'une Sortie).
+model GroupMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Message privé entre deux randonneurs. readAt sert à compter les messages non
+// lus dans la liste des conversations (jamais renvoyé comme preuve de lecture
+// à l'expéditeur pour l'instant, juste utilisé côté destinataire).
+model DirectMessage {
+  id          String    @id @default(cuid())
+  senderId    String
+  sender      User      @relation("DmSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User      @relation("DmRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  text        String
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, senderId, createdAt])
 }

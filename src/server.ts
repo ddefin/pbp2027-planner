@@ -14,7 +14,9 @@ import { sortiesRoutes } from "./routes/sorties.js";
 import { webhooksRoutes } from "./routes/webhooks.js";
 import { parcoursRoutes } from "./routes/parcours.js";
 import { meteoRoutes } from "./routes/meteo.js";
+import { messagingRoutes } from "./routes/messaging.js";
 import { chatWsRoutes } from "./ws/chat.js";
+import { messagingWsRoutes } from "./ws/messaging.js";
 
 export function buildServer() {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
@@ -43,7 +45,9 @@ export function buildServer() {
       api.register(webhooksRoutes);
       api.register(parcoursRoutes);
       api.register(meteoRoutes);
+      api.register(messagingRoutes);
       api.register(chatWsRoutes);
+      api.register(messagingWsRoutes);
     },
     { prefix: "/api" },
   );
