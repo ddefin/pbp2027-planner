@@ -1,6 +1,8 @@
 import type { BrmDistance, BrmStatus } from "../api/brm";
 
-export const PBP_DATE = new Date("2027-08-17T05:00:00");
+// Départs donnés par créneaux successifs : date officielle retenue pour le
+// compte à rebours en attendant la répartition définitive des créneaux.
+export const PBP_DATE = new Date("2027-08-22T16:00:00");
 
 export const VALID_DISTANCES: BrmDistance[] = [200, 300, 400, 600];
 
