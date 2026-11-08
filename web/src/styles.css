@@ -1,12 +1,14 @@
 :root {
-  --bg: #eef1ea;
+  /* "Route du jour" : gris de pierre froid + vert sapin, plutôt que le
+     crème/terracotta qu'on voit sur beaucoup d'interfaces générées. */
+  --bg: #eef0ec;
   --panel: #ffffff;
-  --fg: #1c231f;
-  --fg-muted: #5c655e;
-  --line: #d4d9cc;
-  --accent: #c4471f;
-  --accent-fg: #fff8ef;
-  --ok: #2f6b3a;
+  --fg: #1b231c;
+  --fg-muted: #5c6659;
+  --line: #d5d9d0;
+  --accent: #1f5c3f;
+  --accent-fg: #f2f6f0;
+  --ok: #1f6f8a;
   --warn: #b4791a;
   --bad: #a3291a;
   --font-display: "Oswald", sans-serif;
@@ -16,17 +18,28 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #15181a;
-    --panel: #1f2326;
-    --fg: #eceeea;
-    --fg-muted: #9aa29c;
-    --line: #333a33;
-    --accent: #e06a3c;
-    --accent-fg: #1a1200;
-    --ok: #5fb86f;
+    /* Contrepartie sombre de "Route du jour" — un vert plus clair et plus
+       saturé pour rester lisible sur fond sombre, pas juste l'inverse des
+       valeurs claires. */
+    --bg: #12161a;
+    --panel: #1a2019;
+    --fg: #e7ebe4;
+    --fg-muted: #93a08f;
+    --line: #2b332a;
+    --accent: #6fcf9b;
+    --accent-fg: #0d2016;
+    --ok: #49b8d8;
     --warn: #e0a83a;
     --bad: #e25a43;
   }
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
 }
 
 * {
@@ -145,6 +158,7 @@ button.ghost.active {
   background: var(--accent);
   color: var(--accent-fg);
   border-color: var(--accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 button.link {
@@ -612,7 +626,7 @@ button.link {
 }
 
 .cal-chip {
-  background: none;
+  background: var(--panel);
   border: 1px solid var(--line);
   color: var(--fg-muted);
   border-radius: 999px;
@@ -620,12 +634,18 @@ button.link {
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.cal-chip:hover {
+  border-color: var(--accent);
 }
 
 .cal-chip.active {
   background: var(--accent);
   color: var(--accent-fg);
   border-color: var(--accent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .cal-select,
@@ -637,6 +657,12 @@ button.link {
   font-size: 13px;
   color: var(--fg);
   font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.cal-select:hover,
+.cal-search:focus {
+  border-color: var(--accent);
 }
 
 .cal-search {
@@ -698,12 +724,13 @@ button.link {
   width: 30px;
   height: 20px;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
   color: var(--accent);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
   margin-right: 8px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .cal-row .cal-ville {
@@ -734,11 +761,17 @@ button.link {
 }
 
 .cal-row select {
-  background: var(--bg);
+  background: var(--panel);
   border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 7px 10px;
+  border-radius: 999px;
+  padding: 7px 14px;
   font-size: 12.5px;
+  font-weight: 700;
   color: var(--fg);
   font-family: inherit;
+  transition: border-color 0.15s;
+}
+
+.cal-row select:hover {
+  border-color: var(--accent);
 }
