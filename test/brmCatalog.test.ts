@@ -18,8 +18,21 @@ function buildMultipartBody(fieldName: string, filename: string, contentType: st
   return { body: Buffer.concat([pre, content, post]), contentType: `multipart/form-data; boundary=${boundary}` };
 }
 
+function buildMultipartWithLabel(filename: string, contentType: string, content: Buffer, label: string) {
+  const boundary = "----testBoundary" + Date.now();
+  const filePart = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+  );
+  const labelPart = Buffer.from(`\r\n--${boundary}\r\nContent-Disposition: form-data; name="label"\r\n\r\n${label}`);
+  const post = Buffer.from(`\r\n--${boundary}--\r\n`);
+  return { body: Buffer.concat([filePart, content, labelPart, post]), contentType: `multipart/form-data; boundary=${boundary}` };
+}
+
 let buildServer: typeof import("../src/server.js").buildServer;
 let prisma: typeof import("../src/db.js").prisma;
+let generateOpaqueToken: typeof import("../src/lib/tokens.js").generateOpaqueToken;
+let hashToken: typeof import("../src/lib/tokens.js").hashToken;
+let SESSION_COOKIE: typeof import("../src/lib/session.js").SESSION_COOKIE;
 
 function cleanupDbFiles() {
   for (const suffix of ["", "-journal", "-wal", "-shm"]) {
@@ -84,6 +97,8 @@ beforeAll(async () => {
 
   ({ buildServer } = await import("../src/server.js"));
   ({ prisma } = await import("../src/db.js"));
+  ({ generateOpaqueToken, hashToken } = await import("../src/lib/tokens.js"));
+  ({ SESSION_COOKIE } = await import("../src/lib/session.js"));
 });
 
 afterAll(async () => {
@@ -102,6 +117,17 @@ async function registerAndLogin(server: ReturnType<typeof buildServer>, email: s
   await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password, prenom: "Test" } });
   const loginRes = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
   return extractCookie(loginRes.headers["set-cookie"]);
+}
+
+// Session créée directement en base plutôt que via /api/auth/login : passer par la
+// route compterait vers le rate limit par IP (voir src/lib/rateLimit.ts), que cette
+// suite dépasserait avec autant de tests enchaînant plusieurs connexions chacun.
+async function registerWithSession(server: ReturnType<typeof buildServer>, email: string) {
+  await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password: "mot-de-passe-de-test-123", prenom: "Test" } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+  const token = generateOpaqueToken();
+  await prisma.session.create({ data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 60_000) } });
+  return `${SESSION_COOKIE}=${token}`;
 }
 
 describe("API catalogue BRM (ACP)", () => {
@@ -271,5 +297,94 @@ describe("API catalogue BRM (ACP)", () => {
 
     const deleteByA = await server.inject({ method: "DELETE", url: `/api/brm/catalog/${eventId}/track`, headers: { cookie: a } });
     expect(deleteByA.statusCode).toBe(204);
+  });
+
+  it("ajoute des points de ravito/contrôle, visibles par tous, chacun ne retire que les siens", async () => {
+    const a = await registerWithSession(server, `catalog-cp-a-${Date.now()}@example.com`);
+    const b = await registerWithSession(server, `catalog-cp-b-${Date.now()}@example.com`);
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: a } });
+    const eventId = listRes.json().events.find((e: { ville: string }) => e.ville === "Rambouillet").id;
+
+    const created = await server.inject({
+      method: "POST",
+      url: `/api/brm/catalog/${eventId}/control-points`,
+      headers: { cookie: a },
+      payload: { kind: "ravito", label: "Boulangerie du centre", lat: 48.64, lon: 1.83 },
+    });
+    expect(created.statusCode).toBe(201);
+    const point = created.json().point;
+    expect(point.mine).toBe(true);
+
+    // Visible par B, mais pas comme "le sien".
+    const listByB = await server.inject({ method: "GET", url: `/api/brm/catalog/${eventId}/control-points`, headers: { cookie: b } });
+    expect(listByB.json().points).toHaveLength(1);
+    expect(listByB.json().points[0].mine).toBe(false);
+
+    const deleteByB = await server.inject({
+      method: "DELETE",
+      url: `/api/brm/catalog/${eventId}/control-points/${point.id}`,
+      headers: { cookie: b },
+    });
+    expect(deleteByB.statusCode).toBe(403);
+
+    const deleteByA = await server.inject({
+      method: "DELETE",
+      url: `/api/brm/catalog/${eventId}/control-points/${point.id}`,
+      headers: { cookie: a },
+    });
+    expect(deleteByA.statusCode).toBe(204);
+  });
+
+  it("gère plusieurs variantes de tracé pour le même BRM, sans que l'une remplace l'autre", async () => {
+    const a = await registerWithSession(server, `catalog-variant-a-${Date.now()}@example.com`);
+    const b = await registerWithSession(server, `catalog-variant-b-${Date.now()}@example.com`);
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: a } });
+    const eventId = listRes.json().events.find((e: { ville: string }) => e.ville === "Gacé").id;
+
+    const gpx = readFileSync(sampleGpxPath);
+    const multipartA = buildMultipartWithLabel("variante-a.gpx", "application/gpx+xml", gpx, "Évite Nogent");
+    const uploadA = await server.inject({
+      method: "POST",
+      url: `/api/brm/catalog/${eventId}/track-variants`,
+      headers: { cookie: a, "content-type": multipartA.contentType },
+      payload: multipartA.body,
+    });
+    expect(uploadA.statusCode).toBe(201);
+    expect(uploadA.json().variant.label).toBe("Évite Nogent");
+    expect(uploadA.json().variant.mine).toBe(true);
+
+    const multipartB = buildMultipartBody("file", "variante-b.gpx", "application/gpx+xml", gpx);
+    const uploadB = await server.inject({
+      method: "POST",
+      url: `/api/brm/catalog/${eventId}/track-variants`,
+      headers: { cookie: b, "content-type": multipartB.contentType },
+      payload: multipartB.body,
+    });
+    expect(uploadB.statusCode).toBe(201);
+    // Pas de libellé fourni : repli sur le nom de fichier.
+    expect(uploadB.json().variant.label).toBe("variante-b.gpx");
+
+    const list = await server.inject({ method: "GET", url: `/api/brm/catalog/${eventId}/track-variants`, headers: { cookie: a } });
+    expect(list.json().variants).toHaveLength(2);
+    expect(list.json().variants.find((v: { id: string }) => v.id === uploadA.json().variant.id).mine).toBe(true);
+    expect(list.json().variants.find((v: { id: string }) => v.id === uploadB.json().variant.id).mine).toBe(false);
+
+    // A ne peut pas supprimer la variante de B.
+    const deleteWrongUser = await server.inject({
+      method: "DELETE",
+      url: `/api/brm/catalog/${eventId}/track-variants/${uploadB.json().variant.id}`,
+      headers: { cookie: a },
+    });
+    expect(deleteWrongUser.statusCode).toBe(403);
+
+    const deleteOwn = await server.inject({
+      method: "DELETE",
+      url: `/api/brm/catalog/${eventId}/track-variants/${uploadA.json().variant.id}`,
+      headers: { cookie: a },
+    });
+    expect(deleteOwn.statusCode).toBe(204);
+
+    const listAfter = await server.inject({ method: "GET", url: `/api/brm/catalog/${eventId}/track-variants`, headers: { cookie: a } });
+    expect(listAfter.json().variants).toHaveLength(1);
   });
 });

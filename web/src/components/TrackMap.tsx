@@ -1,8 +1,19 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { TrackPoint } from "../api/brmCatalog";
+import type { ControlPoint, TrackPoint } from "../api/brmCatalog";
 import { bearing } from "../lib/gpxAnalysis";
+
+const CONTROL_POINT_SYMBOL: Record<ControlPoint["kind"], string> = {
+  depart: "🏁",
+  arrivee: "🏁",
+  ravito: "🍊",
+  controle: "📍",
+};
+
+// Palette distincte de TRACK_COLOR (le tracé de référence, toujours rouge) pour que
+// les variantes comparées restent identifiables sans se confondre avec lui.
+const VARIANT_COLORS = ["#3b82f6", "#a855f7", "#f59e0b", "#10b981", "#ec4899", "#14b8a6"];
 
 // Couleur fixe et saturée plutôt que l'accent du thème (vert, trop proche des
 // couleurs de terrain sur CyclOSM/satellite — peu visible). Avec un liseré clair
@@ -59,10 +70,32 @@ function arrowIcon(bearingDeg: number): L.DivIcon {
 // exige désormais une clé API sur ses fonds gratuits, OpenTopoMap puis CyclOSM seuls
 // se sont révélés peu lisibles selon les cas. Vélo (CyclOSM), Satellite (Esri, sans
 // clé) et Relief (OpenTopoMap), dans leurs couleurs réelles.
-export function TrackMap({ points, highlight }: { points: TrackPoint[]; highlight?: { lat: number; lon: number } | null }) {
+export function TrackMap({
+  points,
+  highlight,
+  controlPoints,
+  onDeleteControlPoint,
+  addControlPointMode,
+  onMapClick,
+  variants,
+}: {
+  points: TrackPoint[];
+  highlight?: { lat: number; lon: number } | null;
+  controlPoints?: ControlPoint[];
+  onDeleteControlPoint?: (id: string) => void;
+  addControlPointMode?: boolean;
+  onMapClick?: (lat: number, lon: number) => void;
+  variants?: { id: string; label: string; points: TrackPoint[] }[];
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const highlightMarkerRef = useRef<L.CircleMarker | null>(null);
+  const controlLayerRef = useRef<L.LayerGroup | null>(null);
+  const variantLayerRef = useRef<L.LayerGroup | null>(null);
+  const onDeleteControlPointRef = useRef(onDeleteControlPoint);
+  onDeleteControlPointRef.current = onDeleteControlPoint;
+  const onMapClickRef = useRef(onMapClick);
+  onMapClickRef.current = onMapClick;
 
   useEffect(() => {
     if (!containerRef.current || points.length < 2) return;
@@ -86,6 +119,11 @@ export function TrackMap({ points, highlight }: { points: TrackPoint[]; highligh
     });
     velo.addTo(map);
     L.control.layers({ "Vélo": velo, "Satellite": satellite, "Relief": relief }).addTo(map);
+
+    controlLayerRef.current = L.layerGroup().addTo(map);
+    variantLayerRef.current = L.layerGroup().addTo(map);
+
+    map.on("click", (e) => onMapClickRef.current?.(e.latlng.lat, e.latlng.lng));
 
     const latLngs = points.map((p) => L.latLng(p.lat, p.lon));
     L.polyline(latLngs, { color: TRACK_CASING, weight: 7, opacity: 0.9 }).addTo(map);
@@ -113,8 +151,57 @@ export function TrackMap({ points, highlight }: { points: TrackPoint[]; highligh
       map.remove();
       mapRef.current = null;
       highlightMarkerRef.current = null;
+      controlLayerRef.current = null;
+      variantLayerRef.current = null;
     };
   }, [points]);
+
+  // Curseur en croix pendant le mode "ajouter un point" — juste un indice visuel,
+  // le vrai comportement est le listener "click" posé une fois ci-dessus.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) el.style.cursor = addControlPointMode ? "crosshair" : "";
+  }, [addControlPointMode]);
+
+  // Points de ravito/contrôle : effet séparé de celui qui construit la carte, pour
+  // ne pas la reconstruire (et perdre le zoom/la position) à chaque ajout/suppression.
+  useEffect(() => {
+    const layer = controlLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    for (const cp of controlPoints ?? []) {
+      const icon = L.divIcon({
+        className: "",
+        html: `<div style="font-size: 20px; transform: translate(-50%, -100%);">${CONTROL_POINT_SYMBOL[cp.kind]}</div>`,
+        iconSize: [0, 0],
+      });
+      const marker = L.marker([cp.lat, cp.lon], { icon });
+      const deleteBtn = cp.mine && onDeleteControlPointRef.current ? `<br/><button type="button" class="cp-delete-btn" style="margin-top:4px;">Supprimer</button>` : "";
+      marker.bindPopup(`<b>${cp.label}</b>${deleteBtn}`);
+      marker.on("popupopen", (e) => {
+        const btn = e.popup.getElement()?.querySelector(".cp-delete-btn");
+        btn?.addEventListener("click", () => {
+          onDeleteControlPointRef.current?.(cp.id);
+          marker.closePopup();
+        });
+      });
+      marker.addTo(layer);
+    }
+  }, [controlPoints]);
+
+  // Variantes de tracé en overlay, une couleur distincte chacune — juste la ligne,
+  // sans flèches/repères (ça alourdirait trop la carte avec plusieurs variantes).
+  useEffect(() => {
+    const layer = variantLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    (variants ?? []).forEach((v, i) => {
+      const color = VARIANT_COLORS[i % VARIANT_COLORS.length];
+      L.polyline(v.points.map((p) => L.latLng(p.lat, p.lon)), { color, weight: 3, dashArray: "6 6" })
+        .bindTooltip(v.label)
+        .addTo(layer);
+    });
+  }, [variants]);
 
   // Effet séparé (pas dans celui ci-dessus) : la position survolée sur le profil
   // change à chaque mouvement de souris — recréer toute la carte à ce rythme serait

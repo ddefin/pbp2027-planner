@@ -85,3 +85,65 @@ export async function uploadCatalogTrack(id: string, file: File): Promise<Catalo
 export function deleteCatalogTrack(id: string) {
   return request<void>(`/brm/catalog/${id}/track`, { method: "DELETE" });
 }
+
+export type ControlPointKind = "depart" | "ravito" | "controle" | "arrivee";
+
+export interface ControlPoint {
+  id: string;
+  kind: ControlPointKind;
+  label: string;
+  lat: number;
+  lon: number;
+  mine: boolean;
+}
+
+export async function listControlPoints(id: string): Promise<ControlPoint[]> {
+  const res = await request<{ points: ControlPoint[] }>(`/brm/catalog/${id}/control-points`);
+  return res.points;
+}
+
+export async function createControlPoint(
+  id: string,
+  data: { kind: ControlPointKind; label: string; lat: number; lon: number },
+): Promise<ControlPoint> {
+  const res = await request<{ point: ControlPoint }>(`/brm/catalog/${id}/control-points`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return res.point;
+}
+
+export function deleteControlPoint(id: string, pointId: string) {
+  return request<void>(`/brm/catalog/${id}/control-points/${pointId}`, { method: "DELETE" });
+}
+
+export interface TrackVariant {
+  id: string;
+  label: string;
+  fileName: string;
+  points: TrackPoint[];
+  distanceKm: number | null;
+  elevationGainM: number | null;
+  elevationLossM: number | null;
+  uploadedBy: string;
+  mine: boolean;
+}
+
+export async function listTrackVariants(id: string): Promise<TrackVariant[]> {
+  const res = await request<{ variants: TrackVariant[] }>(`/brm/catalog/${id}/track-variants`);
+  return res.variants;
+}
+
+export async function uploadTrackVariant(id: string, file: File, label: string): Promise<TrackVariant> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("label", label);
+  const res = await fetch(`/api/brm/catalog/${id}/track-variants`, { method: "POST", credentials: "include", body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? "unknown_error");
+  return (body as { variant: TrackVariant }).variant;
+}
+
+export function deleteTrackVariant(id: string, variantId: string) {
+  return request<void>(`/brm/catalog/${id}/track-variants/${variantId}`, { method: "DELETE" });
+}

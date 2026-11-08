@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { publicName } from "../lib/publicName.js";
 import { broadcast, dmRoomKey, GENERAL_ROOM_KEY } from "../ws/messaging.js";
+import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 
 const MESSAGE_PAGE_SIZE = 200;
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 Mo : large pour une photo, raisonnable pour une pièce jointe de chat
@@ -121,6 +122,7 @@ export async function messagingRoutes(app: FastifyInstance) {
     const buffer = await file.toBuffer();
     if (buffer.length > MAX_FILE_BYTES) return reply.code(413).send({ error: "file_too_large" });
 
+    const filePath = await saveUploadedFile("messages", buffer);
     const message = await prisma.groupMessage.create({
       data: {
         userId: user.id,
@@ -128,7 +130,7 @@ export async function messagingRoutes(app: FastifyInstance) {
         kind: "file",
         fileName: file.filename,
         fileMimeType: file.mimetype || "application/octet-stream",
-        fileData: buffer,
+        filePath,
       },
     });
     broadcast(GENERAL_ROOM_KEY, { type: "message", ...serializeGroup({ ...message, user: { prenom: user.prenom } }) });
@@ -141,11 +143,15 @@ export async function messagingRoutes(app: FastifyInstance) {
 
     const { id } = request.params as { id: string };
     const message = await prisma.groupMessage.findUnique({ where: { id } });
-    if (!message || !message.fileData || !message.fileName) return reply.code(404).send({ error: "not_found" });
+    if (!message || !message.fileName || (!message.filePath && !message.fileData)) {
+      return reply.code(404).send({ error: "not_found" });
+    }
+
+    const content = message.filePath ? await readUploadedFile(message.filePath) : message.fileData!;
 
     reply.header("content-type", message.fileMimeType ?? "application/octet-stream");
     reply.header("content-disposition", `inline; filename="${message.fileName.replace(/"/g, "")}"`);
-    return reply.send(message.fileData);
+    return reply.send(content);
   });
 
   // Seul l'auteur peut supprimer son propre message — jamais un message d'un autre,
@@ -159,6 +165,7 @@ export async function messagingRoutes(app: FastifyInstance) {
     if (!message) return reply.code(404).send({ error: "not_found" });
     if (message.userId !== user.id) return reply.code(403).send({ error: "forbidden" });
 
+    if (message.filePath) await deleteUploadedFile(message.filePath);
     await prisma.groupMessage.delete({ where: { id } });
     broadcast(GENERAL_ROOM_KEY, { type: "message_deleted", id });
     return reply.code(204).send();
@@ -263,6 +270,7 @@ export async function messagingRoutes(app: FastifyInstance) {
     const buffer = await file.toBuffer();
     if (buffer.length > MAX_FILE_BYTES) return reply.code(413).send({ error: "file_too_large" });
 
+    const filePath = await saveUploadedFile("messages", buffer);
     const message = await prisma.directMessage.create({
       data: {
         senderId: user.id,
@@ -271,7 +279,7 @@ export async function messagingRoutes(app: FastifyInstance) {
         kind: "file",
         fileName: file.filename,
         fileMimeType: file.mimetype || "application/octet-stream",
-        fileData: buffer,
+        filePath,
       },
     });
     const serialized = serializeDirect(message);
@@ -285,13 +293,17 @@ export async function messagingRoutes(app: FastifyInstance) {
 
     const { peerId, id } = request.params as { peerId: string; id: string };
     const message = await prisma.directMessage.findUnique({ where: { id } });
-    if (!message || !message.fileData || !message.fileName) return reply.code(404).send({ error: "not_found" });
+    if (!message || !message.fileName || (!message.filePath && !message.fileData)) {
+      return reply.code(404).send({ error: "not_found" });
+    }
     const isParty = (message.senderId === user.id && message.recipientId === peerId) || (message.recipientId === user.id && message.senderId === peerId);
     if (!isParty) return reply.code(403).send({ error: "forbidden" });
 
+    const content = message.filePath ? await readUploadedFile(message.filePath) : message.fileData!;
+
     reply.header("content-type", message.fileMimeType ?? "application/octet-stream");
     reply.header("content-disposition", `inline; filename="${message.fileName.replace(/"/g, "")}"`);
-    return reply.send(message.fileData);
+    return reply.send(content);
   });
 
   app.delete("/messaging/dm/:peerId/messages/:id", async (request, reply) => {
@@ -303,6 +315,7 @@ export async function messagingRoutes(app: FastifyInstance) {
     if (!message) return reply.code(404).send({ error: "not_found" });
     if (message.senderId !== user.id) return reply.code(403).send({ error: "forbidden" });
 
+    if (message.filePath) await deleteUploadedFile(message.filePath);
     await prisma.directMessage.delete({ where: { id } });
     broadcast(dmRoomKey(user.id, peerId), { type: "message_deleted", id });
     return reply.code(204).send();

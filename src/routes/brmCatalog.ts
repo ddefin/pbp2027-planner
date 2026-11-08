@@ -18,6 +18,14 @@ const statusSchema = z.enum(CATALOG_STATUSES);
 const catalogIdSchema = z.string().regex(/^[0-9a-f]{16}$/);
 const MAX_TRACK_FILE_BYTES = 5 * 1024 * 1024; // 5 Mo : largement suffisant pour un GPX de 1200km
 
+const CONTROL_POINT_KINDS = ["depart", "ravito", "controle", "arrivee"] as const;
+const controlPointSchema = z.object({
+  kind: z.enum(CONTROL_POINT_KINDS),
+  label: z.string().trim().min(1).max(100),
+  lat: z.number().min(-90).max(90),
+  lon: z.number().min(-180).max(180),
+});
+
 export async function brmCatalogRoutes(app: FastifyInstance) {
   app.get("/brm/catalog", async (request, reply) => {
     const user = await getSessionUser(request);
@@ -221,6 +229,162 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
     if (existing.uploadedByUserId !== user.id) return reply.code(403).send({ error: "forbidden" });
 
     await prisma.catalogTrack.delete({ where: { catalogEventId: id } });
+    return reply.code(204).send();
+  });
+
+  // Points de ravito/contrôle/départ/arrivée pour un BRM du calendrier : collectifs
+  // (visibles par tous, voir CatalogTrack), mais chacun ne peut retirer que les siens
+  // — contrairement au tracé de référence, plusieurs personnes posent des points
+  // indépendamment, pas de notion de "remplacer celui d'un autre".
+  app.get("/brm/catalog/:id/control-points", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    const points = await prisma.catalogControlPoint.findMany({
+      where: { catalogEventId: id },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return reply.send({
+      points: points.map((p) => ({
+        id: p.id,
+        kind: p.kind,
+        label: p.label,
+        lat: p.lat,
+        lon: p.lon,
+        mine: p.createdByUserId === user.id,
+      })),
+    });
+  });
+
+  app.post("/brm/catalog/:id/control-points", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    const parsed = controlPointSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
+
+    const point = await prisma.catalogControlPoint.create({
+      data: { catalogEventId: id, createdByUserId: user.id, ...parsed.data },
+    });
+
+    return reply.code(201).send({
+      point: { id: point.id, kind: point.kind, label: point.label, lat: point.lat, lon: point.lon, mine: true },
+    });
+  });
+
+  app.delete("/brm/catalog/:id/control-points/:pointId", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { pointId } = request.params as { id: string; pointId: string };
+    const point = await prisma.catalogControlPoint.findUnique({ where: { id: pointId } });
+    if (!point) return reply.code(404).send({ error: "not_found" });
+    if (point.createdByUserId !== user.id) return reply.code(403).send({ error: "forbidden" });
+
+    await prisma.catalogControlPoint.delete({ where: { id: pointId } });
+    return reply.code(204).send();
+  });
+
+  // Variantes de tracé : contrairement à CatalogTrack (LE tracé de référence,
+  // remplaçable par n'importe qui), plusieurs variantes peuvent coexister pour
+  // comparer des options — voir le commentaire du modèle CatalogTrackVariant.
+  app.get("/brm/catalog/:id/track-variants", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    const variants = await prisma.catalogTrackVariant.findMany({
+      where: { catalogEventId: id },
+      include: { uploadedBy: { select: { prenom: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return reply.send({
+      variants: variants.map((v) => ({
+        id: v.id,
+        label: v.label,
+        fileName: v.fileName,
+        points: JSON.parse(v.points),
+        distanceKm: v.distanceKm,
+        elevationGainM: v.elevationGainM,
+        elevationLossM: v.elevationLossM,
+        uploadedBy: publicName(v.uploadedBy),
+        mine: v.uploadedByUserId === user.id,
+      })),
+    });
+  });
+
+  app.post("/brm/catalog/:id/track-variants", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
+
+    const file = await request.file({ limits: { fileSize: MAX_TRACK_FILE_BYTES } });
+    if (!file) return reply.code(400).send({ error: "no_file" });
+    if (!/\.gpx$/i.test(file.filename)) return reply.code(400).send({ error: "invalid_file_type" });
+
+    // Champ texte envoyé dans le même multipart que le fichier (voir @fastify/multipart) :
+    // le libellé de la variante (ex. "Évite Nogent"), pas de valeur par défaut utile.
+    const labelField = (file.fields?.label as { value?: unknown } | undefined)?.value;
+    const label = typeof labelField === "string" && labelField.trim() ? labelField.trim().slice(0, 100) : file.filename;
+
+    const buffer = await file.toBuffer();
+    if (buffer.length > MAX_TRACK_FILE_BYTES) return reply.code(413).send({ error: "file_too_large" });
+
+    const xml = buffer.toString("utf8");
+    const points = parseGpxProfile(xml);
+    if (!points) return reply.code(422).send({ error: "unreadable_gpx" });
+    const stats = parseGpxStats(xml);
+
+    const variant = await prisma.catalogTrackVariant.create({
+      data: {
+        catalogEventId: id,
+        uploadedByUserId: user.id,
+        label,
+        fileName: file.filename,
+        points: JSON.stringify(points),
+        distanceKm: stats?.distanceKm ?? null,
+        elevationGainM: stats?.elevationGainM ?? null,
+        elevationLossM: stats?.elevationLossM ?? null,
+      },
+    });
+
+    return reply.code(201).send({
+      variant: {
+        id: variant.id,
+        label: variant.label,
+        fileName: variant.fileName,
+        points,
+        distanceKm: variant.distanceKm,
+        elevationGainM: variant.elevationGainM,
+        elevationLossM: variant.elevationLossM,
+        uploadedBy: publicName(user),
+        mine: true,
+      },
+    });
+  });
+
+  app.delete("/brm/catalog/:id/track-variants/:variantId", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { variantId } = request.params as { id: string; variantId: string };
+    const variant = await prisma.catalogTrackVariant.findUnique({ where: { id: variantId } });
+    if (!variant) return reply.code(404).send({ error: "not_found" });
+    if (variant.uploadedByUserId !== user.id) return reply.code(403).send({ error: "forbidden" });
+
+    await prisma.catalogTrackVariant.delete({ where: { id: variantId } });
     return reply.code(204).send();
   });
 }

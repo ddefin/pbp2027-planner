@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { fetchOpenRunnerStats } from "../lib/openrunner.js";
 import { parseGpxStats } from "../lib/gpx.js";
+import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 Mo : largement suffisant pour un GPX de 1200km
 
@@ -129,12 +130,16 @@ export async function parcoursRoutes(app: FastifyInstance) {
 
     const stats = parseGpxStats(buffer.toString("utf8"));
 
+    const existing = await prisma.parcours.findUnique({ where: { brmEventId } });
+    const filePath = await saveUploadedFile("parcours", buffer);
+    if (existing?.filePath) await deleteUploadedFile(existing.filePath);
+
     const parcours = await prisma.parcours.upsert({
       where: { brmEventId },
       create: {
         brmEventId,
         fileName: file.filename,
-        fileData: buffer,
+        filePath,
         fileMimeType: "application/gpx+xml",
         ...(stats ? {
           distanceKm: stats.distanceKm,
@@ -146,7 +151,8 @@ export async function parcoursRoutes(app: FastifyInstance) {
       },
       update: {
         fileName: file.filename,
-        fileData: buffer,
+        filePath,
+        fileData: null, // écrase un éventuel ancien fichier stocké en base (voir src/lib/fileStorage.ts)
         fileMimeType: "application/gpx+xml",
         ...(stats ? {
           distanceKm: stats.distanceKm,
@@ -170,11 +176,17 @@ export async function parcoursRoutes(app: FastifyInstance) {
     if (!brmEvent) return reply.code(404).send({ error: "not_found" });
 
     const parcours = await prisma.parcours.findUnique({ where: { brmEventId } });
-    if (!parcours || !parcours.fileData || !parcours.fileName) return reply.code(404).send({ error: "no_file" });
+    if (!parcours || !parcours.fileName || (!parcours.filePath && !parcours.fileData)) {
+      return reply.code(404).send({ error: "no_file" });
+    }
+
+    // Lit sur disque si disponible (nouveaux uploads), sinon l'ancien stockage en
+    // base (fichiers uploadés avant ce changement — voir src/lib/fileStorage.ts).
+    const content = parcours.filePath ? await readUploadedFile(parcours.filePath) : parcours.fileData!;
 
     reply.header("content-type", parcours.fileMimeType ?? "application/gpx+xml");
     reply.header("content-disposition", `attachment; filename="${parcours.fileName.replace(/"/g, "")}"`);
-    return reply.send(parcours.fileData);
+    return reply.send(content);
   });
 
   app.delete("/brm/:brmEventId/parcours/file", async (request, reply) => {
@@ -185,9 +197,12 @@ export async function parcoursRoutes(app: FastifyInstance) {
     const brmEvent = await requireOwnedBrmEvent(user.id, brmEventId);
     if (!brmEvent) return reply.code(404).send({ error: "not_found" });
 
+    const existing = await prisma.parcours.findUnique({ where: { brmEventId } });
+    if (existing?.filePath) await deleteUploadedFile(existing.filePath);
+
     await prisma.parcours.updateMany({
       where: { brmEventId },
-      data: { fileName: null, fileData: null, fileMimeType: null },
+      data: { fileName: null, fileData: null, filePath: null, fileMimeType: null },
     });
     return reply.code(204).send();
   });
