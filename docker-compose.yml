@@ -18,3 +18,10 @@ services:
     env_file:
       # Jamais committé — voir .env.production.example pour les clés attendues.
       - .env.production
+    logging:
+      # Sans ça, le driver par défaut (json-file) n'a pas de limite : les logs d'un
+      # conteneur qui tourne en continu finissent par remplir le disque du NAS.
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

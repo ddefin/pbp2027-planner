@@ -126,6 +126,37 @@ SMTP_PASSWORD="le mot de passe de cette boîte mail"
 (Les identifiants et le port exacts dépendent de ton hébergeur mail — pour OVH,
 vérifie dans Espace client → Emails → le mode de connexion SMTP proposé.)
 
+### Alerte vent fort (optionnel, nécessite OPENWEATHER_API_KEY)
+
+Si `OPENWEATHER_API_KEY` est renseignée, l'app vérifie automatiquement (toutes
+les 6h) la météo prévue sur les BRM du calendrier ACP que quelqu'un a marqués
+"prévu"/"inscrit" dans les 5 prochains jours. Si le vent (ou les rafales)
+dépasse `WIND_ALERT_THRESHOLD_KMH` (50 km/h par défaut), l'événement webhook
+"meteo.vent_fort" se déclenche — abonne un webhook Discord/Slack à cet
+événement (page Webhooks) pour être notifié. Pas de notification en double :
+au plus une par BRM et par jour de prévision.
+
+### Sauvegardes automatiques
+
+`./data` contient la base SQLite — c'est la seule donnée qui ne se régénère pas
+en redéployant. `scripts/backup.sh` en fait une copie cohérente (via `VACUUM
+INTO`, sans arrêter le conteneur) compressée dans `~/pbp2027-backups/`, et
+purge celles de plus de 30 jours.
+
+Pour l'automatiser sans crontab (DSM le déconseille), utilise le
+**Planificateur de tâches** du Panneau de configuration :
+
+1. Créer → Tâche déclenchée → Script défini par l'utilisateur.
+2. Général : utilisateur `admin` (ou celui qui a accès à Docker), déclenchement
+   quotidien à une heure creuse.
+3. Paramètres de tâche → Exécuter la commande :
+   ```bash
+   /bin/sh ~/pbp2027-planner/scripts/backup.sh
+   ```
+
+Vérifie ensuite que `~/pbp2027-backups/` est bien inclus dans tes sauvegardes
+NAS existantes (Hyper Backup), pour avoir une copie hors du NAS lui-même.
+
 ## 5. Déploiement
 
 Pousser sur `main` suffit : le workflow `.github/workflows/deploy.yml` fait tourner

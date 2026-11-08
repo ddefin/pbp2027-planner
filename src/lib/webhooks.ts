@@ -5,13 +5,19 @@ import { decryptSecret, encryptSecret } from "./secretCrypto.js";
 export const VALID_FORMATS = ["discord", "slack", "generic"] as const;
 export type WebhookFormat = (typeof VALID_FORMATS)[number];
 
-export const VALID_EVENTS = ["sortie.created", "sortie.participant_joined", "brm.participation_changed"] as const;
+export const VALID_EVENTS = [
+  "sortie.created",
+  "sortie.participant_joined",
+  "brm.participation_changed",
+  "meteo.vent_fort",
+] as const;
 export type WebhookEvent = (typeof VALID_EVENTS)[number];
 
 export const EVENT_LABEL: Record<WebhookEvent, string> = {
   "sortie.created": "Nouvelle sortie planifiée",
   "sortie.participant_joined": "Un randonneur rejoint une sortie",
   "brm.participation_changed": "Choix sur un BRM du calendrier",
+  "meteo.vent_fort": "Vent fort prévu sur un BRM choisi",
 };
 
 const DELIVERY_TIMEOUT_MS = 5000;
@@ -20,6 +26,7 @@ type EventPayloads = {
   "sortie.created": { titre: string; date: string; lieu: string; createdBy: string };
   "sortie.participant_joined": { titre: string; who: string };
   "brm.participation_changed": { who: string; status: string; distance: number; ville: string; date: string };
+  "meteo.vent_fort": { ville: string; distance: number; date: string; windKmh: number; gustsKmh: number | null; direction: string };
 };
 
 function humanText<E extends WebhookEvent>(event: E, data: EventPayloads[E]): string {
@@ -38,6 +45,12 @@ function humanText<E extends WebhookEvent>(event: E, data: EventPayloads[E]): st
       const date = new Date(d.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
       const statusLabel: Record<string, string> = { prevu: "Prévu", inscrit: "Inscrit", fait: "Fait", homologue: "Homologué" };
       return `🗓️ ${d.who} a marqué le BRM ${d.distance}km de ${d.ville} (${date}) comme "${statusLabel[d.status] ?? d.status}"`;
+    }
+    case "meteo.vent_fort": {
+      const d = data as EventPayloads["meteo.vent_fort"];
+      const date = new Date(d.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+      const gusts = d.gustsKmh ? ` (rafales à ${d.gustsKmh} km/h)` : "";
+      return `💨 Vent fort annoncé sur le BRM ${d.distance}km de ${d.ville} (${date}) : ${d.windKmh} km/h${gusts}, secteur ${d.direction}`;
     }
     default:
       return "Événement PBP2027";

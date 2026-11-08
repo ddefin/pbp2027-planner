@@ -1,25 +1,58 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ApiError, forgotPassword } from "../api/auth";
+
+// Le backend limite à 5 essais / 15 min par IP (voir src/routes/auth.ts) — un
+// cooldown visible plus court évite surtout les doubles clics/soumissions
+// involontaires, pas une attaque.
+const RESEND_COOLDOWN_S = 30;
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
   const [notConfigured, setNotConfigured] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  function startCooldown() {
+    setCooldown(RESEND_COOLDOWN_S);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setCooldown((v) => {
+        if (v <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          return 0;
+        }
+        return v - 1;
+      });
+    }, 1000);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (cooldown > 0) return;
     setBusy(true);
     try {
       await forgotPassword(email);
       setDone(true);
+      startCooldown();
     } catch (err) {
       // Même en cas d'erreur, on ne distingue pas "compte inconnu" du reste — sauf
       // "non configuré", qui mérite un message clair plutôt qu'une fausse promesse
       // d'email envoyé.
-      if (err instanceof ApiError && err.status === 503) setNotConfigured(true);
-      else setDone(true);
+      if (err instanceof ApiError && err.status === 503) {
+        setNotConfigured(true);
+      } else {
+        setDone(true);
+        startCooldown();
+      }
     } finally {
       setBusy(false);
     }
@@ -50,9 +83,28 @@ export function ForgotPasswordPage() {
           <p className="hint">
             Si un compte existe avec cette adresse, un lien de réinitialisation valable 1 heure vient d'être envoyé.
           </p>
-          <Link to="/login" className="hint" style={{ textDecoration: "underline" }}>
-            Retour à la connexion
-          </Link>
+          <button
+            type="button"
+            className="ghost"
+            style={{ marginTop: 16 }}
+            disabled={cooldown > 0}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await forgotPassword(email);
+              } catch {
+                // le message générique ci-dessus reste valable même en cas d'erreur
+              } finally {
+                setBusy(false);
+                startCooldown();
+              }
+            }}
+          >
+            {cooldown > 0 ? `Renvoyer le lien (${cooldown}s)` : busy ? "Envoi…" : "Renvoyer le lien"}
+          </button>
+          <p className="hint" style={{ marginTop: 16 }}>
+            <Link to="/login">Retour à la connexion</Link>
+          </p>
         </div>
       </div>
     );

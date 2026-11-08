@@ -260,3 +260,15 @@ model CatalogTrack {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
+
+// Déduplique les alertes météo (vent fort) : au plus une par BRM du calendrier
+// ACP et par jour de prévision concerné, même si la vérification périodique
+// (voir src/lib/windAlerts.ts) tourne plusieurs fois avant le départ.
+model WindAlertSent {
+  id             String   @id @default(cuid())
+  catalogEventId String
+  forecastDate   String // yyyy-mm-dd
+  createdAt      DateTime @default(now())
+
+  @@unique([catalogEventId, forecastDate])
+}

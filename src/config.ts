@@ -29,6 +29,10 @@ export const config = {
         from: process.env.SMTP_FROM || process.env.SMTP_USER || "",
       }
     : null,
+  // Seuil (km/h, vitesse soutenue OU rafales) au-delà duquel un BRM choisi dans
+  // les 5 prochains jours (limite de l'API prévisions gratuite) déclenche
+  // l'événement webhook "meteo.vent_fort" — voir src/lib/windAlerts.ts.
+  windAlertThresholdKmh: Number(process.env.WIND_ALERT_THRESHOLD_KMH ?? 50),
   // D'où partent les liens de réinitialisation (ex. https://pbp2027.lameteoducyclo.fr) :
   // sans elle, dérivé de l'en-tête Host de la requête (voir src/routes/auth.ts).
   publicUrl: process.env.PUBLIC_URL || null,

@@ -6,6 +6,7 @@ import cookie from "@fastify/cookie";
 import multipart from "@fastify/multipart";
 import staticFiles from "@fastify/static";
 import websocket from "@fastify/websocket";
+import { prisma } from "./db.js";
 import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { brmRoutes } from "./routes/brm.js";
@@ -17,6 +18,9 @@ import { meteoRoutes } from "./routes/meteo.js";
 import { messagingRoutes } from "./routes/messaging.js";
 import { chatWsRoutes } from "./ws/chat.js";
 import { messagingWsRoutes } from "./ws/messaging.js";
+import { checkWindAlerts } from "./lib/windAlerts.js";
+
+const WIND_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 export function buildServer() {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
@@ -57,7 +61,17 @@ export function buildServer() {
     { prefix: "/api" },
   );
 
-  app.get("/health", async () => ({ status: "ok" }));
+  // Vérifie aussi la DB (pas juste que le process Node répond) : un monitoring externe
+  // (Uptime Kuma, etc.) doit détecter une base verrouillée/corrompue, pas seulement un
+  // conteneur arrêté.
+  app.get("/health", async (_request, reply) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch {
+      return reply.code(503).send({ status: "degraded", db: "unreachable" });
+    }
+    return { status: "ok", db: "ok" };
+  });
 
   // Sert le frontend déjà construit (web/dist) quand il existe, pour le déploiement en
   // un seul conteneur (même origine que l'API, conforme à l'architecture /api voulue).
@@ -84,4 +98,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       app.log.error(err);
       process.exit(1);
     });
+
+  // Décalé après le démarrage (pas immédiat) pour ne pas ajouter de latence au
+  // tout premier health check d'un conteneur qui vient de démarrer ; répété
+  // ensuite, pas de sens à vérifier plus souvent que les prévisions ne changent.
+  setTimeout(() => {
+    checkWindAlerts().catch((err) => app.log.error(err, "checkWindAlerts a échoué"));
+    setInterval(() => {
+      checkWindAlerts().catch((err) => app.log.error(err, "checkWindAlerts a échoué"));
+    }, WIND_ALERT_INTERVAL_MS);
+  }, 60_000);
 }
