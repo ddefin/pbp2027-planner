@@ -70,6 +70,25 @@ function collectPoints(parsed: unknown): TrackPoint[] {
   return points;
 }
 
+// Certains GPX n'ont pas d'altitude sur leurs tout premiers (ou derniers) points
+// (le capteur baro/GPS n'a parfois pas encore de valeur fiable au tout début de
+// l'enregistrement) — sans ça, le profil perdait ce morceau du tracé au lieu de
+// juste réutiliser la valeur connue la plus proche.
+function fillMissingElevation(points: TrackPoint[]): TrackPoint[] {
+  const filled = points.map((p) => ({ ...p }));
+  let lastKnown: number | null = null;
+  for (const p of filled) {
+    if (p.ele !== null) lastKnown = p.ele;
+    else if (lastKnown !== null) p.ele = lastKnown;
+  }
+  let nextKnown: number | null = null;
+  for (let i = filled.length - 1; i >= 0; i--) {
+    if (filled[i].ele !== null) nextKnown = filled[i].ele;
+    else if (nextKnown !== null) filled[i].ele = nextKnown;
+  }
+  return filled;
+}
+
 export interface TrackProfilePoint {
   lat: number;
   lon: number;
@@ -94,8 +113,9 @@ export function parseGpxProfile(xml: string, maxPoints = 600): TrackProfilePoint
     return null;
   }
 
-  const points = collectPoints(parsed);
-  if (points.length < 2) return null;
+  const rawPoints = collectPoints(parsed);
+  if (rawPoints.length < 2) return null;
+  const points = fillMissingElevation(rawPoints);
 
   const cumKm: number[] = [0];
   for (let i = 1; i < points.length; i++) {

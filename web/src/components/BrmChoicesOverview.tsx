@@ -6,7 +6,7 @@ import { useCatalogTrack } from "../hooks/useCatalogTrack";
 import { WeatherPanel } from "./WeatherPanel";
 import { TrackMap } from "./TrackMap";
 import { ElevationProfile } from "./ElevationProfile";
-import { CATALOG_STATUS_LABEL, daysUntil } from "../lib/brmMeta";
+import { ACP_CALENDAR_URL, CATALOG_STATUS_LABEL, daysUntil } from "../lib/brmMeta";
 import { compassToDeg, overallBearing, windRelation, WIND_RELATION_LABEL } from "../lib/gpxAnalysis";
 import type { TrackPoint } from "../api/brmCatalog";
 
@@ -59,20 +59,16 @@ export function BrmChoicesOverview() {
                   <b>{e.ville}</b>
                 </div>
 
-                {(e.roadMap || e.siteWeb) && (
-                  <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                    {e.roadMap && (
-                      <a href={e.roadMap} target="_blank" rel="noreferrer" className="hint" style={{ margin: 0, textDecoration: "underline" }}>
-                        Parcours →
-                      </a>
-                    )}
-                    {e.siteWeb && (
-                      <a href={e.siteWeb} target="_blank" rel="noreferrer" className="hint" style={{ margin: 0, textDecoration: "underline" }}>
-                        Inscription →
-                      </a>
-                    )}
-                  </div>
-                )}
+                <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  {e.roadMap && (
+                    <a href={e.roadMap} target="_blank" rel="noreferrer" className="hint" style={{ margin: 0, textDecoration: "underline" }}>
+                      Parcours →
+                    </a>
+                  )}
+                  <a href={e.siteWeb || ACP_CALENDAR_URL} target="_blank" rel="noreferrer" className="hint" style={{ margin: 0, textDecoration: "underline" }}>
+                    Inscription →
+                  </a>
+                </div>
 
                 <MeteoToggle catalogEventId={e.id} />
                 <TrackToggle catalogEventId={e.id} />

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { CatalogEvent } from "../api/brmCatalog";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
-import { CATALOG_STATUS_LABEL, CATALOG_STATUS_OPTIONS, VALID_DISTANCES } from "../lib/brmMeta";
+import { ACP_CALENDAR_URL, CATALOG_STATUS_LABEL, CATALOG_STATUS_OPTIONS, VALID_DISTANCES } from "../lib/brmMeta";
 
 const MONTH_LABEL = [
   "Janvier",
@@ -153,12 +153,8 @@ function CatalogRow({
               <a href={event.roadMap} target="_blank" rel="noreferrer">Parcours</a>
             </>
           )}
-          {event.siteWeb && (
-            <>
-              {" · "}
-              <a href={event.siteWeb} target="_blank" rel="noreferrer">Inscription</a>
-            </>
-          )}
+          {" · "}
+          <a href={event.siteWeb || ACP_CALENDAR_URL} target="_blank" rel="noreferrer">Inscription</a>
         </div>
       </div>
       <div className="cal-participants">

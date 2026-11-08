@@ -6,6 +6,11 @@ export const PBP_DATE = new Date("2027-08-22T16:00:00");
 
 export const VALID_DISTANCES: BrmDistance[] = [200, 300, 400, 600];
 
+// Repli quand le calendrier ACP ne fournit pas de site propre à l'événement (ex.
+// certains BRM organisés directement par l'Audax Club Parisien plutôt que par un
+// club affilié) : la page calendrier officielle, d'où viennent ces données.
+export const ACP_CALENDAR_URL = "https://www.audax-club-parisien.com/organisation/brm-monde/";
+
 export const STATUS_LABEL: Record<BrmStatus, string> = {
   "a-venir": "À venir",
   inscrit: "Inscrit",
