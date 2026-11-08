@@ -41,6 +41,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
   app.get("/webhooks", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!user.isAdmin) return reply.code(403).send({ error: "forbidden" });
 
     const subs = await prisma.webhookSubscription.findMany({
       where: { userId: user.id },
@@ -52,6 +53,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
   app.post("/webhooks", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!user.isAdmin) return reply.code(403).send({ error: "forbidden" });
 
     const parsed = createSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
@@ -75,6 +77,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
   app.patch("/webhooks/:id", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!user.isAdmin) return reply.code(403).send({ error: "forbidden" });
 
     const { id } = request.params as { id: string };
     const existing = await prisma.webhookSubscription.findUnique({ where: { id } });
@@ -96,6 +99,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
   app.delete("/webhooks/:id", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!user.isAdmin) return reply.code(403).send({ error: "forbidden" });
 
     const { id } = request.params as { id: string };
     const existing = await prisma.webhookSubscription.findUnique({ where: { id } });
@@ -108,6 +112,7 @@ export async function webhooksRoutes(app: FastifyInstance) {
   app.post("/webhooks/:id/test", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!user.isAdmin) return reply.code(403).send({ error: "forbidden" });
 
     const { id } = request.params as { id: string };
     const existing = await prisma.webhookSubscription.findUnique({ where: { id } });

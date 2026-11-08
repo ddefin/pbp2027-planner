@@ -176,7 +176,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.get("/auth/session", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
-    return reply.send({ email: user.email, prenom: user.prenom, mfaEnabled: user.mfaEnabled });
+    return reply.send({ email: user.email, prenom: user.prenom, mfaEnabled: user.mfaEnabled, isAdmin: user.isAdmin });
   });
 
   app.post("/auth/logout", async (request, reply) => {

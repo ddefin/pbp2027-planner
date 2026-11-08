@@ -11,12 +11,13 @@ import { SecurityPage } from "./pages/SecurityPage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 
-function ProtectedLayout({ children }: { children: ReactNode }) {
+function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
   const { status, user, logout } = useAuth();
   const navigate = useNavigate();
 
   if (status === "loading") return null;
   if (status === "anonymous") return <Navigate to="/login" replace />;
+  if (adminOnly && !user?.isAdmin) return <Navigate to="/" replace />;
 
   return (
     <div>
@@ -30,7 +31,7 @@ function ProtectedLayout({ children }: { children: ReactNode }) {
           <Link to="/sorties">Sorties</Link>
           <Link to="/messagerie">Messagerie</Link>
           <Link to="/securite">Sécurité</Link>
-          <Link to="/webhooks">Webhooks</Link>
+          {user?.isAdmin && <Link to="/webhooks">Webhooks</Link>}
           {user && <span className="hint">Bonjour, {user.prenom}</span>}
           <button
             className="ghost"
@@ -97,7 +98,7 @@ export default function App() {
         <Route
           path="/webhooks"
           element={
-            <ProtectedLayout>
+            <ProtectedLayout adminOnly>
               <WebhooksPage />
             </ProtectedLayout>
           }

@@ -10,6 +10,9 @@ const dbPath = path.resolve(repoRoot, "prisma/test-webhooks.db");
 
 let buildServer: typeof import("../src/server.js").buildServer;
 let prisma: typeof import("../src/db.js").prisma;
+let generateOpaqueToken: typeof import("../src/lib/tokens.js").generateOpaqueToken;
+let hashToken: typeof import("../src/lib/tokens.js").hashToken;
+let SESSION_COOKIE: typeof import("../src/lib/session.js").SESSION_COOKIE;
 
 function cleanupDbFiles() {
   for (const suffix of ["", "-journal", "-wal", "-shm"]) {
@@ -27,6 +30,8 @@ beforeAll(async () => {
 
   ({ buildServer } = await import("../src/server.js"));
   ({ prisma } = await import("../src/db.js"));
+  ({ generateOpaqueToken, hashToken } = await import("../src/lib/tokens.js"));
+  ({ SESSION_COOKIE } = await import("../src/lib/session.js"));
 });
 
 afterAll(async () => {
@@ -43,6 +48,9 @@ function extractCookie(setCookieHeader: string | string[] | undefined): string {
 async function registerAndLogin(server: ReturnType<typeof buildServer>, email: string) {
   const password = "mot-de-passe-de-test-123";
   await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password, prenom: "Test" } });
+  // Les routes webhooks sont réservées à l'administrateur (voir App.tsx / webhooks.ts) :
+  // les comptes de test doivent l'être pour exercer ces routes.
+  await prisma.user.update({ where: { email }, data: { isAdmin: true } });
   const loginRes = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
   return extractCookie(loginRes.headers["set-cookie"]);
 }
@@ -71,6 +79,23 @@ describe("API Webhooks", () => {
   it("refuse l'accès sans session", async () => {
     const res = await server.inject({ method: "GET", url: "/api/webhooks" });
     expect(res.statusCode).toBe(401);
+  });
+
+  it("refuse l'accès à un utilisateur connecté mais non administrateur", async () => {
+    // Session créée directement en base plutôt que via /api/auth/login : cette suite
+    // enchaîne déjà le nombre maximum de connexions que le rate limit de /auth/login
+    // autorise par IP (voir src/lib/rateLimit.ts) — passer par la route le ferait échouer.
+    const email = `wh-non-admin-${Date.now()}@example.com`;
+    await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password: "mot-de-passe-de-test-123", prenom: "Test" } });
+    const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const token = generateOpaqueToken();
+    await prisma.session.create({
+      data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + 60_000) },
+    });
+    const cookie = `${SESSION_COOKIE}=${token}`;
+
+    const res = await server.inject({ method: "GET", url: "/api/webhooks", headers: { cookie } });
+    expect(res.statusCode).toBe(403);
   });
 
   it("crée un webhook Discord, le liste, le supprime", async () => {

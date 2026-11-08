@@ -27,6 +27,7 @@ export interface SessionInfo {
   email: string;
   prenom: string;
   mfaEnabled: boolean;
+  isAdmin: boolean;
 }
 
 export type LoginResult = { status: "authenticated" } | { status: "mfa_required"; challengeToken: string };
