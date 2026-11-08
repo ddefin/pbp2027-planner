@@ -7,14 +7,17 @@ import "leaflet/dist/leaflet.css";
 // Leaflet manipule le DOM lui-même, donc instance impérative dans un useEffect
 // plutôt qu'un rendu déclaratif React classique.
 //
-// Fond de carte CARTO plutôt que tile.openstreetmap.org : ce dernier a bloqué nos
-// requêtes ("App is not following the tile usage policy") — leurs serveurs sont
-// prévus pour du développement/usage ponctuel, pas pour être appelés directement
-// par une app en production. CARTO fournit des fonds gratuits pensés pour cet
-// usage, sans clé requise, avec une variante sombre assortie au thème de l'app.
+// Fond de carte OpenTopoMap : tile.openstreetmap.org a bloqué nos requêtes ("App is
+// not following the tile usage policy" — pas prévu pour une app en production), et
+// CARTO (essayé ensuite) exige désormais une clé API sur ses fonds gratuits.
+// OpenTopoMap reste accessible sans clé et son usage policy encourage justement ce
+// genre d'intégration externe à volume modéré. Pas de variante sombre officielle :
+// en mode sombre, un filtre CSS inverse les tuiles (technique standard pour donner
+// un rendu nocturne à un fond de carte qui n'en propose pas).
 export function TrackMap({ points }: { points: { lat: number; lon: number }[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const dark = typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
 
   useEffect(() => {
     if (!containerRef.current || points.length < 2) return;
@@ -22,13 +25,18 @@ export function TrackMap({ points }: { points: { lat: number; lon: number }[] })
     const map = L.map(containerRef.current, { attributionControl: true });
     mapRef.current = map;
 
-    const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-    const variant = dark ? "dark_all" : "light_all";
-    L.tileLayer(`https://{s}.basemaps.cartocdn.com/${variant}/{z}/{x}/{y}{r}.png`, {
-      maxZoom: 18,
-      subdomains: "abcd",
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+    L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
+      maxZoom: 17,
+      subdomains: "abc",
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
     }).addTo(map);
+
+    // Le filtre s'applique uniquement aux tuiles (pas au conteneur entier) : sinon il
+    // inverserait aussi la couleur du tracé tracé par-dessus.
+    if (dark) {
+      const tilePane = map.getPane("tilePane");
+      if (tilePane) tilePane.style.filter = "invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9)";
+    }
 
     const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#1f5c3f";
     const latLngs = points.map((p) => L.latLng(p.lat, p.lon));
