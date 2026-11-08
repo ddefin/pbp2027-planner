@@ -58,9 +58,10 @@ function arrowIcon(bearingDeg: number): L.DivIcon {
 // exige désormais une clé API sur ses fonds gratuits, OpenTopoMap puis CyclOSM seuls
 // se sont révélés peu lisibles selon les cas. Vélo (CyclOSM), Satellite (Esri, sans
 // clé) et Relief (OpenTopoMap), dans leurs couleurs réelles.
-export function TrackMap({ points }: { points: TrackPoint[] }) {
+export function TrackMap({ points, highlight }: { points: TrackPoint[]; highlight?: { lat: number; lon: number } | null }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const highlightMarkerRef = useRef<L.CircleMarker | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || points.length < 2) return;
@@ -110,8 +111,38 @@ export function TrackMap({ points }: { points: TrackPoint[] }) {
     return () => {
       map.remove();
       mapRef.current = null;
+      highlightMarkerRef.current = null;
     };
   }, [points]);
+
+  // Effet séparé (pas dans celui ci-dessus) : la position survolée sur le profil
+  // change à chaque mouvement de souris — recréer toute la carte à ce rythme serait
+  // coûteux et ferait clignoter les tuiles. On déplace juste un marqueur existant.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!highlight) {
+      if (highlightMarkerRef.current) {
+        highlightMarkerRef.current.remove();
+        highlightMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (highlightMarkerRef.current) {
+      highlightMarkerRef.current.setLatLng([highlight.lat, highlight.lon]);
+    } else {
+      highlightMarkerRef.current = L.circleMarker([highlight.lat, highlight.lon], {
+        radius: 7,
+        color: "#ffffff",
+        weight: 2,
+        fillColor: TRACK_COLOR,
+        fillOpacity: 1,
+        interactive: false,
+      }).addTo(map);
+    }
+  }, [highlight]);
 
   if (points.length < 2) return null;
 

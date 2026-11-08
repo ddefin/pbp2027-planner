@@ -123,6 +123,7 @@ function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
   // ce second appel indépendant du bouton météo n'ajoute pas de coût réel.
   const { weather } = useCatalogMeteo(open ? catalogEventId : null);
   const [busy, setBusy] = useState(false);
+  const [hoverPoint, setHoverPoint] = useState<TrackPoint | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -149,7 +150,7 @@ function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
 
           {!loading && track && (
             <>
-              <TrackMap points={track.points} />
+              <TrackMap points={track.points} highlight={hoverPoint} />
               <p className="hint" style={{ marginTop: 8, marginBottom: 6 }}>
                 {track.fileName}
                 {track.distanceKm != null && ` · ${track.distanceKm} km`}
@@ -158,7 +159,7 @@ function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
 
               <WindHint points={track.points} windDirection={weather?.current.windDirection} windSpeedKmh={weather?.current.windSpeedKmh} />
 
-              <ElevationProfile points={track.points} />
+              <ElevationProfile points={track.points} onHoverPoint={setHoverPoint} />
 
               <button type="button" className="ghost" onClick={() => fileInputRef.current?.click()} disabled={busy} style={{ padding: "4px 10px", fontSize: 11.5, marginTop: 10 }}>
                 {busy ? "Import…" : "Remplacer le GPX"}

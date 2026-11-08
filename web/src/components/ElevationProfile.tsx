@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { TrackPoint } from "../api/brmCatalog";
 import { cumulativeGain, findClimbs, withProfile } from "../lib/gpxAnalysis";
 
@@ -13,13 +13,29 @@ const PAD_B = 20;
 // comme sur OpenRunner) et les montées significatives mises en évidence — calculées
 // une fois ici plutôt que renvoyées par le serveur, pour ne pas avoir à republier un
 // format de données à chaque ajustement du seuil de détection.
-export function ElevationProfile({ points }: { points: TrackPoint[] }) {
+export function ElevationProfile({
+  points,
+  onHoverPoint,
+}: {
+  points: TrackPoint[];
+  // Position survolée reportée au composant parent, pour la montrer aussi sur la
+  // carte (voir TrackMap `highlight`) — comme le fait OpenRunner entre son profil et
+  // sa carte.
+  onHoverPoint?: (point: TrackPoint | null) => void;
+}) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const withEle = useMemo(() => withProfile(points), [points]);
   const gain = useMemo(() => cumulativeGain(withEle), [withEle]);
   const climbs = useMemo(() => findClimbs(withEle), [withEle]);
+
+  const hoverPointForCallback = hoverIdx !== null ? withEle[hoverIdx] : null;
+  useEffect(() => {
+    onHoverPoint?.(hoverPointForCallback ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hoverPointForCallback]);
+  useEffect(() => () => onHoverPoint?.(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (withEle.length < 2) return null;
 
