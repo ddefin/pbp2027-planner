@@ -187,8 +187,17 @@ docker compose up -d --build
   n'est pas dans le groupe `docker` (étape 3.5 ci-dessus).
 - **Le chat ne se connecte pas (WebSocket)** : vérifie que "Prise en charge de
   WebSocket" est bien cochée dans la règle de reverse proxy DSM.
-- **`.env.production manquant`** : étape 4 pas encore faite, ou faite dans le mauvais
-  dossier (celui où le runner clone réellement le repo, pas ton `$HOME`).
+- **`.env.production manquant` dans le job `deploy`** : le runner tourne dans son
+  propre conteneur (`runner-home`, un volume Docker nommé, voir étape 3) — son clone
+  du dépôt (`~/actions-runner/_work/...` *à l'intérieur de ce conteneur*, donc
+  invisible depuis un SSH classique sur le NAS) est un dossier **différent** d'un
+  clone fait soi-même en SSH (ex. `~/pbp2027-planner`, utilisé pour un déploiement
+  manuel — étape 5). `.env.production` doit exister dans le clone *du runner*
+  spécifiquement pour que la CI déploie automatiquement ; sinon continue de
+  déployer manuellement depuis ton propre clone, ce qui marche tout aussi bien.
+  Vérifie l'onglet Actions du dépôt GitHub pour savoir si ce job a réussi — un échec
+  y est silencieux côté NAS, `main` est à jour sur GitHub mais rien ne change en
+  production tant qu'un déploiement (manuel ou CI) n'a pas réellement tourné.
 - **`Bind mount failed: '.../data' does not exist`** : le dossier `data` n'a pas été
   créé côté hôte avant le premier `docker compose up` — `mkdir -p data` dans le
   dossier du repo (étape 4), puis relance.

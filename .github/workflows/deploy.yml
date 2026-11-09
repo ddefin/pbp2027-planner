@@ -45,7 +45,15 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: [self-hosted, synology]
     steps:
+      # clean: false est indispensable ici : actions/checkout nettoie le répertoire de
+      # travail avec `git clean -ffdx` par défaut, qui supprime TOUT fichier non suivi
+      # par git — y compris .env.production et ./data (la base SQLite de prod + les
+      # fichiers uploadés, voir docker-compose.yml). Avec clean: true (le défaut), ça
+      # expliquait pourquoi .env.production disparaissait à chaque run, et aurait aussi
+      # effacé data/ au tout premier déploiement CI qui serait allé jusqu'au bout.
       - uses: actions/checkout@v4
+        with:
+          clean: false
 
       # .env.production est créé une seule fois, directement sur le NAS — jamais ici,
       # jamais dans un secret GitHub (voir .env.production.example et web/README.md
