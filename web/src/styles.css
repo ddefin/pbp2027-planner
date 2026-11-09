@@ -965,3 +965,19 @@ button.link {
 .cal-row select:hover {
   border-color: var(--accent);
 }
+
+/* iOS Safari zoome automatiquement la page au focus sur un champ texte dont le
+   font-size est sous 16px — et comme la navigation ensuite se fait en SPA (pas de
+   rechargement complet), ce zoom reste collé sur la page suivante (ex. le menu
+   hamburger du tableau de bord après la connexion, qui se retrouve hors-écran tant
+   qu'on ne dézoome pas à la main). Simplement remonter à 16px sur mobile pour les
+   champs de saisie évite que ça se déclenche du tout. */
+@media (max-width: 700px) {
+  .field input,
+  .chat-input input,
+  .cal-select,
+  .cal-search,
+  .cal-row select {
+    font-size: 16px;
+  }
+}
