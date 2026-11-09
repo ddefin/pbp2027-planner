@@ -700,6 +700,23 @@ button.link {
   word-wrap: break-word;
   position: relative;
 }
+
+/* Pièce jointe : un nom de fichier technique (souvent long, sans espaces — un export
+   GPX par ex.) forçait la bulle à s'étirer sur presque toute la largeur de l'écran en
+   se coupant au milieu sur un tiret. Tronqué avec ellipsis dans une largeur fixe à la
+   place — le nom complet reste visible en infobulle et le lien de téléchargement est
+   inchangé. */
+.file-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(220px, 60vw);
+}
+.file-attachment-link .fname {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .msg.me {
   align-self: flex-end;
 }

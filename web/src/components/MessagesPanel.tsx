@@ -180,8 +180,9 @@ function MessageContent({ message, fileUrl }: { message: { kind: string; text: s
       );
     }
     return (
-      <a href={url} target="_blank" rel="noreferrer" style={{ color: "inherit" }}>
-        📎 {message.fileName}
+      <a href={url} target="_blank" rel="noreferrer" className="file-attachment-link" title={message.fileName} style={{ color: "inherit" }}>
+        <span>📎</span>
+        <span className="fname">{message.fileName}</span>
       </a>
     );
   }
