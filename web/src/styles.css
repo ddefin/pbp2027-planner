@@ -556,6 +556,13 @@ button.link {
   grid-template-columns: 1fr 1.3fr;
   gap: 18px;
 }
+/* Sans ça, un élément de grille ne rétrécit jamais sous la largeur "naturelle" de
+   son contenu (ici, un nom de fichier en pièce jointe) même si ce contenu a par
+   ailleurs son propre max-width/ellipsis — un classique de CSS Grid qui pousse
+   tout le panneau (et la page entière sur mobile) hors de l'écran. */
+.sorties-grid > * {
+  min-width: 0;
+}
 .mobile-back {
   display: none;
 }
