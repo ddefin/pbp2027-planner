@@ -167,15 +167,37 @@ NAS existantes (Hyper Backup), pour avoir une copie hors du NAS lui-même.
 
 ## 5. Déploiement
 
-Pousser sur `main` suffit : le workflow `.github/workflows/deploy.yml` fait tourner
-les tests (sur un runner GitHub classique, pas sur ton NAS), et seulement s'ils
-passent, construit l'image et relance le conteneur sur le NAS.
+Le workflow `.github/workflows/deploy.yml` fait tourner les tests sur chaque push
+(sur un runner GitHub classique) — ça, ça marche. Le job `deploy` qui suit, lui,
+tourne sur le runner self-hébergé mais **ne doit pas être utilisé tel quel pour
+déployer en production sur ce NAS** : ce runner a son propre clone du dépôt dans
+son conteneur, et `docker compose up` lancé depuis là-dedans résout `./data`
+(la base SQLite de prod) comme un chemin à l'intérieur de ce conteneur, pas le
+vrai dossier de données du NAS — un déploiement qui irait jusqu'au bout
+risquerait de faire tourner l'app sur un `./data` vide. Le job échoue
+volontairement avant d'en arriver là (`.env.production manquant`, voir
+Dépannage) ; ne crée pas ce fichier dans le clone du runner pour le "corriger".
 
-Pour forcer un déploiement manuel depuis le NAS (sans attendre un push) :
+**Déploiement automatique réel** : `scripts/auto-deploy.sh`, planifié toutes les
+5 minutes via le Planificateur de tâches DSM — même principe que les sauvegardes
+(étape précédente), tourne directement sur l'hôte donc sans l'ambiguïté
+ci-dessus. Il vérifie les derniers commits sur `main` et reconstruit seulement
+si besoin (peu coûteux à relancer souvent grâce au cache Docker).
+
+1. Créer → Tâche déclenchée → Script défini par l'utilisateur.
+2. Général : utilisateur **root** (évite les soucis de permissions Docker),
+   déclenchement toutes les 5 minutes.
+3. Paramètres de tâche → Exécuter la commande :
+   ```bash
+   /bin/sh ~/pbp2027-planner/scripts/auto-deploy.sh
+   ```
+
+Pour forcer un déploiement manuel immédiat (sans attendre le prochain passage) :
 
 ```bash
-cd ~/actions-runner/_work/pbp2027-planner/pbp2027-planner
-docker compose up -d --build
+cd ~/pbp2027-planner
+sudo docker run --rm -v "$(pwd):/repo" -w /repo alpine/git pull origin main
+sudo docker compose up -d --build
 ```
 
 ## Dépannage
@@ -187,17 +209,23 @@ docker compose up -d --build
   n'est pas dans le groupe `docker` (étape 3.5 ci-dessus).
 - **Le chat ne se connecte pas (WebSocket)** : vérifie que "Prise en charge de
   WebSocket" est bien cochée dans la règle de reverse proxy DSM.
-- **`.env.production manquant` dans le job `deploy`** : le runner tourne dans son
-  propre conteneur (`runner-home`, un volume Docker nommé, voir étape 3) — son clone
-  du dépôt (`~/actions-runner/_work/...` *à l'intérieur de ce conteneur*, donc
-  invisible depuis un SSH classique sur le NAS) est un dossier **différent** d'un
-  clone fait soi-même en SSH (ex. `~/pbp2027-planner`, utilisé pour un déploiement
-  manuel — étape 5). `.env.production` doit exister dans le clone *du runner*
-  spécifiquement pour que la CI déploie automatiquement ; sinon continue de
-  déployer manuellement depuis ton propre clone, ce qui marche tout aussi bien.
-  Vérifie l'onglet Actions du dépôt GitHub pour savoir si ce job a réussi — un échec
-  y est silencieux côté NAS, `main` est à jour sur GitHub mais rien ne change en
-  production tant qu'un déploiement (manuel ou CI) n'a pas réellement tourné.
+- **`.env.production manquant` dans le job `deploy`** : normal et volontaire (voir
+  étape 5) — ce job n'est pas le mécanisme de déploiement réel sur ce NAS,
+  `scripts/auto-deploy.sh` planifié s'en charge. Ne crée **pas** `.env.production`
+  dans le clone du runner pour faire taire cette erreur : le job irait alors
+  jusqu'au bout et risquerait de faire tourner l'app sur un dossier `./data` vide
+  (voir l'explication à l'étape 5).
+- **`scripts/auto-deploy.sh` ne semble pas tourner** : vérifie dans le
+  Planificateur de tâches DSM que la tâche est bien activée et qu'elle a un
+  historique d'exécution récent ; `sudo docker image prune -f` dans le script
+  nécessite les droits root ou docker, d'où la recommandation de la lancer en
+  tant que root (étape 5).
+- **Rien ne change en production après un push sur `main`** : vérifie l'onglet
+  Actions du dépôt GitHub — le job `test` doit être vert (c'est lui qui compte,
+  le job `deploy` qui le suit échoue par conception, voir ci-dessus). `main` peut
+  très bien être à jour sur GitHub sans que rien n'ait changé sur le NAS tant que
+  `scripts/auto-deploy.sh` n'est pas passé (jusqu'à 5 min après le push) — ou
+  lance le déploiement manuel de l'étape 5 pour ne pas attendre.
 - **`Bind mount failed: '.../data' does not exist`** : le dossier `data` n'a pas été
   créé côté hôte avant le premier `docker compose up` — `mkdir -p data` dans le
   dossier du repo (étape 4), puis relance.
