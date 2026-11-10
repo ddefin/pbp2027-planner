@@ -337,34 +337,23 @@ function PersonalEventsSection() {
 
 function LicensePreview({ fileName, fileMimeType, id }: { fileName: string; fileMimeType: string; id: string }) {
   const url = licenseFileUrl(id);
-  if (fileMimeType.startsWith("image/")) {
-    return (
-      <a href={url} target="_blank" rel="noreferrer">
-        <img
-          src={url}
-          alt={fileName}
-          style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 8, display: "block", border: "1px solid var(--line)" }}
-        />
-      </a>
-    );
-  }
+
+  // Image : affichée telle quelle dans le cadre. PDF : dans une <iframe> (le
+  // visualiseur PDF intégré du navigateur, y compris sur mobile) — un lien "ouvrir
+  // dans un nouvel onglet" reste en repli, au cas où un navigateur ne le gère pas.
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "10px 14px",
-        border: "1px solid var(--line)",
-        borderRadius: 8,
-        color: "inherit",
-      }}
-    >
-      📄 {fileName}
-    </a>
+    <div>
+      <div className="license-frame">
+        {fileMimeType.startsWith("image/") ? (
+          <img src={url} alt={fileName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        ) : (
+          <iframe src={url} title={fileName} />
+        )}
+      </div>
+      <a href={url} target="_blank" rel="noreferrer" className="hint" style={{ display: "inline-block", marginTop: 6, marginBottom: 0, textDecoration: "underline" }}>
+        Ouvrir dans un nouvel onglet ↗
+      </a>
+    </div>
   );
 }
 

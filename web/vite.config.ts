@@ -21,6 +21,14 @@ export default defineConfig({
       // réseau mobile capricieux en plein brevet, sans réinstaller l'app.
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
+        // Par défaut, le service worker traite toute navigation (y compris une
+        // <iframe src="...">, qui EST une navigation pour le navigateur, pas une
+        // simple requête fetch) comme une route de l'app React et la renvoie vers
+        // index.html — adapté pour "/profil" ou "/calendrier", pas pour l'aperçu
+        // PDF de la licence (page Profil), qui se retrouvait silencieusement
+        // remplacé par la page d'accueil de l'app. Exclut tout /api/* de ce
+        // mécanisme : ces routes ne rendent jamais du HTML de toute façon.
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             // Fonds de carte CyclOSM/Esri/OpenTopoMap (voir TrackMap.tsx) : une fois

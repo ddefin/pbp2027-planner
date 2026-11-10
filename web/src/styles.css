@@ -334,6 +334,26 @@ button.link {
   transform: rotate(180deg);
 }
 
+/* Cadre d'aperçu de la licence (image ou PDF en <iframe>) : une hauteur en vh
+   plutôt qu'une valeur fixe pour rester utilisable aussi bien sur mobile (où
+   600px fixes dépasseraient l'écran) que sur desktop. Fond blanc fixe — un PDF
+   est lui-même sur fond blanc, le laisser hériter du thème sombre le rendrait
+   illisible (texte sombre sur fond sombre dans la zone non couverte par le PDF). */
+.license-frame {
+  width: 100%;
+  height: min(70vh, 600px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.license-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+}
+
 .security-row {
   display: flex;
   align-items: center;

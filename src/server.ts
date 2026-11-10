@@ -28,9 +28,14 @@ export function buildServer() {
   app.register(websocket);
   app.register(multipart);
 
-  app.addHook("onSend", async (_request, reply, payload) => {
+  app.addHook("onSend", async (request, reply, payload) => {
     reply.header("X-Content-Type-Options", "nosniff");
-    reply.header("X-Frame-Options", "DENY");
+    // DENY partout, sauf le fichier de licence (page "Mon profil") : affiché dans
+    // une <iframe> same-origin pour le visualiseur PDF intégré du navigateur (y
+    // compris sur mobile) — SAMEORIGIN l'autorise sans permettre un plongement
+    // depuis un autre site.
+    const isLicenseFile = request.routeOptions?.url === "/api/profile/license/:id/file";
+    reply.header("X-Frame-Options", isLicenseFile ? "SAMEORIGIN" : "DENY");
     // "same-origin" bloquait aussi le referer vers les tuiles OpenStreetMap
     // (carte Leaflet) — leur politique d'usage des tuiles refuse les requêtes qui
     // n'identifient pas le site appelant. "strict-origin-when-cross-origin" (le
