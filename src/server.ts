@@ -9,6 +9,7 @@ import websocket from "@fastify/websocket";
 import { prisma } from "./db.js";
 import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
+import { profileRoutes } from "./routes/profile.js";
 import { brmRoutes } from "./routes/brm.js";
 import { brmCatalogRoutes } from "./routes/brmCatalog.js";
 import { sortiesRoutes } from "./routes/sorties.js";
@@ -48,6 +49,7 @@ export function buildServer() {
   app.register(
     async (api) => {
       api.register(authRoutes);
+      api.register(profileRoutes);
       api.register(brmRoutes);
       api.register(brmCatalogRoutes);
       api.register(sortiesRoutes);

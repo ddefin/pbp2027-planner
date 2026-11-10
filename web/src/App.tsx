@@ -9,6 +9,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { SortiesPage } from "./pages/SortiesPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { CalendrierPage } from "./pages/CalendrierPage";
+import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 
@@ -27,6 +28,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
     { to: "/calendrier", label: "Calendrier BRM" },
     { to: "/sorties", label: "Sorties" },
     { to: "/messagerie", label: "Messagerie" },
+    { to: "/profil", label: "Mon profil" },
     ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }] : []),
   ];
 
@@ -108,6 +110,14 @@ export default function App() {
           element={
             <ProtectedLayout>
               <MessagesPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/profil"
+          element={
+            <ProtectedLayout>
+              <ProfilePage />
             </ProtectedLayout>
           }
         />

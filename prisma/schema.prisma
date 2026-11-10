@@ -13,11 +13,17 @@ model User {
   prenom               String
   isAdmin              Boolean        @default(false)
   passwordHash         String
+  // Profil (page "Mon profil") : tout optionnel, rien de bloquant pour le reste
+  // de l'app si laissé vide.
+  licenceNumero        String? // numéro de licence FFCT/ACP, utile pour l'homologation
+  club                 String?
+  notebook             String? // carnet de bord personnel, texte libre (matériel, nutrition, notes de brevet...)
   failedLoginAttempts  Int            @default(0)
   lockedUntil          DateTime?
   createdAt            DateTime       @default(now())
   sessions             Session[]
   passwordResetTokens  PasswordResetToken[]
+  personalEvents       PersonalEvent[]
   brmEvents            BrmEvent[]
   brmParticipations    BrmParticipation[]
   sortiesCreees        Sortie[]            @relation("SortieCreateur")
@@ -289,4 +295,21 @@ model WindAlertSent {
   createdAt      DateTime @default(now())
 
   @@unique([catalogEventId, forecastDate])
+}
+
+// Événement personnel (page "Mon profil") : entièrement privé à son auteur,
+// contrairement aux Sorties ou au calendrier BRM qui sont collectifs — un
+// randonneur y note ce qu'il veut (sortie d'entraînement, rendez-vous médical,
+// rappel de renouvellement de licence...), rien n'est partagé au groupe.
+model PersonalEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  date      DateTime
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
 }
