@@ -21,6 +21,24 @@ function cleanupDbFiles() {
   }
 }
 
+// Réponse ACP factice (même forme que la vraie API, voir src/lib/acpCatalog.ts) —
+// nécessaire ici car déclencher "brm.participation_changed" (voir brmCatalog.ts)
+// passe par un second appel au catalogue ACP pour retrouver les infos de
+// l'événement, en plus de la livraison du webhook lui-même.
+const FAKE_ACP_EVENT = {
+  Date: "01/03/2027",
+  Distance: 200,
+  Pays: "France",
+  SiteWeb: "",
+  Ville: "Test",
+  Departement: "Test",
+  Region: "Test",
+  RoadMap: "",
+  Denivele: 1000,
+  Contact: "",
+  NomClub: "Club Webhook Test",
+};
+
 beforeAll(async () => {
   cleanupDbFiles();
   process.env.DATABASE_URL = `file:${dbPath}`;
@@ -64,7 +82,14 @@ describe("API Webhooks", () => {
   });
 
   beforeEach(() => {
-    fetchMock = vi.fn(async () => new Response("ok", { status: 200 }));
+    fetchMock = vi.fn(async (url: string) => {
+      // Appel interne au catalogue ACP (voir brmCatalog.ts) : toute autre URL est
+      // une livraison de webhook, simplement acquittée.
+      if (url.includes("audax-club-parisien")) {
+        return new Response(JSON.stringify([FAKE_ACP_EVENT]), { status: 200 });
+      }
+      return new Response("ok", { status: 200 });
+    });
     vi.stubGlobal("fetch", fetchMock);
   });
 
@@ -105,11 +130,11 @@ describe("API Webhooks", () => {
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie },
-      payload: { url: "https://discord.com/api/webhooks/123/abc", format: "discord", events: ["sortie.created"] },
+      payload: { url: "https://discord.com/api/webhooks/123/abc", format: "discord", events: ["brm.participation_changed"] },
     });
     expect(created.statusCode).toBe(201);
     const webhook = created.json().webhook;
-    expect(webhook.events).toEqual(["sortie.created"]);
+    expect(webhook.events).toEqual(["brm.participation_changed"]);
     expect(created.json().secret).toBeNull(); // pas de secret pour le format discord
 
     const list = await server.inject({ method: "GET", url: "/api/webhooks", headers: { cookie } });
@@ -128,7 +153,7 @@ describe("API Webhooks", () => {
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie },
-      payload: { url: "https://example.com/hook", format: "generic", events: ["sortie.created"] },
+      payload: { url: "https://example.com/hook", format: "generic", events: ["brm.participation_changed"] },
     });
     expect(created.json().secret).toMatch(/^[0-9a-f]{64}$/);
 
@@ -142,7 +167,7 @@ describe("API Webhooks", () => {
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie },
-      payload: { url: "http://example.com/hook", format: "generic", events: ["sortie.created"] },
+      payload: { url: "http://example.com/hook", format: "generic", events: ["brm.participation_changed"] },
     });
     expect(res1.statusCode).toBe(400);
 
@@ -163,7 +188,7 @@ describe("API Webhooks", () => {
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie: a },
-      payload: { url: "https://example.com/hook-a", format: "discord", events: ["sortie.created"] },
+      payload: { url: "https://example.com/hook-a", format: "discord", events: ["brm.participation_changed"] },
     });
     const id = created.json().webhook.id;
 
@@ -174,7 +199,7 @@ describe("API Webhooks", () => {
     expect(deleteB.statusCode).toBe(404);
   });
 
-  it("diffuse sortie.created à tous les webhooks Discord abonnés, avec le bon format", async () => {
+  it("diffuse brm.participation_changed aux webhooks abonnés à cet événement, pas aux autres", async () => {
     const a = await registerAndLogin(server, `wh-broadcast-a-${Date.now()}@example.com`);
     const b = await registerAndLogin(server, `wh-broadcast-b-${Date.now()}@example.com`);
 
@@ -182,32 +207,37 @@ describe("API Webhooks", () => {
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie: a },
-      payload: { url: "https://discord.com/api/webhooks/aaa", format: "discord", events: ["sortie.created"] },
+      payload: { url: "https://discord.com/api/webhooks/aaa", format: "discord", events: ["brm.participation_changed"] },
     });
     await server.inject({
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie: b },
-      payload: { url: "https://discord.com/api/webhooks/bbb", format: "discord", events: ["sortie.participant_joined"] },
+      payload: { url: "https://discord.com/api/webhooks/bbb", format: "discord", events: ["meteo.vent_fort"] },
     });
 
+    // Récupère l'id stable de l'événement ACP factice, comme le ferait le calendrier.
+    const catalogRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: a } });
+    const eventId = catalogRes.json().events[0].id;
+
     fetchMock.mockClear();
-    const created = await server.inject({
-      method: "POST",
-      url: "/api/sorties",
+    const participation = await server.inject({
+      method: "PUT",
+      url: `/api/brm/catalog/${eventId}/participation`,
       headers: { cookie: a },
-      payload: { titre: "Sortie webhook", date: "2027-03-01T07:00:00.000Z", lieu: "Test" },
+      payload: { status: "prevu" },
     });
-    expect(created.statusCode).toBe(201);
+    expect(participation.statusCode).toBe(200);
 
     // triggerWebhooks n'est pas attendu par la route : on laisse le event loop tourner.
     await new Promise((r) => setTimeout(r, 50));
 
-    expect(fetchMock).toHaveBeenCalledTimes(1); // seul le webhook de A écoute sortie.created
-    const [url, init] = fetchMock.mock.calls[0];
+    const discordCalls = fetchMock.mock.calls.filter(([url]: [string]) => url.includes("discord.com"));
+    expect(discordCalls).toHaveLength(1); // seul le webhook de A écoute brm.participation_changed
+    const [url, init] = discordCalls[0];
     expect(url).toBe("https://discord.com/api/webhooks/aaa");
     const body = JSON.parse(init.body as string);
-    expect(body.content).toContain("Sortie webhook");
+    expect(body.content).toContain("Test"); // ville de l'événement ACP factice
     expect(init.headers["x-pbp-signature"]).toBeUndefined(); // pas de signature pour discord
   });
 
@@ -219,13 +249,13 @@ describe("API Webhooks", () => {
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie: a },
-      payload: { url: "https://discord.com/api/webhooks/testa", format: "discord", events: ["sortie.created"] },
+      payload: { url: "https://discord.com/api/webhooks/testa", format: "discord", events: ["brm.participation_changed"] },
     });
     await server.inject({
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie: b },
-      payload: { url: "https://discord.com/api/webhooks/testb", format: "discord", events: ["sortie.created"] },
+      payload: { url: "https://discord.com/api/webhooks/testb", format: "discord", events: ["brm.participation_changed"] },
     });
 
     fetchMock.mockClear();
@@ -246,7 +276,7 @@ describe("API Webhooks", () => {
       method: "POST",
       url: "/api/webhooks",
       headers: { cookie },
-      payload: { url: "https://example.com/hook", format: "generic", events: ["sortie.created"] },
+      payload: { url: "https://example.com/hook", format: "generic", events: ["brm.participation_changed"] },
     });
     const webhook = created.json().webhook;
 
@@ -261,6 +291,6 @@ describe("API Webhooks", () => {
     const [, init] = fetchMock.mock.calls[0];
     expect(init.headers["x-pbp-signature"]).toMatch(/^sha256=[0-9a-f]{64}$/);
     const payload = JSON.parse(init.body as string);
-    expect(payload.event).toBe("sortie.created");
+    expect(payload.event).toBe("brm.participation_changed");
   });
 });

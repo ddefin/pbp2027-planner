@@ -6,7 +6,6 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
-import { SortiesPage } from "./pages/SortiesPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { CalendrierPage } from "./pages/CalendrierPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -26,7 +25,6 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
   const links = [
     { to: "/", label: "Tableau de bord" },
     { to: "/calendrier", label: "Calendrier BRM" },
-    { to: "/sorties", label: "Sorties" },
     { to: "/messagerie", label: "Messagerie" },
     { to: "/profil", label: "Mon profil" },
     ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }] : []),
@@ -94,14 +92,6 @@ export default function App() {
           element={
             <ProtectedLayout>
               <CalendrierPage />
-            </ProtectedLayout>
-          }
-        />
-        <Route
-          path="/sorties"
-          element={
-            <ProtectedLayout>
-              <SortiesPage />
             </ProtectedLayout>
           }
         />

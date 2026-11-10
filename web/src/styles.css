@@ -579,28 +579,6 @@ button.link {
   margin-top: 2px;
 }
 
-.avatars {
-  display: flex;
-}
-.avatars .av {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-fg);
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--panel);
-  margin-left: -8px;
-  font-family: var(--font-mono);
-}
-.avatars .av:first-child {
-  margin-left: 0;
-}
-
 .chat {
   display: flex;
   flex-direction: column;

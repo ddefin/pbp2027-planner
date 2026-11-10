@@ -18,9 +18,9 @@ export function WebhooksPage() {
           </button>
         </div>
         <p className="hint">
-          Reçois une notification (Discord, Slack, ou un point de terminaison à toi) quand une sortie est planifiée,
-          qu'un randonneur la rejoint, ou qu'un choix est fait sur le calendrier des BRM. Visible et déclenché pour
-          tout le groupe, pas seulement pour toi.
+          Reçois une notification (Discord, Slack, ou un point de terminaison à toi) quand un choix est fait sur le
+          calendrier des BRM, ou qu'un vent fort est prévu sur un BRM choisi. Visible et déclenché pour tout le
+          groupe, pas seulement pour toi.
         </p>
 
         {error && <div className="error-banner">{error}</div>}
@@ -77,7 +77,7 @@ function WebhookForm({
 }) {
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState<WebhookFormat>("discord");
-  const [events, setEvents] = useState<Set<WebhookEventName>>(new Set(["sortie.created"]));
+  const [events, setEvents] = useState<Set<WebhookEventName>>(new Set(["brm.participation_changed"]));
   const [busy, setBusy] = useState(false);
 
   function toggleEvent(ev: WebhookEventName) {

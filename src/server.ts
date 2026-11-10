@@ -12,12 +12,10 @@ import { authRoutes } from "./routes/auth.js";
 import { profileRoutes } from "./routes/profile.js";
 import { brmRoutes } from "./routes/brm.js";
 import { brmCatalogRoutes } from "./routes/brmCatalog.js";
-import { sortiesRoutes } from "./routes/sorties.js";
 import { webhooksRoutes } from "./routes/webhooks.js";
 import { parcoursRoutes } from "./routes/parcours.js";
 import { meteoRoutes } from "./routes/meteo.js";
 import { messagingRoutes } from "./routes/messaging.js";
-import { chatWsRoutes } from "./ws/chat.js";
 import { messagingWsRoutes } from "./ws/messaging.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
 
@@ -43,21 +41,20 @@ export function buildServer() {
   });
 
   // Tout sous /api : évite toute collision avec les routes côté client du frontend
-  // (ex. /sorties existe à la fois comme route API et comme route React Router — sans
-  // préfixe, un rechargement complet sur /sorties serait intercepté par le proxy et
-  // renverrait la réponse de l'API au lieu de la page de l'app).
+  // (ex. /messagerie existe à la fois comme route API — préfixée ici — et comme route
+  // React Router : sans préfixe, un rechargement complet sur une URL partagée par les
+  // deux serait intercepté par le proxy et renverrait la réponse de l'API au lieu de
+  // la page de l'app).
   app.register(
     async (api) => {
       api.register(authRoutes);
       api.register(profileRoutes);
       api.register(brmRoutes);
       api.register(brmCatalogRoutes);
-      api.register(sortiesRoutes);
       api.register(webhooksRoutes);
       api.register(parcoursRoutes);
       api.register(meteoRoutes);
       api.register(messagingRoutes);
-      api.register(chatWsRoutes);
       api.register(messagingWsRoutes);
     },
     { prefix: "/api" },

@@ -1,7 +1,7 @@
 # PBP 2027 Planner — backend
 
-Service d'authentification, de suivi BRM et de coordination des sorties pour le planner
-de qualification Paris-Brest-Paris 2027.
+Service d'authentification et de suivi BRM pour le planner de qualification
+Paris-Brest-Paris 2027.
 Dépôt séparé de `lameteoducyclo.fr` (repo `meteo-velo`) — aucun impact sur le site météo existant.
 
 ## Choix de sécurité
@@ -11,7 +11,7 @@ Dépôt séparé de `lameteoducyclo.fr` (repo `meteo-velo`) — aucun impact sur
 - **Verrouillage de compte** : après 8 échecs de mot de passe, compte verrouillé 15 minutes.
 - **Rate limiting** : 10 tentatives de login / 15 min par IP (en mémoire ; à migrer vers un backend partagé type Redis en cas de plusieurs instances).
 - **Énumération de comptes** : `/api/auth/register` et les échecs de `/api/auth/login` renvoient des réponses génériques.
-- **Toutes les routes sont sous `/api`** : évite toute collision avec les routes côté client du frontend (ex. `/sorties` existe à la fois côté API et côté React Router — sans préfixe, un rechargement de page sur cette URL serait intercepté par le proxy et renverrait la réponse JSON au lieu de l'app).
+- **Toutes les routes sont sous `/api`** : évite toute collision avec les routes côté client du frontend (ex. `/messagerie` existe à la fois côté API et côté React Router — sans préfixe, un rechargement de page sur cette URL serait intercepté par le proxy et renverrait la réponse JSON au lieu de l'app).
 
 ## Démarrer en local
 
@@ -55,20 +55,9 @@ Le service écoute sur `http://localhost:3001`.
 | PUT | `/api/brm/catalog/:id/participation` | Choisit un statut (prévu/inscrit/fait/homologué) sur un BRM du calendrier |
 | DELETE | `/api/brm/catalog/:id/participation` | Retire son choix |
 
-### Sorties et chat
-
-| Méthode | Route | Description |
-|---|---|---|
-| GET | `/api/sorties` | Liste les sorties planifiées |
-| POST | `/api/sorties` | Planifie une sortie (l'auteur y est automatiquement inscrit) |
-| POST | `/api/sorties/:id/join` | Rejoint une sortie |
-| DELETE | `/api/sorties/:id/join` | Se retire d'une sortie |
-| GET | `/api/sorties/:id/messages` | Historique du chat de la sortie |
-| WS | `/api/sorties/:id/chat` | Chat temps réel (diffusion à tous les participants connectés, persisté en base) |
-
 ### Webhooks
 
-Notifications de groupe (Discord, Slack, ou un point de terminaison à soi en JSON signé HMAC-SHA256) déclenchées sur `sortie.created`, `sortie.participant_joined` et `brm.participation_changed`. Un abonnement est diffusé pour tout le monde dès qu'il écoute l'événement, pas seulement pour celui qui l'a configuré — c'est pensé pour un salon Discord/Slack partagé par le groupe, pas des notifications privées.
+Notifications de groupe (Discord, Slack, ou un point de terminaison à soi en JSON signé HMAC-SHA256) déclenchées sur `brm.participation_changed` et `meteo.vent_fort`. Un abonnement est diffusé pour tout le monde dès qu'il écoute l'événement, pas seulement pour celui qui l'a configuré — c'est pensé pour un salon Discord/Slack partagé par le groupe, pas des notifications privées.
 
 | Méthode | Route | Description |
 |---|---|---|
@@ -108,17 +97,19 @@ Nécessite `OPENWEATHER_API_KEY` (clé gratuite sur [openweathermap.org](https:/
 npm test
 ```
 
-Hachage de mot de passe, cycle de vie et isolation des BRM entre utilisateurs, calendrier ACP (mock réseau), sorties
-et chat WebSocket (diffusion temps réel, auth au handshake, persistance), webhooks
-(diffusion de groupe filtrée par événement, isolation par propriétaire, signature HMAC),
-parcours (récupération automatique mockée, upload/téléchargement GPX, isolation), météo
-(conversions d'unités, cache par ville, 503 propre sans clé configurée).
+Hachage de mot de passe, cycle de vie et isolation des BRM entre utilisateurs, calendrier
+ACP (mock réseau), messagerie WebSocket (diffusion temps réel, auth au handshake,
+persistance), webhooks (diffusion de groupe filtrée par événement, isolation par
+propriétaire, signature HMAC), parcours (récupération automatique mockée,
+upload/téléchargement GPX, isolation), météo (conversions d'unités, cache par ville,
+503 propre sans clé configurée), profil (événements personnels isolés par utilisateur).
 
 ## Frontend
 
 Le dossier `web/` contient l'app React (Vite) branchée sur ce service : connexion,
-tableau de bord (compte à rebours + suivi BRM), calendrier des BRM officiels, sorties,
-chat temps réel, webhooks et parcours (upload GPX, météo live + prévisions, notes).
+tableau de bord (compte à rebours + suivi BRM), calendrier des BRM officiels,
+messagerie temps réel, webhooks, parcours (upload GPX, météo live + prévisions,
+notes) et profil (licence, carnet de bord, événements personnels).
 Voir `web/README.md` pour le détail (notamment le découpage front/back qui évite le
 CORS en gardant tout sous le même domaine en prod).
 

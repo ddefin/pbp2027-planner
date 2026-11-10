@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export type ChatStatus = "connecting" | "open" | "closed";
 
-// Générique derrière useChat (sorties) et le salon général / messages privés : ouvre
+// Générique derrière le salon général et les messages privés : ouvre
 // un socket sur `socketUrl`, charge l'historique via `loadHistory`, et ajoute les
 // messages reçus au fil de l'eau. `key` déclenche une reconnexion (ex. changer de
 // conversation privée). Un envoi via REST (pièce jointe, position) arrive aussi par

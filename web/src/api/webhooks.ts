@@ -1,7 +1,7 @@
 import { ApiError } from "./auth";
 
 export type WebhookFormat = "discord" | "slack" | "generic";
-export type WebhookEventName = "sortie.created" | "sortie.participant_joined" | "brm.participation_changed";
+export type WebhookEventName = "brm.participation_changed" | "meteo.vent_fort";
 
 export interface Webhook {
   id: string;

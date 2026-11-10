@@ -5,17 +5,10 @@ import { decryptSecret, encryptSecret } from "./secretCrypto.js";
 export const VALID_FORMATS = ["discord", "slack", "generic"] as const;
 export type WebhookFormat = (typeof VALID_FORMATS)[number];
 
-export const VALID_EVENTS = [
-  "sortie.created",
-  "sortie.participant_joined",
-  "brm.participation_changed",
-  "meteo.vent_fort",
-] as const;
+export const VALID_EVENTS = ["brm.participation_changed", "meteo.vent_fort"] as const;
 export type WebhookEvent = (typeof VALID_EVENTS)[number];
 
 export const EVENT_LABEL: Record<WebhookEvent, string> = {
-  "sortie.created": "Nouvelle sortie planifiée",
-  "sortie.participant_joined": "Un randonneur rejoint une sortie",
   "brm.participation_changed": "Choix sur un BRM du calendrier",
   "meteo.vent_fort": "Vent fort prévu sur un BRM choisi",
 };
@@ -23,23 +16,12 @@ export const EVENT_LABEL: Record<WebhookEvent, string> = {
 const DELIVERY_TIMEOUT_MS = 5000;
 
 type EventPayloads = {
-  "sortie.created": { titre: string; date: string; lieu: string; createdBy: string };
-  "sortie.participant_joined": { titre: string; who: string };
   "brm.participation_changed": { who: string; status: string; distance: number; ville: string; date: string };
   "meteo.vent_fort": { ville: string; distance: number; date: string; windKmh: number; gustsKmh: number | null; direction: string };
 };
 
 function humanText<E extends WebhookEvent>(event: E, data: EventPayloads[E]): string {
   switch (event) {
-    case "sortie.created": {
-      const d = data as EventPayloads["sortie.created"];
-      const date = new Date(d.date).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-      return `📅 Nouvelle sortie : "${d.titre}" le ${date} à ${d.lieu} (par ${d.createdBy})`;
-    }
-    case "sortie.participant_joined": {
-      const d = data as EventPayloads["sortie.participant_joined"];
-      return `🚴 ${d.who} rejoint la sortie "${d.titre}"`;
-    }
     case "brm.participation_changed": {
       const d = data as EventPayloads["brm.participation_changed"];
       const date = new Date(d.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
@@ -112,11 +94,12 @@ export async function triggerWebhooks<E extends WebhookEvent>(event: E, data: Ev
 // Envoie un événement de test à UN SEUL abonnement, jamais une diffusion de groupe —
 // sinon tester son propre webhook spammerait aussi ceux des autres utilisateurs.
 export async function sendTestEvent(sub: Subscription): Promise<void> {
-  await deliver(sub, "sortie.created", {
-    titre: "Ceci est un test",
+  await deliver(sub, "brm.participation_changed", {
+    who: "Ceci est un test",
+    status: "prevu",
+    distance: 200,
+    ville: "Test",
     date: new Date().toISOString(),
-    lieu: "Test",
-    createdBy: "pbp2027-planner",
   });
 }
 

@@ -26,9 +26,6 @@ model User {
   personalEvents       PersonalEvent[]
   brmEvents            BrmEvent[]
   brmParticipations    BrmParticipation[]
-  sortiesCreees        Sortie[]            @relation("SortieCreateur")
-  sortieParticipations SortieParticipant[]
-  chatMessages         ChatMessage[]
   webhookSubscriptions WebhookSubscription[]
   groupMessages        GroupMessage[]
   sentDirectMessages     DirectMessage[] @relation("DmSender")
@@ -125,42 +122,6 @@ model BrmParticipation {
   @@index([catalogEventId])
 }
 
-// Une sortie d'entraînement coordonnée par le groupe (distincte des BRM officiels).
-model Sortie {
-  id           String              @id @default(cuid())
-  titre        String
-  date         DateTime
-  lieu         String
-  createdById  String
-  createdBy    User                @relation("SortieCreateur", fields: [createdById], references: [id], onDelete: Cascade)
-  createdAt    DateTime            @default(now())
-  participants SortieParticipant[]
-  messages     ChatMessage[]
-}
-
-model SortieParticipant {
-  id       String   @id @default(cuid())
-  sortieId String
-  sortie   Sortie   @relation(fields: [sortieId], references: [id], onDelete: Cascade)
-  userId   String
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  joinedAt DateTime @default(now())
-
-  @@unique([sortieId, userId])
-}
-
-model ChatMessage {
-  id        String   @id @default(cuid())
-  sortieId  String
-  sortie    Sortie   @relation(fields: [sortieId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  text      String
-  createdAt DateTime @default(now())
-
-  @@index([sortieId, createdAt])
-}
-
 // Abonnement webhook configuré par un utilisateur, mais déclenché pour TOUT le groupe
 // (ex. un webhook Discord pointant sur le salon du club) : c'est le même modèle que la
 // visibilité des participations BRM, pensé pour la coordination collective plutôt que
@@ -181,8 +142,7 @@ model WebhookSubscription {
   @@index([userId])
 }
 
-// Salon général : un seul fil, visible par tous les randonneurs connectés
-// (pas de notion de membres, contrairement au chat d'une Sortie).
+// Salon général : un seul fil, visible par tous les randonneurs connectés.
 model GroupMessage {
   id           String   @id @default(cuid())
   userId       String

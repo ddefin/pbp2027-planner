@@ -47,7 +47,7 @@ export const GENERAL_ROOM_KEY = "general";
 
 export async function messagingWsRoutes(app: FastifyInstance) {
   // Salon général : accessible à tout utilisateur connecté, pas de vérification
-  // d'appartenance (contrairement au chat d'une Sortie).
+  // d'appartenance.
   app.get(
     "/messaging/general/chat",
     {

@@ -7,7 +7,6 @@ export const FORMAT_OPTIONS: { value: WebhookFormat; label: string }[] = [
 ];
 
 export const EVENT_OPTIONS: { value: WebhookEventName; label: string }[] = [
-  { value: "sortie.created", label: "Nouvelle sortie planifiée" },
-  { value: "sortie.participant_joined", label: "Un randonneur rejoint une sortie" },
   { value: "brm.participation_changed", label: "Choix sur un BRM du calendrier" },
+  { value: "meteo.vent_fort", label: "Vent fort prévu sur un BRM choisi" },
 ];
