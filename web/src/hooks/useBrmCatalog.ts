@@ -15,7 +15,19 @@ export function useBrmCatalog() {
     setError(null);
     try {
       const res = await listCatalog();
-      setEvents(res.events);
+      // Le calendrier ACP source liste parfois deux fois le même brevet (entrée
+      // strictement identique côté ACP) — même id stable des deux côtés (voir
+      // stableId() dans src/lib/acpCatalog.ts). Sans dédoublonnage, deux éléments
+      // de liste React partagent la même key, ce qui corrompt la réconciliation
+      // du DOM dès qu'un filtre change la taille de la liste (des BRM d'autres
+      // régions se mettaient à apparaître dans une région filtrée).
+      const seen = new Set<string>();
+      const deduped = res.events.filter((e) => {
+        if (seen.has(e.id)) return false;
+        seen.add(e.id);
+        return true;
+      });
+      setEvents(deduped);
     } catch {
       setError("Impossible de charger le calendrier des BRM.");
     }
