@@ -1,17 +1,43 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useProfile } from "../hooks/useProfile";
 import { usePersonalEvents } from "../hooks/usePersonalEvents";
 import { ApiError } from "../api/auth";
 import { changePassword } from "../api/profile";
 
+// Replié par défaut (sauf la première section) : quatre blocs complets l'un sous
+// l'autre forçaient beaucoup de défilement avant même de voir ce qu'on cherche.
+function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <section className="panel">
+      <button type="button" className="collapsible-header" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+        <h2>{title}</h2>
+        <span className={`collapsible-caret${open ? " open" : ""}`} aria-hidden="true">
+          ▾
+        </span>
+      </button>
+      {open && <div style={{ marginTop: 14 }}>{children}</div>}
+    </section>
+  );
+}
+
 export function ProfilePage() {
   return (
     <div className="wrap">
-      <ProfileSection />
-      <PasswordSection />
-      <NotebookSection />
-      <PersonalEventsSection />
+      <CollapsibleSection title="Mon profil" defaultOpen>
+        <ProfileSection />
+      </CollapsibleSection>
+      <CollapsibleSection title="Mot de passe">
+        <PasswordSection />
+      </CollapsibleSection>
+      <CollapsibleSection title="Carnet de bord">
+        <NotebookSection />
+      </CollapsibleSection>
+      <CollapsibleSection title="Mes événements">
+        <PersonalEventsSection />
+      </CollapsibleSection>
     </div>
   );
 }
@@ -47,18 +73,14 @@ function ProfileSection() {
 
   if (loading || !profile) {
     return (
-      <section className="panel">
-        <h2>Mon profil</h2>
-        <p className="hint" style={{ margin: 0 }}>
-          Chargement…
-        </p>
-      </section>
+      <p className="hint" style={{ margin: 0 }}>
+        Chargement…
+      </p>
     );
   }
 
   return (
-    <section className="panel">
-      <h2>Mon profil</h2>
+    <>
       <form onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="profile-email">Email</label>
@@ -91,7 +113,7 @@ function ProfileSection() {
           </span>
         )}
       </form>
-    </section>
+    </>
   );
 }
 
@@ -131,8 +153,7 @@ function PasswordSection() {
   }
 
   return (
-    <section className="panel">
-      <h2>Mot de passe</h2>
+    <>
       {error && <div className="error-banner">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="field">
@@ -179,7 +200,7 @@ function PasswordSection() {
           </span>
         )}
       </form>
-    </section>
+    </>
   );
 }
 
@@ -207,8 +228,7 @@ function NotebookSection() {
   if (loading) return null;
 
   return (
-    <section className="panel">
-      <h2>Carnet de bord</h2>
+    <>
       <p className="hint" style={{ marginTop: 0 }}>
         Notes libres rien que pour toi — liste de matériel, plan de nutrition, points de vigilance pour le brevet...
       </p>
@@ -238,7 +258,7 @@ function NotebookSection() {
           </span>
         )}
       </div>
-    </section>
+    </>
   );
 }
 
@@ -264,8 +284,7 @@ function PersonalEventsSection() {
   }
 
   return (
-    <section className="panel">
-      <h2>Mes événements</h2>
+    <>
       <p className="hint" style={{ marginTop: 0 }}>
         Un calendrier rien qu'à toi — entraînements, rendez-vous, rappels liés au PBP. Visible seulement par toi.
       </p>
@@ -308,6 +327,6 @@ function PersonalEventsSection() {
           Ajouter
         </button>
       </form>
-    </section>
+    </>
   );
 }

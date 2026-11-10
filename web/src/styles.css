@@ -309,6 +309,31 @@ button.link {
   margin-bottom: 20px;
 }
 
+.collapsible-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.collapsible-caret {
+  font-size: 18px;
+  color: var(--fg-muted);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+.collapsible-caret.open {
+  transform: rotate(180deg);
+}
+
 .security-row {
   display: flex;
   align-items: center;
