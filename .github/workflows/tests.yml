@@ -1,0 +1,50 @@
+name: Tests
+
+# Déploiement volontairement absent d'ici : un job "deploy" sur le runner
+# self-hébergé a existé un temps, mais ne peut pas fonctionner correctement sur
+# cette installation (le runner tourne dans son propre conteneur Docker, donc
+# `docker compose up` lancé depuis là-dedans résoudrait ./data — la base de
+# prod — comme un chemin interne à CE conteneur, pas le vrai dossier du NAS :
+# risque réel de faire tourner l'app sur un dossier de données vide). Le vrai
+# déploiement se fait par scripts/auto-deploy.sh, planifié toutes les 5 min
+# sur le NAS via le Planificateur de tâches DSM — voir DEPLOY.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Installe les dépendances backend
+        run: npm ci
+
+      - name: Génère le client Prisma
+        run: npx prisma generate
+
+      - name: Vérifie les types (backend)
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Build backend
+        run: npm run build
+
+      - name: Tests backend
+        run: npm test
+
+      - name: Installe les dépendances frontend
+        working-directory: web
+        run: npm ci
+
+      - name: Build frontend (inclut la vérification des types)
+        working-directory: web
+        run: npm run build

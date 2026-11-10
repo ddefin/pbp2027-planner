@@ -116,11 +116,12 @@ CORS en gardant tout sous le même domaine en prod).
 ## Déploiement
 
 Un seul conteneur Docker sert le frontend et le backend ensemble (voir `Dockerfile`,
-`docker-compose.yml`). Déployé sur un Synology personnel via un runner GitHub Actions
-auto-hébergé (`.github/workflows/deploy.yml`) — pas de FTP ni d'hébergement mutualisé
-dans cette chaîne, qui ne peuvent pas faire tourner un process Node en continu ni
-relayer le WebSocket du chat. Voir **[DEPLOY.md](./DEPLOY.md)** pour la mise en place
-complète (DNS, reverse proxy DSM, runner).
+`docker-compose.yml`). Déployé sur un Synology personnel : `scripts/auto-deploy.sh`,
+planifié toutes les 5 min sur le NAS, récupère les derniers commits et reconstruit
+l'image si besoin — pas de FTP ni d'hébergement mutualisé dans cette chaîne, qui ne
+peuvent pas faire tourner un process Node en continu ni relayer le WebSocket du chat.
+Voir **[DEPLOY.md](./DEPLOY.md)** pour la mise en place complète (DNS, reverse proxy
+DSM, déploiement automatique).
 
 ## Pour la suite
 

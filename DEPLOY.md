@@ -37,11 +37,13 @@ Dans la zone DNS du domaine (Espace client OVH → Web Cloud → Noms de domaine
      `docker-compose.yml`, premier nombre de la ligne `ports:` — à garder identique
      des deux côtés si tu dois le changer un jour, lui était déjà pris sur ce NAS).
 
-## 3. Runner GitHub Actions (sur le NAS, dans un conteneur)
+## 3. Runner GitHub Actions (optionnel, plus utilisé par défaut)
 
-Le déploiement se fait par un **runner auto-hébergé** : pas d'accès SSH exposé sur
-Internet, pas de clé SSH à stocker comme secret GitHub. Le runner tourne *sur* le
-NAS et c'est lui qui construit l'image Docker et redémarre le conteneur, en local.
+**Cette étape n'est plus nécessaire** : le déploiement se fait par
+`scripts/auto-deploy.sh` (étape 5), planifié directement sur le NAS — pas besoin
+d'un runner GitHub pour ça. Elle reste documentée ici seulement si tu veux un
+jour faire tourner d'autres workflows sur ce NAS ; sinon ignore cette section et
+passe à l'étape 4.
 
 **Le runner GitHub officiel ne s'installe pas directement sur DSM** : son
 `config.sh` attend des outils que DSM n'a pas (`ldd` et d'autres bibliothèques),
@@ -168,16 +170,22 @@ NAS existantes (Hyper Backup), pour avoir une copie hors du NAS lui-même.
 
 ## 5. Déploiement
 
-Le workflow `.github/workflows/deploy.yml` fait tourner les tests sur chaque push
-(sur un runner GitHub classique) — ça, ça marche. Le job `deploy` qui suit, lui,
-tourne sur le runner self-hébergé mais **ne doit pas être utilisé tel quel pour
-déployer en production sur ce NAS** : ce runner a son propre clone du dépôt dans
-son conteneur, et `docker compose up` lancé depuis là-dedans résout `./data`
-(la base SQLite de prod) comme un chemin à l'intérieur de ce conteneur, pas le
-vrai dossier de données du NAS — un déploiement qui irait jusqu'au bout
-risquerait de faire tourner l'app sur un `./data` vide. Le job échoue
-volontairement avant d'en arriver là (`.env.production manquant`, voir
-Dépannage) ; ne crée pas ce fichier dans le clone du runner pour le "corriger".
+Le workflow `.github/workflows/tests.yml` fait tourner les tests sur chaque push,
+sur un runner GitHub classique (`ubuntu-latest`) — c'est tout ce qu'il fait,
+aucun déploiement dedans : un runner self-hébergé dans son propre conteneur
+Docker ne peut pas déployer correctement sur ce NAS (`docker compose up` lancé
+depuis là-dedans résoudrait `./data` — la base SQLite de prod — comme un chemin
+à l'intérieur de ce conteneur, pas le vrai dossier de données du NAS : risque
+réel de faire tourner l'app sur un `./data` vide).
+
+**Le runner self-hébergé de l'étape 3 n'est donc plus utilisé par rien** (les
+tests tournent sur l'infrastructure GitHub, le déploiement via
+`scripts/auto-deploy.sh`) — tu peux l'arrêter sans rien casser si tu veux
+libérer les ressources qu'il occupe sur le NAS :
+```bash
+cd ~/pbp2027-planner/runner
+docker compose down
+```
 
 **Déploiement automatique réel** : `scripts/auto-deploy.sh`, planifié toutes les
 5 minutes via le Planificateur de tâches DSM — même principe que les sauvegardes
@@ -203,28 +211,16 @@ sudo docker compose up -d --build
 
 ## Dépannage
 
-- **Le job `deploy` reste "en attente" sur GitHub** : le runner n'est pas démarré, ou
-  le label `synology` ne correspond pas — vérifie Settings → Actions → Runners (doit
-  afficher "Idle", pas "Offline").
-- **`docker compose` échoue avec une erreur de permissions** : l'utilisateur du runner
-  n'est pas dans le groupe `docker` (étape 3.5 ci-dessus).
 - **Le chat ne se connecte pas (WebSocket)** : vérifie que "Prise en charge de
   WebSocket" est bien cochée dans la règle de reverse proxy DSM.
-- **`.env.production manquant` dans le job `deploy`** : normal et volontaire (voir
-  étape 5) — ce job n'est pas le mécanisme de déploiement réel sur ce NAS,
-  `scripts/auto-deploy.sh` planifié s'en charge. Ne crée **pas** `.env.production`
-  dans le clone du runner pour faire taire cette erreur : le job irait alors
-  jusqu'au bout et risquerait de faire tourner l'app sur un dossier `./data` vide
-  (voir l'explication à l'étape 5).
 - **`scripts/auto-deploy.sh` ne semble pas tourner** : vérifie dans le
   Planificateur de tâches DSM que la tâche est bien activée et qu'elle a un
   historique d'exécution récent ; `sudo docker image prune -f` dans le script
   nécessite les droits root ou docker, d'où la recommandation de la lancer en
   tant que root (étape 5).
 - **Rien ne change en production après un push sur `main`** : vérifie l'onglet
-  Actions du dépôt GitHub — le job `test` doit être vert (c'est lui qui compte,
-  le job `deploy` qui le suit échoue par conception, voir ci-dessus). `main` peut
-  très bien être à jour sur GitHub sans que rien n'ait changé sur le NAS tant que
+  Actions du dépôt GitHub — le workflow `Tests` doit être vert. `main` peut très
+  bien être à jour sur GitHub sans que rien n'ait changé sur le NAS tant que
   `scripts/auto-deploy.sh` n'est pas passé (jusqu'à 5 min après le push) — ou
   lance le déploiement manuel de l'étape 5 pour ne pas attendre.
 - **`Bind mount failed: '.../data' does not exist`** : le dossier `data` n'a pas été
