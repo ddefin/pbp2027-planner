@@ -13,16 +13,11 @@ model User {
   prenom               String
   isAdmin              Boolean        @default(false)
   passwordHash         String
-  mfaEnabled           Boolean        @default(false)
-  mfaSecretEncrypted   String?
-  mfaPendingEncrypted  String?
   failedLoginAttempts  Int            @default(0)
   lockedUntil          DateTime?
   createdAt            DateTime       @default(now())
   sessions             Session[]
-  recoveryCodes        RecoveryCode[]
   passwordResetTokens  PasswordResetToken[]
-  mfaChallenges        MfaChallenge[]
   brmEvents            BrmEvent[]
   brmParticipations    BrmParticipation[]
   sortiesCreees        Sortie[]            @relation("SortieCreateur")
@@ -49,30 +44,9 @@ model Session {
   ip         String?
 }
 
-// Jeton temporaire émis entre "mot de passe validé" et "code MFA validé".
-// Ne donne jamais accès à une ressource protégée tant que verified=false.
-model MfaChallenge {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attempts  Int      @default(0)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-}
-
-model RecoveryCode {
-  id        String    @id @default(cuid())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  codeHash  String
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-}
-
 // Jeton de réinitialisation de mot de passe oublié, envoyé par email. À usage
 // unique (supprimé dès utilisation) et de courte durée de vie — voir
-// src/routes/auth.ts, même logique que MfaChallenge.
+// src/routes/auth.ts.
 model PasswordResetToken {
   id        String   @id @default(cuid())
   tokenHash String   @unique

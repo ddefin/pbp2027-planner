@@ -1,8 +1,8 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { config } from "../config.js";
 
-// AES-256-GCM pour chiffrer les secrets MFA au repos — une fuite de la base seule
-// ne suffit pas à cloner l'authentification des utilisateurs.
+// AES-256-GCM pour chiffrer au repos les secrets de webhook "generic" (signature
+// HMAC) — une fuite de la base seule ne suffit pas à usurper un abonnement webhook.
 function getKey(): Buffer {
   const key = Buffer.from(config.mfaEncryptionKeyHex, "hex");
   if (key.length !== 32) {

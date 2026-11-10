@@ -9,8 +9,11 @@ function required(name: string): string {
 export const config = {
   port: Number(process.env.PORT ?? 3001),
   databaseUrl: required("DATABASE_URL"),
+  // Nom historique (venait de la double authentification, retirée depuis) : sert
+  // maintenant à chiffrer au repos les secrets de webhook "generic" (voir
+  // src/lib/secretCrypto.ts) — pas renommé pour ne pas casser les .env.production
+  // déjà déployés.
   mfaEncryptionKeyHex: required("MFA_ENCRYPTION_KEY"),
-  totpIssuer: process.env.TOTP_ISSUER ?? "PBP2027 Planner",
   cookieSecure: process.env.COOKIE_SECURE === "true",
   // Optionnelle : sans elle, /brm/:id/meteo répond juste "non configuré" plutôt que
   // d'empêcher le serveur de démarrer — la météo live n'est pas une fonctionnalité

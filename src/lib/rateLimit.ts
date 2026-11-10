@@ -1,4 +1,4 @@
-// Limiteur en mémoire, par clé (ex: "login:<ip>" ou "mfa:<userId>").
+// Limiteur en mémoire, par clé (ex: "login:<ip>" ou "forgot-password:<ip>").
 // Suffisant pour une seule instance ; derrière plusieurs instances, remplacer
 // par un backend partagé (Redis) en gardant la même interface.
 interface Bucket {

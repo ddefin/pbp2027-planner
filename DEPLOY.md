@@ -91,7 +91,8 @@ dernière version d'`actions/runner` — dis-le moi, je corrigerai la logique.
 # Dans le dossier où le runner a cloné le repo (généralement
 # ~/actions-runner/_work/pbp2027-planner/pbp2027-planner) :
 cp .env.production.example .env.production
-nano .env.production   # renseigne MFA_ENCRYPTION_KEY (openssl rand -hex 32),
+nano .env.production   # renseigne MFA_ENCRYPTION_KEY (openssl rand -hex 32 —
+                        # chiffre les secrets de webhook, nom historique),
                         # OPENWEATHER_API_KEY si tu l'utilises, etc.
 mkdir -p data
 ```

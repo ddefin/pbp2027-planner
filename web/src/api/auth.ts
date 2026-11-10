@@ -26,11 +26,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export interface SessionInfo {
   email: string;
   prenom: string;
-  mfaEnabled: boolean;
   isAdmin: boolean;
 }
 
-export type LoginResult = { status: "authenticated" } | { status: "mfa_required"; challengeToken: string };
+export type LoginResult = { status: "authenticated" };
 
 export function register(email: string, password: string, prenom: string) {
   return request<{ status: string }>("/auth/register", {
@@ -46,34 +45,12 @@ export function login(email: string, password: string) {
   });
 }
 
-export function verifyMfa(challengeToken: string, code: string) {
-  return request<{ status: "authenticated" }>("/auth/mfa/verify", {
-    method: "POST",
-    body: JSON.stringify({ challengeToken, code }),
-  });
-}
-
 export function getSession() {
   return request<SessionInfo>("/auth/session");
 }
 
 export function logout() {
   return request<{ status: string }>("/auth/logout", { method: "POST" });
-}
-
-export function setupMfa() {
-  return request<{ secret: string; otpauthUri: string }>("/auth/mfa/setup", { method: "POST" });
-}
-
-export function enableMfa(code: string) {
-  return request<{ status: string; recoveryCodes: string[] }>("/auth/mfa/enable", {
-    method: "POST",
-    body: JSON.stringify({ code }),
-  });
-}
-
-export function disableMfa() {
-  return request<{ status: string }>("/auth/mfa/disable", { method: "POST" });
 }
 
 export function revokeOtherSessions() {

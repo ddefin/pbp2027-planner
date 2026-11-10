@@ -120,8 +120,8 @@ export async function sendTestEvent(sub: Subscription): Promise<void> {
   });
 }
 
-// Le secret brut n'est renvoyé qu'une fois, à la création de l'abonnement (comme les
-// codes de récupération MFA) ; seule sa version chiffrée est conservée en base.
+// Le secret brut n'est renvoyé qu'une fois, à la création de l'abonnement ; seule
+// sa version chiffrée est conservée en base.
 export function generateWebhookSecret(): string {
   return randomBytes(32).toString("hex");
 }

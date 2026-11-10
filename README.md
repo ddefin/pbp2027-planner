@@ -8,10 +8,8 @@ Dépôt séparé de `lameteoducyclo.fr` (repo `meteo-velo`) — aucun impact sur
 
 - **Mots de passe** : `scrypt` (node:crypto, pas de dépendance tierce), sel aléatoire par utilisateur, comparaison en temps constant.
 - **Sessions** : cookie `httpOnly`, `SameSite=Strict`, jeton opaque de 256 bits ; seul le hash SHA-256 du jeton est stocké en base (une fuite de la base ne permet pas de rejouer une session). Expiration glissante sur 30 jours.
-- **MFA (TOTP, RFC 6238)** : implémentation maison sur `node:crypto` (HMAC-SHA1), secret de 160 bits, fenêtre de tolérance d'une étape de 30s pour la dérive d'horloge. Secret chiffré au repos (AES-256-GCM) avec `MFA_ENCRYPTION_KEY`.
-- **Codes de récupération** : 10 codes à usage unique générés à l'activation de la MFA, hachés comme un mot de passe, affichés une seule fois.
 - **Verrouillage de compte** : après 8 échecs de mot de passe, compte verrouillé 15 minutes.
-- **Rate limiting** : 10 tentatives de login / 15 min par IP, 5 tentatives de code MFA / 5 min par challenge (en mémoire ; à migrer vers un backend partagé type Redis en cas de plusieurs instances).
+- **Rate limiting** : 10 tentatives de login / 15 min par IP (en mémoire ; à migrer vers un backend partagé type Redis en cas de plusieurs instances).
 - **Énumération de comptes** : `/api/auth/register` et les échecs de `/api/auth/login` renvoient des réponses génériques.
 - **Toutes les routes sont sous `/api`** : évite toute collision avec les routes côté client du frontend (ex. `/sorties` existe à la fois côté API et côté React Router — sans préfixe, un rechargement de page sur cette URL serait intercepté par le proxy et renverrait la réponse JSON au lieu de l'app).
 
@@ -19,7 +17,8 @@ Dépôt séparé de `lameteoducyclo.fr` (repo `meteo-velo`) — aucun impact sur
 
 ```bash
 cp .env.example .env
-# openssl rand -hex 32  → colle le résultat dans MFA_ENCRYPTION_KEY
+# openssl rand -hex 32  → colle le résultat dans MFA_ENCRYPTION_KEY (chiffre les
+# secrets de webhook, nom historique — voir src/lib/secretCrypto.ts)
 npm install
 npm run prisma:migrate
 npm run dev
@@ -29,16 +28,12 @@ Le service écoute sur `http://localhost:3001`.
 
 ## Endpoints
 
-### Auth / MFA
+### Auth
 
 | Méthode | Route | Description |
 |---|---|---|
 | POST | `/api/auth/register` | Création de compte (email + mot de passe) |
-| POST | `/api/auth/login` | Étape 1 : vérifie le mot de passe. Renvoie soit une session, soit un `challengeToken` si la MFA est activée |
-| POST | `/api/auth/mfa/verify` | Étape 2 : vérifie le code TOTP (ou un code de récupération) avec le `challengeToken`, ouvre la session |
-| POST | `/api/auth/mfa/setup` | (authentifié) Génère un secret TOTP en attente + URI `otpauth://` pour le QR code |
-| POST | `/api/auth/mfa/enable` | (authentifié) Confirme le secret en attente avec un premier code, active la MFA, renvoie les codes de récupération |
-| POST | `/api/auth/mfa/disable` | (authentifié) Désactive la MFA |
+| POST | `/api/auth/login` | Vérifie le mot de passe, ouvre la session |
 | GET  | `/api/auth/session` | (authentifié) Infos de session courante |
 | POST | `/api/auth/logout` | Détruit la session courante |
 | POST | `/api/auth/sessions/revoke-others` | (authentifié) Déconnecte toutes les autres sessions de l'utilisateur |
@@ -113,8 +108,7 @@ Nécessite `OPENWEATHER_API_KEY` (clé gratuite sur [openweathermap.org](https:/
 npm test
 ```
 
-45 tests : hachage de mot de passe, TOTP (round-trip base32, tolérance de dérive d'horloge),
-cycle de vie et isolation des BRM entre utilisateurs, calendrier ACP (mock réseau), sorties
+Hachage de mot de passe, cycle de vie et isolation des BRM entre utilisateurs, calendrier ACP (mock réseau), sorties
 et chat WebSocket (diffusion temps réel, auth au handshake, persistance), webhooks
 (diffusion de groupe filtrée par événement, isolation par propriétaire, signature HMAC),
 parcours (récupération automatique mockée, upload/téléchargement GPX, isolation), météo
@@ -122,7 +116,7 @@ parcours (récupération automatique mockée, upload/téléchargement GPX, isola
 
 ## Frontend
 
-Le dossier `web/` contient l'app React (Vite) branchée sur ce service : connexion/MFA,
+Le dossier `web/` contient l'app React (Vite) branchée sur ce service : connexion,
 tableau de bord (compte à rebours + suivi BRM), calendrier des BRM officiels, sorties,
 chat temps réel, webhooks et parcours (upload GPX, météo live + prévisions, notes).
 Voir `web/README.md` pour le détail (notamment le découpage front/back qui évite le

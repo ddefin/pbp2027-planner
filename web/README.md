@@ -1,4 +1,4 @@
-# Frontend — login / MFA
+# Frontend — login
 
 App React (Vite) branchée sur le service d'authentification du dossier parent (`../src`).
 
@@ -41,6 +41,6 @@ Ouvrir `http://localhost:5173`.
 ## Pages
 
 - `/inscription` — création de compte.
-- `/login` — mot de passe, puis étape MFA si elle est activée sur le compte (code TOTP ou code de récupération).
-- `/` — tableau de bord (placeholder, à compléter avec le compte à rebours / suivi BRM / sorties).
-- `/securite` — activation/désactivation de la MFA (QR code + confirmation, affichage unique des codes de récupération), déconnexion des autres sessions.
+- `/login` — email + mot de passe.
+- `/` — tableau de bord (compte à rebours, suivi BRM, BRM choisis par le groupe).
+- `/securite` — déconnexion des autres sessions.
