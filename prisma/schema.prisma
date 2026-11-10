@@ -24,6 +24,7 @@ model User {
   sessions             Session[]
   passwordResetTokens  PasswordResetToken[]
   personalEvents       PersonalEvent[]
+  licenseDocuments     LicenseDocument[]
   brmEvents            BrmEvent[]
   brmParticipations    BrmParticipation[]
   webhookSubscriptions WebhookSubscription[]
@@ -272,4 +273,20 @@ model PersonalEvent {
   updatedAt DateTime @updatedAt
 
   @@index([userId, date])
+}
+
+// Licence FFCT/ACP scannée ou photographiée (PDF/PNG/JPEG), page "Mon profil".
+// Pas de notion de "courante" en base : la plus récente (createdAt) l'est
+// implicitement, les autres forment l'archive — un nouvel upload n'écrase
+// jamais les précédents, pensé pour garder une collection au fil des ans.
+model LicenseDocument {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fileName     String
+  fileMimeType String
+  filePath     String
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
 }

@@ -1,9 +1,10 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useProfile } from "../hooks/useProfile";
 import { usePersonalEvents } from "../hooks/usePersonalEvents";
+import { useLicenseDocuments } from "../hooks/useLicenseDocuments";
 import { ApiError } from "../api/auth";
-import { changePassword } from "../api/profile";
+import { changePassword, licenseFileUrl } from "../api/profile";
 
 // Replié par défaut (sauf la première section) : quatre blocs complets l'un sous
 // l'autre forçaient beaucoup de défilement avant même de voir ce qu'on cherche.
@@ -28,6 +29,9 @@ export function ProfilePage() {
     <div className="wrap">
       <CollapsibleSection title="Mon profil" defaultOpen>
         <ProfileSection />
+      </CollapsibleSection>
+      <CollapsibleSection title="Ma licence">
+        <LicenseSection />
       </CollapsibleSection>
       <CollapsibleSection title="Mot de passe">
         <PasswordSection />
@@ -327,6 +331,120 @@ function PersonalEventsSection() {
           Ajouter
         </button>
       </form>
+    </>
+  );
+}
+
+function LicensePreview({ fileName, fileMimeType, id }: { fileName: string; fileMimeType: string; id: string }) {
+  const url = licenseFileUrl(id);
+  if (fileMimeType.startsWith("image/")) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer">
+        <img
+          src={url}
+          alt={fileName}
+          style={{ maxWidth: "100%", maxHeight: 260, borderRadius: 8, display: "block", border: "1px solid var(--line)" }}
+        />
+      </a>
+    );
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 14px",
+        border: "1px solid var(--line)",
+        borderRadius: 8,
+        color: "inherit",
+      }}
+    >
+      📄 {fileName}
+    </a>
+  );
+}
+
+function LicenseSection() {
+  const { documents, loading, error, upload, remove } = useLicenseDocuments();
+  const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      await upload(file);
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  if (loading) return null;
+
+  const [current, ...archive] = documents ?? [];
+
+  return (
+    <>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Scan ou photo de ta licence FFCT/ACP (PDF, PNG ou JPEG, 10 Mo max). Chaque import garde le précédent dans
+        l'archive plutôt que de l'effacer — pratique pour retrouver tes licences des années passées.
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+
+      {current ? (
+        <div>
+          <LicensePreview fileName={current.fileName} fileMimeType={current.fileMimeType} id={current.id} />
+          <p className="hint" style={{ marginBottom: 0 }}>
+            Ajoutée le {new Date(current.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+          </p>
+        </div>
+      ) : (
+        <p className="hint">Aucune licence enregistrée pour l'instant.</p>
+      )}
+
+      <button
+        type="button"
+        className="ghost"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={busy}
+        style={{ marginTop: 10 }}
+      >
+        {busy ? "Import…" : current ? "Changer de licence" : "Ajouter ma licence"}
+      </button>
+      <input ref={fileInputRef} type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" hidden onChange={handleFileChange} />
+
+      {archive.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <p className="hint" style={{ margin: "0 0 6px", fontWeight: 700 }}>
+            Archive ({archive.length})
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {archive.map((d) => (
+              <div key={d.id} className="security-row">
+                <div>
+                  <div className="t">
+                    <a href={licenseFileUrl(d.id)} target="_blank" rel="noreferrer" style={{ color: "inherit" }}>
+                      📄 {d.fileName}
+                    </a>
+                  </div>
+                  <div className="d">
+                    {new Date(d.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })}
+                  </div>
+                </div>
+                <button type="button" className="ghost" onClick={() => remove(d.id)}>
+                  Supprimer
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }

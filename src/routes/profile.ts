@@ -3,6 +3,10 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
+import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
+
+const MAX_LICENSE_FILE_BYTES = 10 * 1024 * 1024; // 10 Mo : large pour un scan/une photo
+const LICENSE_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
 
 const prenomSchema = z.string().trim().min(1).max(60);
 const optionalTextSchema = (max: number) =>
@@ -151,6 +155,70 @@ export async function profileRoutes(app: FastifyInstance) {
     if (!existing || existing.userId !== user.id) return reply.code(404).send({ error: "not_found" });
 
     await prisma.personalEvent.delete({ where: { id } });
+    return reply.code(204).send();
+  });
+
+  // Licence FFCT/ACP (PDF/PNG/JPEG) : chaque upload s'ajoute à la collection plutôt
+  // que de remplacer le précédent — la plus récente (createdAt) est "la courante"
+  // côté interface, les autres forment l'archive. Rien n'est jamais écrasé.
+  app.get("/profile/license", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const docs = await prisma.licenseDocument.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, fileName: true, fileMimeType: true, createdAt: true },
+    });
+    return reply.send({ documents: docs.map((d) => ({ ...d, createdAt: d.createdAt.toISOString() })) });
+  });
+
+  app.post("/profile/license", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const file = await request.file({ limits: { fileSize: MAX_LICENSE_FILE_BYTES } });
+    if (!file) return reply.code(400).send({ error: "no_file" });
+    const mimeType = file.mimetype || "application/octet-stream";
+    if (!LICENSE_MIME_TYPES.has(mimeType)) return reply.code(400).send({ error: "invalid_file_type" });
+
+    const buffer = await file.toBuffer();
+    if (buffer.length > MAX_LICENSE_FILE_BYTES) return reply.code(413).send({ error: "file_too_large" });
+
+    const filePath = await saveUploadedFile("licenses", buffer);
+    const doc = await prisma.licenseDocument.create({
+      data: { userId: user.id, fileName: file.filename, fileMimeType: mimeType, filePath },
+    });
+
+    return reply.code(201).send({
+      document: { id: doc.id, fileName: doc.fileName, fileMimeType: doc.fileMimeType, createdAt: doc.createdAt.toISOString() },
+    });
+  });
+
+  app.get("/profile/license/:id/file", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    const doc = await prisma.licenseDocument.findUnique({ where: { id } });
+    if (!doc || doc.userId !== user.id) return reply.code(404).send({ error: "not_found" });
+
+    const content = await readUploadedFile(doc.filePath);
+    reply.header("content-type", doc.fileMimeType);
+    reply.header("content-disposition", `inline; filename="${doc.fileName.replace(/"/g, "")}"`);
+    return reply.send(content);
+  });
+
+  app.delete("/profile/license/:id", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const { id } = request.params as { id: string };
+    const doc = await prisma.licenseDocument.findUnique({ where: { id } });
+    if (!doc || doc.userId !== user.id) return reply.code(404).send({ error: "not_found" });
+
+    await deleteUploadedFile(doc.filePath);
+    await prisma.licenseDocument.delete({ where: { id } });
     return reply.code(204).send();
   });
 }

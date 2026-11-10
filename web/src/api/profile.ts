@@ -55,3 +55,31 @@ export function createPersonalEvent(data: { title: string; date: string; notes?:
 export function deletePersonalEvent(id: string) {
   return request<void>(`/profile/events/${id}`, { method: "DELETE" });
 }
+
+export interface LicenseDocument {
+  id: string;
+  fileName: string;
+  fileMimeType: string;
+  createdAt: string; // ISO
+}
+
+export function listLicenseDocuments() {
+  return request<{ documents: LicenseDocument[] }>("/profile/license").then((r) => r.documents);
+}
+
+export async function uploadLicenseDocument(file: File): Promise<LicenseDocument> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/profile/license", { method: "POST", credentials: "include", body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? "unknown_error");
+  return (body as { document: LicenseDocument }).document;
+}
+
+export function licenseFileUrl(id: string) {
+  return `/api/profile/license/${id}/file`;
+}
+
+export function deleteLicenseDocument(id: string) {
+  return request<void>(`/profile/license/${id}`, { method: "DELETE" });
+}
