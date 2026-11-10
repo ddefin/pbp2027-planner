@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { hashToken } from "../lib/tokens.js";
-import { createSession, destroySession, destroyOtherSessions, destroyAllSessions, getSessionUser } from "../lib/session.js";
+import { createSession, destroySession, destroyAllSessions, getSessionUser } from "../lib/session.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
 import { generateOpaqueToken } from "../lib/tokens.js";
 import { sendPasswordResetEmail } from "../lib/mailer.js";
@@ -147,12 +147,5 @@ export async function authRoutes(app: FastifyInstance) {
   app.post("/auth/logout", async (request, reply) => {
     await destroySession(request, reply);
     return reply.send({ status: "logged_out" });
-  });
-
-  app.post("/auth/sessions/revoke-others", async (request, reply) => {
-    const user = await getSessionUser(request);
-    if (!user) return reply.code(401).send({ error: "unauthenticated" });
-    await destroyOtherSessions(user.id, request);
-    return reply.send({ status: "ok" });
   });
 }

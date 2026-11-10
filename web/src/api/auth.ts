@@ -53,10 +53,6 @@ export function logout() {
   return request<{ status: string }>("/auth/logout", { method: "POST" });
 }
 
-export function revokeOtherSessions() {
-  return request<{ status: string }>("/auth/sessions/revoke-others", { method: "POST" });
-}
-
 export function forgotPassword(email: string) {
   return request<{ status: string }>("/auth/forgot-password", {
     method: "POST",
