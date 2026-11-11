@@ -14,9 +14,6 @@ import { RoadbookView, type RoadbookData } from "../components/roadbook/Roadbook
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
 
 const SAVE_DEBOUNCE_MS = 700;
-// Rythme d'envoi des positions GPS au serveur (pour le lien de partage) : assez
-// fréquent pour un suivi utile, assez rare pour ne pas vider la batterie ni le forfait.
-const GPS_POST_INTERVAL_MS = 5 * 60_000;
 
 export function RoadbookPage() {
   const { id } = useParams<{ id: string }>();
@@ -30,7 +27,6 @@ export function RoadbookPage() {
 
   const pending = useRef<Partial<RoadbookSettings>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastPost = useRef<{ at: number; km: number } | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -41,7 +37,6 @@ export function RoadbookPage() {
         const last = checkins[0];
         if (last) {
           setPosition({ km: last.km, lat: last.lat, lon: last.lon, at: last.at, source: last.source });
-          lastPost.current = { at: new Date(last.at).getTime(), km: last.km };
         }
       })
       .catch(() => setError("Roadbook introuvable."));
@@ -70,22 +65,22 @@ export function RoadbookPage() {
     [id],
   );
 
-  // Envoie la position si c'est un pointage manuel, ou pour le GPS : la première, puis
-  // toutes les 5 min, et à chaque contrôle franchi depuis le dernier envoi.
+  // Chaque pointage est une action volontaire du randonneur : toujours envoyé (pas de
+  // tri ni de cadence, il n'y a plus de suivi continu). Renvoie false si l'envoi a
+  // échoué (pas de réseau), pour que l'écran le dise au lieu de laisser croire que
+  // les proches voient la position.
   const handlePosition = useCallback(
-    (p: LivePosition) => {
-      if (!id || !data) return;
+    async (p: LivePosition): Promise<boolean> => {
+      if (!id) return false;
       setPosition(p);
-      const prev = lastPost.current;
-      const crossedControl = prev !== null && data.controls.some((c) => c.km > prev.km && c.km <= p.km);
-      const due = p.source !== "gps" || prev === null || Date.now() - prev.at >= GPS_POST_INTERVAL_MS || crossedControl;
-      if (!due) return;
-      lastPost.current = { at: Date.now(), km: p.km };
-      postCheckin(id, { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source }).catch(() => {
-        lastPost.current = prev; // réessaiera au prochain point
-      });
+      try {
+        await postCheckin(id, { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source });
+        return true;
+      } catch {
+        return false;
+      }
     },
-    [id, data],
+    [id],
   );
 
   if (error) return <div className="wrap"><div className="error-banner">{error}</div></div>;
@@ -101,7 +96,7 @@ export function RoadbookPage() {
       onChange={handleChange}
       live={
         <div className="rb-live">
-          <h3 className="rb-h3">Suivi en direct</h3>
+          <h3 className="rb-h3">Pointage</h3>
           <LiveTracker
             points={data.points}
             controls={[...data.controls].sort((a, b) => a.km - b.km)}
@@ -110,7 +105,6 @@ export function RoadbookPage() {
             onReset={async () => {
               await resetCheckins(data.id);
               setPosition(null);
-              lastPost.current = null;
             }}
           />
         </div>

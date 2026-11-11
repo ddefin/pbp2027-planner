@@ -38,8 +38,13 @@ Points d'attention côté hébergement :
 3. **Roadbook** : heure d'arrivée prévue à chaque contrôle, fenêtre officielle
    d'ouverture/fermeture, marge, D+ par étape, résumé (arrivée, temps total, arrêts,
    moyenne générale, marge sur le délai).
-4. **Jour J** : suivi GPS en direct (recalé sur le tracé) ou saisie manuelle du km,
-   ou « Pointé » au contrôle. Deux voyants :
+4. **Jour J** : **pointage à la demande**. Le bouton « 📍 Pointer ma position » allume
+   le GPS le temps d'un seul relevé, recale la position sur le tracé et l'enregistre.
+   On peut aussi saisir le km à la main, ou appuyer sur « Pointé » au contrôle (sans
+   GPS ni réseau consommé). Il n'y a **jamais de suivi en continu** ni d'écran maintenu
+   allumé : la batterie n'est sollicitée que quelques secondes par pointage. Chaque
+   pointage met à jour le statut et la page de suivi partagée. Si l'envoi échoue
+   (pas de réseau), l'écran le dit clairement. Deux voyants :
    - **Mon objectif** : avance/retard sur son propre roadbook
      (vert ≥ 0, orange jusqu'à −30 min, rouge au-delà) ;
    - **Barrière horaire** : marge à l'arrivée au prochain contrôle *en roulant à sa
@@ -82,9 +87,8 @@ l'organisateur fait foi** : l'interface le rappelle sous le tableau.
 - **Recalage GPS** (`snapToRoute`) : recherche d'abord autour du dernier km connu,
   puis en avant, puis partout. Sans ça, sur une boucle, l'arrivée serait prise pour
   le départ, et sur un aller-retour le retour pour l'aller.
-- **Envoi des positions** : la première, puis toutes les 5 min et à chaque contrôle
-  franchi (pas à chaque point GPS), pour ménager batterie et forfait. Historique
-  borné à 500 positions par roadbook.
+- **Envoi des positions** : uniquement à chaque pointage volontaire, sans cadence
+  automatique. Historique borné à 500 positions par roadbook.
 - **Réutilisation** : carte (`components/pbp/RouteMap`, rendu canvas, fonds IGN,
   plein écran), profil (`ElevationProfile`), parsing GPX (`parseGpxRoute`) — communs
   avec la page Parcours PBP.
