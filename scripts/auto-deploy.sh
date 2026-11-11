@@ -29,7 +29,25 @@ LOG=deploy.log
 # l'utilisateur du NAS — sans ça, git refuse d'y travailler ("dubious ownership").
 git_() { docker run --rm -v "$(pwd):/repo" -w /repo alpine/git -c safe.directory=/repo "$@"; }
 
-log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"; }
+log() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG"
+  # Lancé à la main dans un terminal : on affiche aussi, au lieu de rester muet.
+  if [ -t 1 ]; then echo "$*"; fi
+}
+
+# Un seul déploiement à la fois : un build peut durer plus que les 5 min entre deux
+# passages de la tâche planifiée — sans verrou, deux builds se chevaucheraient.
+LOCK=.deploy.lock
+if ! mkdir "$LOCK" 2>/dev/null; then
+  # Verrou laissé par un passage interrompu (redémarrage du NAS...) : ignoré après 1 h.
+  if [ -n "$(find "$LOCK" -maxdepth 0 -mmin +60 2>/dev/null)" ]; then
+    rmdir "$LOCK" 2>/dev/null; mkdir "$LOCK" 2>/dev/null || exit 0
+  else
+    if [ -t 1 ]; then echo "Un déploiement est déjà en cours (verrou $LOCK) : réessaie dans quelques minutes."; fi
+    exit 0
+  fi
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 
 # Journal borné à ~2000 lignes (une tâche toutes les 5 min en produit beaucoup).
 if [ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt 2000 ]; then tail -n 1000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"; fi
@@ -46,11 +64,28 @@ AFTER=$(git_ rev-parse --short HEAD 2>/dev/null || echo "?")
 APP_VERSION="$(git_ log -1 --format='%h %cs' 2>/dev/null || echo "$AFTER")"
 export APP_VERSION
 
-if [ "$BEFORE" != "$AFTER" ]; then log "nouveau code : $BEFORE → $AFTER, reconstruction…"; fi
-if ! OUT=$(docker compose up -d --build 2>&1); then
+if [ "$BEFORE" != "$AFTER" ]; then log "nouveau code : $BEFORE → $AFTER"; fi
+if [ -t 1 ]; then echo "Construction et démarrage de $APP_VERSION (plusieurs minutes si le code a changé)…"; fi
+BUILD_OUT=$(mktemp)
+if [ -t 1 ]; then
+  # En terminal : progression visible en direct, et gardée pour le journal.
+  # Le code de retour de docker ne traverse pas un tube en sh POSIX (pas de
+  # pipefail) : on l'écrit dans le flux puis on le relit.
+  { docker compose up -d --build 2>&1; echo "__EXIT__$?"; } | tee "$BUILD_OUT" | grep -v '^__EXIT__'
+  STATUS=$(sed -n 's/^__EXIT__//p' "$BUILD_OUT" | tail -n 1)
+else
+  docker compose up -d --build > "$BUILD_OUT" 2>&1; STATUS=$?
+fi
+if [ "$STATUS" != "0" ]; then
   log "ÉCHEC build/démarrage ($AFTER), l'ancienne version continue de tourner :"
-  echo "$OUT" | tail -n 40 >> "$LOG"
+  tail -n 40 "$BUILD_OUT" >> "$LOG"
+  rm -f "$BUILD_OUT"
   exit 1
 fi
-if [ "$BEFORE" != "$AFTER" ]; then log "déployé : $APP_VERSION"; fi
+rm -f "$BUILD_OUT"
+# Pas une ligne toutes les 5 min quand rien ne change : seulement s'il y a du nouveau
+# code, un lancement à la main, ou une réussite qui suit un échec.
+if [ "$BEFORE" != "$AFTER" ] || [ -t 1 ] || tail -n 45 "$LOG" 2>/dev/null | grep -q "ÉCHEC"; then
+  log "en service : $APP_VERSION"
+fi
 docker image prune -f > /dev/null 2>&1 || true

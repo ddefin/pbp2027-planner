@@ -8,3 +8,4 @@ prisma/dev.db-journal
 /data/
 runner/.env
 deploy.log
+.deploy.lock/

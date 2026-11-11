@@ -231,8 +231,10 @@ sudo docker compose up -d --build
      autre fichier du dépôt.)
    - `ÉCHEC build/démarrage` : l'erreur de build suit dans le journal ; l'ancienne
      version continue de tourner en attendant.
-3. **Forcer un déploiement tout de suite** : `sudo sh scripts/auto-deploy.sh`, puis
-   `tail deploy.log`.
+3. **Forcer un déploiement tout de suite** : `sudo sh scripts/auto-deploy.sh`. Lancé dans
+   un terminal, il affiche sa progression ; la reconstruction prend plusieurs minutes sur
+   le NAS. Un seul déploiement à la fois : si la tâche planifiée est déjà en train de
+   reconstruire, le script le dit et s'arrête (verrou `.deploy.lock`).
 
 
 - **Le chat ne se connecte pas (WebSocket)** : vérifie que "Prise en charge de
