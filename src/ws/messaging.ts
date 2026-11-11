@@ -52,20 +52,24 @@ export async function messagingWsRoutes(app: FastifyInstance) {
     "/messaging/general/chat",
     {
       websocket: true,
+      // Utilisateur résolu ici et réutilisé tel quel par le handler (comme pour les
+      // messages privés ci-dessous) : un second `await getSessionUser` dans le handler
+      // retardait l'enregistrement de socket.on("message"), et un message envoyé dès
+      // l'ouverture de la connexion arrivait avant l'écouteur — perdu sans erreur
+      // (visible surtout sur un serveur lent ou chargé).
       preValidation: async (request, reply) => {
         const user = await getSessionUser(request);
         if (!user) return reply.code(401).send({ error: "unauthenticated" });
+        (request as DmRequest).pbpUser = user;
       },
     },
     async (socket, request) => {
-      const room = join(GENERAL_ROOM_KEY, socket);
-
-      const user = await getSessionUser(request);
+      const user = (request as DmRequest).pbpUser;
       if (!user) {
         socket.close(4401, "unauthenticated");
-        room.delete(socket);
         return;
       }
+      join(GENERAL_ROOM_KEY, socket);
 
       socket.on("message", async (raw: RawData) => {
         let text: string;
