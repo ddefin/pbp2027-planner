@@ -71,7 +71,7 @@ export function SharedRoadbookPage() {
         data={data.roadbook}
         author={data.roadbook.author}
         editable={false}
-        live={<WhatsAppShare text={situation?.whatsapp ?? null} at={situation?.at} />}
+        slots={{ quickShare: () => <WhatsAppShare text={situation?.whatsapp ?? null} at={situation?.at} /> }}
         position={last ? { km: last.km, lat: last.lat, lon: last.lon, at: last.at, source: last.source } : null}
       />
     </div>

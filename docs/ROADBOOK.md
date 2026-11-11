@@ -18,6 +18,28 @@ Points d'attention côté hébergement :
 - **Taille d'import** : 25 Mo max côté application. Si un gros GPX échoue avec une
   erreur 413, c'est la limite du reverse proxy DSM qu'il faut relever.
 
+## Organisation de la page
+
+Quatre onglets, dans une barre collée en haut de l'écran (la page est pensée pour le
+téléphone, au guidon) ; l'onglet actif est mémorisé dans l'adresse (`#partage`…), donc un
+rechargement ou un lien direct rouvre le bon.
+
+| Onglet | Contenu |
+|---|---|
+| 📍 **Suivi** | Lien Garmin LiveTrack, statut avance/retard et barrière horaire, **pointage**, **« Partager ma situation »** (WhatsApp, lien de suivi, état du canal Telegram), carte, profil altimétrique |
+| 📋 **Roadbook** | Résumé, tableau des contrôles (pauses modifiables), points d'intérêt du GPX, **export PDF** |
+| ⚙️ **Réglages** | Nom, type de brevet, départ, allure (vitesse, montées, pauses) ; téléchargement du GPX et suppression |
+| 📣 **Partage** | Lien de suivi (créer, partager, renouveler, désactiver), WhatsApp, canal Telegram (publication, mode d'emploi, test admin), Garmin LiveTrack |
+
+L'onglet d'ouverture dépend de la situation : **Réglages** tant que l'heure de départ n'est
+pas renseignée, **Roadbook** pour préparer, **Suivi** à moins de 3 h du départ et pendant le
+brevet. Les proches qui ouvrent le lien de suivi n'ont que **Suivi** et **Roadbook**, en
+lecture seule.
+
+Sur téléphone, le tableau des contrôles devient une fiche par contrôle (pas de défilement
+latéral). À l'impression, seuls le profil et le roadbook sont imprimés, quel que soit
+l'onglet actif.
+
 ## Parcours utilisateur
 
 1. **Import** : glisser-déposer (ou sélection sur mobile) d'un `.gpx` (`<trk>` ou

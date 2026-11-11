@@ -165,7 +165,7 @@ export function ElevationProfile({
         ))}
 
         {typeof cursorKm === "number" && cursorKm >= 0 && cursorKm <= totalKm && (
-          <line x1={x(cursorKm)} x2={x(cursorKm)} y1={PAD_T} y2={VB_H - PAD_B} stroke="#2563eb" strokeWidth={2} />
+          <line className="no-print" x1={x(cursorKm)} x2={x(cursorKm)} y1={PAD_T} y2={VB_H - PAD_B} stroke="#2563eb" strokeWidth={2} />
         )}
 
         {hover && (

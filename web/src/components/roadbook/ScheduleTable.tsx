@@ -54,7 +54,7 @@ export function ScheduleTable({
             const passed = passedKm !== null && row.km <= passedKm + 0.05;
             return (
               <tr key={`${row.km}-${i}`} className={passed ? "is-passed" : undefined} onClick={() => onSelectKm?.(row.km)}>
-                <td>
+                <td className="rb-cell-name">
                   {editable ? (
                     <input className="rb-input no-print-border" value={sorted[i].name} maxLength={80} onClick={(e) => e.stopPropagation()} onChange={(e) => update(i, { name: e.target.value })} />
                   ) : (
@@ -62,12 +62,12 @@ export function ScheduleTable({
                   )}
                   {row.legGainM !== null && row.legGainM > 0 && <div className="ctrl-note">D+ {row.legGainM} m depuis le précédent</div>}
                 </td>
-                <td className="num tabular">{row.km.toFixed(1)}</td>
-                <td className="num tabular">{i === 0 ? "" : row.legKm.toFixed(1)}</td>
-                <td className="tabular">
+                <td className="num tabular" data-label="Km">{row.km.toFixed(1)}</td>
+                <td className="num tabular" data-label="Étape" data-empty={i === 0 ? "" : undefined}>{i === 0 ? "" : row.legKm.toFixed(1)}</td>
+                <td className="tabular" data-label="Arrivée prévue">
                   <strong>{clock(startAt, row.arriveMin)}</strong>
                 </td>
-                <td className="num tabular">
+                <td className="num tabular" data-label="Pause" data-empty={editable && !isEdge ? undefined : row.stopMinutes ? undefined : ""}>
                   {editable && !isEdge ? (
                     <input
                       className="rb-input rb-input-num"
@@ -86,12 +86,12 @@ export function ScheduleTable({
                     ""
                   )}
                 </td>
-                <td className="tabular rb-window">
+                <td className="tabular rb-window" data-label="Ouvre / ferme">
                   {clock(startAt, row.openMin)} → {clock(startAt, row.closeMin)}
                 </td>
-                <td className={`num tabular rb-margin lvl-text-${level}`}>{formatMinutes(row.marginMin)}</td>
+                <td className={`num tabular rb-margin lvl-text-${level}`} data-label="Marge">{formatMinutes(row.marginMin)}</td>
                 {editable && (
-                  <td className="no-print">
+                  <td className="no-print rb-cell-del" data-empty={isEdge ? "" : undefined}>
                     {!isEdge && (
                       <button
                         type="button"

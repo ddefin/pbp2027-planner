@@ -7,15 +7,14 @@ import {
   postCheckin,
   resetCheckins,
   roadbookGpxUrl,
-  setRoadbookSharing,
   updateRoadbook,
   type AnnounceStatus,
   type RoadbookSettings,
 } from "../api/roadbooks";
 import { RoadbookView, type RoadbookData } from "../components/roadbook/RoadbookView";
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
-import { TrackingSettings } from "../components/roadbook/TrackingSettings";
-import { WhatsAppShare } from "../components/roadbook/WhatsAppShare";
+import { LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
+import { QuickShare, ShareLinkCard, WhatsAppCard } from "../components/roadbook/ShareCards";
 
 const SAVE_DEBOUNCE_MS = 700;
 
@@ -27,7 +26,6 @@ export function RoadbookPage() {
   const [position, setPosition] = useState<LivePosition | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const [situation, setSituation] = useState<{ whatsapp: string; at: string } | null>(null);
   const refreshSituation = useCallback(() => {
     if (!id) return;
@@ -104,7 +102,8 @@ export function RoadbookPage() {
   if (error) return <div className="wrap"><div className="error-banner">{error}</div></div>;
   if (!data) return <p className="hint" style={{ padding: 24 }}>Chargement du roadbook…</p>;
 
-  const shareUrl = shareToken ? `${window.location.origin}/r/${shareToken}` : null;
+  const saveLabel =
+    saveState === "saving" ? "Enregistrement…" : saveState === "saved" ? "✓ Enregistré" : saveState === "error" ? "⚠️ Échec de l'enregistrement" : null;
 
   return (
     <RoadbookView
@@ -112,100 +111,78 @@ export function RoadbookPage() {
       position={position}
       editable
       onChange={handleChange}
-      live={
-        <div className="rb-live">
-          <h3 className="rb-h3">Pointage</h3>
-          <LiveTracker
-            points={data.points}
-            controls={[...data.controls].sort((a, b) => a.km - b.km)}
-            lastKm={position?.km ?? null}
-            onPosition={handlePosition}
-            onReset={async () => {
-              await resetCheckins(data.id);
-              setPosition(null);
-              setSituation(null);
-            }}
-          />
-          <WhatsAppShare text={situation?.whatsapp ?? null} at={situation?.at} />
-        </div>
-      }
-      actions={
-        <div className="rb-actions">
-          <div className="rb-save hint" style={{ margin: 0 }}>
-            {saveState === "saving" ? "Enregistrement…" : saveState === "saved" ? "✓ Enregistré" : saveState === "error" ? "⚠️ Échec de l'enregistrement" : ""}
-          </div>
-          <button type="button" className="primary" style={{ width: "auto", padding: "10px 18px" }} onClick={() => window.print()}>
-            🖨️ Exporter en PDF
-          </button>
-          <a className="ghost-link" href={roadbookGpxUrl(data.id)} download>
-            Télécharger le GPX
-          </a>
-
-          <TrackingSettings
+      slots={{
+        saveStatus: saveLabel,
+        pointage: (
+          <>
+            <h3 className="rb-h3">Pointer ma position</h3>
+            <LiveTracker
+              points={data.points}
+              controls={[...data.controls].sort((a, b) => a.km - b.km)}
+              lastKm={position?.km ?? null}
+              onPosition={handlePosition}
+              onReset={async () => {
+                await resetCheckins(data.id);
+                setPosition(null);
+                setSituation(null);
+              }}
+            />
+          </>
+        ),
+        quickShare: (goTo) => (
+          <QuickShare
             roadbookId={data.id}
-            liveTrackUrl={data.liveTrackUrl ?? null}
+            title={data.title}
+            shareToken={shareToken}
+            onShareToken={setShareToken}
+            whatsapp={situation ? { text: situation.whatsapp, at: situation.at } : null}
             telegramAnnounce={data.telegramAnnounce ?? true}
             announceStatus={data.announceStatus}
-            onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))}
+            onOpenSharing={() => goTo("partage")}
           />
-
-          <div className="rb-share">
-            <strong>Lien de suivi</strong>
-            {shareUrl ? (
-              <>
-                <input className="rb-input" readOnly value={shareUrl} onFocus={(e) => e.target.select()} aria-label="Lien de partage" />
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="ghost"
-                    onClick={async () => {
-                      if (navigator.share) await navigator.share({ title: data.title, url: shareUrl }).catch(() => undefined);
-                      else {
-                        await navigator.clipboard.writeText(shareUrl).catch(() => undefined);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 2000);
-                      }
-                    }}
-                  >
-                    {copied ? "Copié ✓" : "Partager"}
-                  </button>
-                  <button type="button" className="ghost" onClick={async () => setShareToken(await setRoadbookSharing(data.id, true))}>
-                    Nouveau lien
-                  </button>
-                  <button type="button" className="ghost" onClick={async () => setShareToken(await setRoadbookSharing(data.id, false))}>
-                    Désactiver
-                  </button>
-                </div>
-                {!data.startAt && (
-                  <div className="pbp-banner" style={{ margin: 0 }}>
-                    Pas d'heure de départ renseignée : tes proches verront le parcours mais aucun horaire de passage ni suivi.
-                  </div>
-                )}
-                <p className="hint" style={{ margin: 0 }}>
-                  Toute personne qui a ce lien voit ton roadbook et tes positions déclarées, sans compte. « Nouveau lien » rend
-                  l'ancien inutilisable.
-                </p>
-              </>
-            ) : (
-              <button type="button" className="ghost" onClick={async () => setShareToken(await setRoadbookSharing(data.id, true))}>
-                Créer un lien de suivi pour mes proches
+        ),
+        roadbookActions: (
+          <>
+            <button type="button" className="primary" style={{ width: "auto", padding: "9px 16px" }} onClick={() => window.print()}>
+              🖨️ Exporter en PDF
+            </button>
+          </>
+        ),
+        sharing: (
+          <>
+            <ShareLinkCard roadbookId={data.id} title={data.title} startAt={data.startAt} shareToken={shareToken} onShareToken={setShareToken} />
+            <WhatsAppCard text={situation?.whatsapp ?? null} at={situation?.at} />
+            <TelegramCard
+              roadbookId={data.id}
+              telegramAnnounce={data.telegramAnnounce ?? true}
+              announceStatus={data.announceStatus}
+              onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))}
+            />
+            <LiveTrackCard roadbookId={data.id} liveTrackUrl={data.liveTrackUrl ?? null} onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))} />
+          </>
+        ),
+        settingsFooter: (
+          <div className="rb-card">
+            <h3 className="rb-card-title">📁 Fichier et suppression</h3>
+            <div className="rb-card-actions">
+              <a className="ghost-link" href={roadbookGpxUrl(data.id)} download>
+                Télécharger le GPX d'origine
+              </a>
+              <button
+                type="button"
+                className="ghost rb-danger"
+                onClick={async () => {
+                  if (!confirm(`Supprimer le roadbook « ${data.title} » et son suivi ?`)) return;
+                  await deleteRoadbook(data.id);
+                  navigate("/roadbooks", { replace: true });
+                }}
+              >
+                Supprimer ce roadbook
               </button>
-            )}
+            </div>
           </div>
-
-          <button
-            type="button"
-            className="ghost rb-danger"
-            onClick={async () => {
-              if (!confirm(`Supprimer le roadbook « ${data.title} » et son suivi ?`)) return;
-              await deleteRoadbook(data.id);
-              navigate("/roadbooks", { replace: true });
-            }}
-          >
-            Supprimer ce roadbook
-          </button>
-        </div>
-      }
+        ),
+      }}
     />
   );
 }

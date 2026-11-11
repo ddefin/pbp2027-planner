@@ -84,7 +84,23 @@ export function RouteMap({
     map.on("zoomend", updateZoomClass);
     map.setView([48.4, -1.3], 7);
     updateZoomClass();
+
+    // La carte peut être masquée puis réaffichée (onglets du roadbook) ou redimensionnée :
+    // Leaflet doit alors recalculer sa taille, et recadrer le tracé quand elle passe de
+    // "invisible" (largeur 0) à visible, sinon elle reste figée sur un cadrage faux.
+    let lastWidth = containerRef.current.clientWidth;
+    const resizeObserver = new ResizeObserver(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const width = el.clientWidth;
+      map.invalidateSize();
+      const pts = pointsRef.current;
+      if (lastWidth === 0 && width > 0 && pts.length > 1) map.fitBounds(L.latLngBounds(pts.map((p) => L.latLng(p.lat, p.lon))), { padding: [20, 20] });
+      lastWidth = width;
+    });
+    resizeObserver.observe(containerRef.current);
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
       layers.current = {};
