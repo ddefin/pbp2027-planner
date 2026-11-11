@@ -1,6 +1,11 @@
 services:
   pbp2027-planner:
-    build: .
+    build:
+      context: .
+      args:
+        # Version affichée dans l'app (fournie par scripts/auto-deploy.sh) ; "dev" si
+        # l'image est construite à la main sans la renseigner.
+        APP_VERSION: ${APP_VERSION:-dev}
     image: pbp2027-planner:latest
     container_name: pbp2027-planner
     restart: unless-stopped

@@ -211,6 +211,30 @@ sudo docker compose up -d --build
 
 ## Dépannage
 
+### Une mise à jour n'apparaît pas sur le site
+
+1. **Quelle version tourne ?** En bas de « Mon profil » (ou sur `/health`) : `Version
+   déployée : <commit> <date>`. Comparer avec le dernier commit sur GitHub.
+2. **Que dit le déploiement automatique ?** Chaque passage de `scripts/auto-deploy.sh`
+   est journalisé :
+   ```bash
+   cd /volume1/homes/admin/pbp2027-planner
+   tail -n 30 deploy.log
+   ```
+   - `ÉCHEC git pull … would be overwritten by merge` : un fichier suivi par git a été
+     modifié directement sur le NAS. Le voir puis l'annuler :
+     ```bash
+     sudo docker run --rm -v "$(pwd):/repo" -w /repo alpine/git -c safe.directory=/repo status --short
+     sudo docker run --rm -v "$(pwd):/repo" -w /repo alpine/git -c safe.directory=/repo checkout -- <fichier>
+     ```
+     (Les réglages vont dans `.env.production`, jamais dans `.env.example` ni dans un
+     autre fichier du dépôt.)
+   - `ÉCHEC build/démarrage` : l'erreur de build suit dans le journal ; l'ancienne
+     version continue de tourner en attendant.
+3. **Forcer un déploiement tout de suite** : `sudo sh scripts/auto-deploy.sh`, puis
+   `tail deploy.log`.
+
+
 - **Le chat ne se connecte pas (WebSocket)** : vérifie que "Prise en charge de
   WebSocket" est bien cochée dans la règle de reverse proxy DSM.
 - **`scripts/auto-deploy.sh` ne semble pas tourner** : vérifie dans le

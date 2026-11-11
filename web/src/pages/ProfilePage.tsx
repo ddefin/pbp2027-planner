@@ -57,6 +57,7 @@ export function ProfilePage() {
       <CollapsibleSection title="Telegram">
         <TelegramSection />
       </CollapsibleSection>
+      <DeployedVersion />
     </div>
   );
 }
@@ -573,5 +574,24 @@ function TelegramSection() {
         </button>
       )}
     </>
+  );
+}
+
+// Version réellement en service sur le serveur (fournie au build par
+// scripts/auto-deploy.sh) : permet de vérifier d'un coup d'œil qu'une mise à jour a
+// bien été déployée, sans passer par le terminal du NAS.
+function DeployedVersion() {
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => {
+    fetch("/health")
+      .then((r) => r.json())
+      .then((b: { version?: string }) => setVersion(b.version ?? null))
+      .catch(() => undefined);
+  }, []);
+  if (!version) return null;
+  return (
+    <p className="hint" style={{ textAlign: "center", marginTop: 8 }}>
+      Version déployée : <span className="tabular">{version}</span>
+    </p>
   );
 }

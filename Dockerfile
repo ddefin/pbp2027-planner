@@ -39,6 +39,11 @@ COPY --from=web-build /app/web/dist ./web/dist
 # survivre aux mises à jour de l'image, donc jamais dans une couche de l'image.
 RUN mkdir -p /app/data
 
+# En fin de fichier : changer de version n'invalide que cette couche, pas le cache
+# des étapes de build au-dessus.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
+
 EXPOSE 3001
 
 # "prisma migrate deploy" est idempotent : sans danger de le relancer à chaque démarrage.

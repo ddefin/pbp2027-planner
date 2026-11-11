@@ -80,7 +80,7 @@ export function buildServer() {
     } catch {
       return reply.code(503).send({ status: "degraded", db: "unreachable" });
     }
-    return { status: "ok", db: "ok" };
+    return { status: "ok", db: "ok", version: process.env.APP_VERSION ?? "dev" };
   });
 
   // Sert le frontend déjà construit (web/dist) quand il existe, pour le déploiement en
