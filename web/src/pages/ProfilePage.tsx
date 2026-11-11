@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useProfile } from "../hooks/useProfile";
 import { usePersonalEvents } from "../hooks/usePersonalEvents";
 import { useLicenseDocuments } from "../hooks/useLicenseDocuments";
 import { ApiError } from "../api/auth";
 import { changePassword, licenseFileUrl } from "../api/profile";
+
+// pdf.js (~350 Ko) n'a aucune raison d'alourdir le chargement initial de toute
+// l'app pour tout le monde — chargé à la demande seulement quand une licence PDF
+// est effectivement affichée (voir Suspense dans LicensePreview ci-dessous).
+const PdfPreview = lazy(() => import("../components/PdfPreview").then((m) => ({ default: m.PdfPreview })));
 
 // Replié par défaut (sauf la première section) : quatre blocs complets l'un sous
 // l'autre forçaient beaucoup de défilement avant même de voir ce qu'on cherche.
@@ -338,18 +343,21 @@ function PersonalEventsSection() {
 function LicensePreview({ fileName, fileMimeType, id }: { fileName: string; fileMimeType: string; id: string }) {
   const url = licenseFileUrl(id);
 
-  // Image : affichée telle quelle dans le cadre. PDF : dans une <iframe> (le
-  // visualiseur PDF intégré du navigateur, y compris sur mobile) — un lien "ouvrir
-  // dans un nouvel onglet" reste en repli, au cas où un navigateur ne le gère pas.
+  // Image : affichée telle quelle dans le cadre. PDF : rendu en <canvas> via pdf.js
+  // (PdfPreview) plutôt qu'une <iframe> — le support natif des PDF en <iframe> est
+  // peu fiable sur mobile (Safari iOS en particulier peut rester silencieusement
+  // vide). Un lien "ouvrir dans un nouvel onglet" reste en repli dans tous les cas.
   return (
     <div>
-      <div className="license-frame">
-        {fileMimeType.startsWith("image/") ? (
+      {fileMimeType.startsWith("image/") ? (
+        <div className="license-frame">
           <img src={url} alt={fileName} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-        ) : (
-          <iframe src={url} title={fileName} />
-        )}
-      </div>
+        </div>
+      ) : (
+        <Suspense fallback={<p className="hint" style={{ margin: 0 }}>Chargement de l'aperçu…</p>}>
+          <PdfPreview url={url} />
+        </Suspense>
+      )}
       <a href={url} target="_blank" rel="noreferrer" className="hint" style={{ display: "inline-block", marginTop: 6, marginBottom: 0, textDecoration: "underline" }}>
         Ouvrir dans un nouvel onglet ↗
       </a>

@@ -26,7 +26,7 @@ export function RegisterPage() {
       <div className="auth-shell">
         <div className="auth-card">
           <h1>Compte créé</h1>
-          <p className="hint">Tu peux maintenant te connecter, puis activer la double authentification depuis les paramètres de sécurité.</p>
+          <p className="hint">Tu peux maintenant te connecter.</p>
           <button className="primary" onClick={() => navigate("/login")}>
             Aller à la connexion
           </button>
