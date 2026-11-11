@@ -100,6 +100,13 @@ départ, météo à l'heure de passage estimée avec vent de face/dos. Routes `/
 **Voir [docs/PARCOURS-PBP.md](./docs/PARCOURS-PBP.md)**, notamment pour basculer sur
 le GPX officiel le jour de sa publication (un simple import, sans redéploiement).
 
+### Roadbook BRM (analyse GPX, allure, barrières horaires, suivi live)
+
+Import GPX par glisser-déposer, contrôles détectés depuis les waypoints, heures de
+passage à son allure, barrières horaires au barème ACP, suivi GPS ou manuel avec
+avance/retard, export PDF et lien de suivi public. Routes `/api/roadbooks/*`, aucune
+nouvelle variable d'environnement. **Voir [docs/ROADBOOK.md](./docs/ROADBOOK.md).**
+
 ### Actualités (agrégées depuis ACP et PBP)
 
 | Méthode | Route | Description |

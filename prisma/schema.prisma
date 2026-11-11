@@ -38,6 +38,7 @@ model User {
   telegramLinkCodes      TelegramLinkCode[]
   notifications          Notification[]
   pbpRoutes              PbpRoute[]
+  roadbooks              Roadbook[]
 }
 
 model Session {
@@ -382,4 +383,52 @@ model PbpRoute {
   updatedAt        DateTime @updatedAt
 
   @@index([kind, createdAt])
+}
+
+// Roadbook personnel d'un BRM (page "Roadbook") : un GPX analysé + le plan de marche
+// de son auteur (vitesse roulée, pauses par contrôle) + son suivi live. Les calculs
+// (heures de passage, barrières ACP, avance/retard) sont faits côté client à partir
+// de ces réglages (web/src/lib/roadbook.ts) : rien de dérivé n'est stocké, changer
+// la vitesse ou une pause n'oblige à rien recalculer en base.
+model Roadbook {
+  id                      String            @id @default(cuid())
+  userId                  String
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                   String
+  classKm                 Int // 200/300/400/600, ou distance nominale d'un format sur-mesure
+  limitMinutes            Int
+  startAt                 DateTime?
+  movingSpeedKmh          Float             @default(22)
+  climbPenaltyMinPer100m  Float             @default(0)
+  controls                String // [{name, km, stopMinutes, lat, lon}] triés par km
+  pois                    String // [{name, km, lat, lon}] waypoints GPX non retenus comme contrôles
+  points                  String // [[lat, lon, ele|null, km], ...] simplifiés (voir src/lib/geo.ts)
+  distanceKm              Float
+  elevationGainM          Int?
+  elevationLossM          Int?
+  fileName                String
+  filePath                String
+  // Lien de partage public en lecture seule (suivi par les proches) : null = non
+  // partagé. Jeton aléatoire de 128 bits, révocable/régénérable par l'auteur.
+  shareToken              String?           @unique
+  checkins                RoadbookCheckin[]
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+// Position déclarée pendant le brevet (GPS ou saisie manuelle du km) : seule la plus
+// récente sert au statut, les précédentes forment l'historique visible en partage.
+model RoadbookCheckin {
+  id         String   @id @default(cuid())
+  roadbookId String
+  roadbook   Roadbook @relation(fields: [roadbookId], references: [id], onDelete: Cascade)
+  km         Float
+  lat        Float?
+  lon        Float?
+  source     String // "gps" | "manuel" | "controle"
+  at         DateTime @default(now())
+
+  @@index([roadbookId, at])
 }

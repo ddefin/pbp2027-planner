@@ -45,6 +45,8 @@ Ouvrir `http://localhost:5173`.
 - `/mot-de-passe-oublie`, `/reinitialiser-mot-de-passe` — mot de passe oublié par email.
 - `/` — tableau de bord (compte à rebours, suivi BRM, BRM choisis par le groupe).
 - `/parcours-pbp` — carte du parcours PBP 2027, profil, contrôles, simulation de passage, météo le long du tracé.
+- `/roadbooks`, `/roadbooks/:id` — roadbook BRM : analyse GPX, allure, barrières horaires, suivi live, export PDF.
+- `/r/:token` — lien de suivi public d'un roadbook (sans compte).
 - `/calendrier` — calendrier des BRM officiels (ACP), choix de statut par utilisateur.
 - `/actualites` — actualités agrégées depuis les sites ACP et PBP (filtres, recherche).
 - `/messagerie` — messagerie temps réel (salon général + messages privés).

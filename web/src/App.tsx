@@ -17,6 +17,11 @@ import { NotificationBell } from "./components/NotificationBell";
 // Page la plus lourde de l'app (carte, profil, simulation, météo) : chargée seulement
 // quand on l'ouvre, pour que le reste de l'app démarre aussi vite qu'avant sur mobile.
 const PbpRoutePage = lazy(() => import("./pages/PbpRoutePage").then((m) => ({ default: m.PbpRoutePage })));
+const RoadbooksPage = lazy(() => import("./pages/RoadbooksPage").then((m) => ({ default: m.RoadbooksPage })));
+const RoadbookPage = lazy(() => import("./pages/RoadbookPage").then((m) => ({ default: m.RoadbookPage })));
+const SharedRoadbookPage = lazy(() => import("./pages/SharedRoadbookPage").then((m) => ({ default: m.SharedRoadbookPage })));
+
+const pageFallback = <p className="hint" style={{ padding: 24 }}>Chargement…</p>;
 
 function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
   const { status, user, logout } = useAuth();
@@ -32,6 +37,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
     { to: "/", label: "Tableau de bord" },
     { to: "/parcours-pbp", label: "Parcours PBP" },
     { to: "/calendrier", label: "Calendrier BRM" },
+    { to: "/roadbooks", label: "Roadbook" },
     { to: "/actualites", label: "Actualités" },
     { to: "/messagerie", label: "Messagerie" },
     { to: "/profil", label: "Mon profil" },
@@ -57,7 +63,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
         </button>
         <nav className={menuOpen ? "nav-open" : undefined}>
           {links.map((l) => (
-            <Link key={l.to} to={l.to} className={location.pathname === l.to ? "active" : undefined} onClick={() => setMenuOpen(false)}>
+            <Link key={l.to} to={l.to} className={location.pathname === l.to || (l.to !== "/" && location.pathname.startsWith(`${l.to}/`)) ? "active" : undefined} onClick={() => setMenuOpen(false)}>
               {l.label}
             </Link>
           ))}
@@ -102,6 +108,35 @@ export default function App() {
             <ProtectedLayout>
               <CalendrierPage />
             </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/roadbooks"
+          element={
+            <ProtectedLayout>
+              <Suspense fallback={pageFallback}>
+                <RoadbooksPage />
+              </Suspense>
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/roadbooks/:id"
+          element={
+            <ProtectedLayout>
+              <Suspense fallback={pageFallback}>
+                <RoadbookPage />
+              </Suspense>
+            </ProtectedLayout>
+          }
+        />
+        {/* Lien de suivi public : volontairement HORS ProtectedLayout (pas de compte). */}
+        <Route
+          path="/r/:token"
+          element={
+            <Suspense fallback={pageFallback}>
+              <SharedRoadbookPage />
+            </Suspense>
           }
         />
         <Route

@@ -149,3 +149,16 @@ export function routeBearingAt(points: RoutePoint[], km: number, windowKm = 3): 
   const b = pointAtKm(points, Math.min(total, km + windowKm));
   return bearingDeg(a, b);
 }
+
+// Format compact pour le transfert et le stockage (≈ 30 octets/point au lieu de ~70
+// en objets JSON nommés) : 4000 points restent sous les 150 Ko, important sur un
+// réseau mobile faible en bord de route. Précision 1e-5° ≈ 1 m, largement suffisant.
+export type CompactPoint = [number, number, number | null, number];
+
+export function toCompactPoint(p: RoutePoint): CompactPoint {
+  return [Math.round(p.lat * 1e5) / 1e5, Math.round(p.lon * 1e5) / 1e5, p.ele === null ? null : Math.round(p.ele), Math.round(p.distKm * 100) / 100];
+}
+
+export function fromCompactPoint(c: CompactPoint): RoutePoint {
+  return { lat: c[0], lon: c[1], ele: c[2], distKm: c[3] };
+}

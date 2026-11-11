@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { getSessionUser } from "../lib/session.js";
 import { parseGpxRoute, type GpxWaypoint } from "../lib/gpx.js";
-import { nearestPointIndex, type RoutePoint } from "../lib/geo.js";
+import { fromCompactPoint, nearestPointIndex, toCompactPoint, type CompactPoint, type RoutePoint } from "../lib/geo.js";
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 import { PBP_2027_CONTROLS, PBP_2027_TOTAL_KM, PBP_2027_WAVES, buildIndicativeRoute, projectControls, type ProjectedControl } from "../lib/pbpControls.js";
 import { computeRouteWeather } from "../lib/routeWeather.js";
@@ -36,17 +36,8 @@ const pointQuerySchema = z.object({
   lon: z.coerce.number().min(-180).max(180),
 });
 
-// Format compact pour le transfert (≈ 30 octets/point au lieu de ~70 en objets JSON
-// nommés) : 4000 points restent sous les 150 Ko, important sur un réseau mobile
-// faible en bord de route. Précision 1e-5° ≈ 1 m, largement suffisant.
-type CompactPoint = [number, number, number | null, number];
-const toCompact = (p: RoutePoint): CompactPoint => [
-  Math.round(p.lat * 1e5) / 1e5,
-  Math.round(p.lon * 1e5) / 1e5,
-  p.ele === null ? null : Math.round(p.ele),
-  Math.round(p.distKm * 100) / 100,
-];
-const fromCompact = (c: CompactPoint): RoutePoint => ({ lat: c[0], lon: c[1], ele: c[2], distKm: c[3] });
+const toCompact = toCompactPoint;
+const fromCompact = fromCompactPoint;
 
 type StoredRoute = {
   id: string;

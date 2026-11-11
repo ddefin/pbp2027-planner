@@ -176,7 +176,7 @@ export function ElevationProfile({
         )}
       </svg>
 
-      <div style={{ fontSize: 11.5, color: "var(--fg-muted)", fontFamily: "JetBrains Mono, monospace", minHeight: 16 }}>
+      <div className="no-print" style={{ fontSize: 11.5, color: "var(--fg-muted)", fontFamily: "JetBrains Mono, monospace", minHeight: 16 }}>
         {hover
           ? `${hover.distKm.toFixed(1)} km · ${Math.round(hover.ele as number)} m · D+ cumulé ${hoverGain} m`
           : `0 → ${totalKm.toFixed(1)} km · passe la souris sur le profil`}

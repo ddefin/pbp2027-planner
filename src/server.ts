@@ -20,6 +20,7 @@ import { messagingWsRoutes } from "./ws/messaging.js";
 import { newsRoutes } from "./routes/news.js";
 import { notificationsRoutes } from "./routes/notifications.js";
 import { pbpRoutesRoutes } from "./routes/pbpRoutes.js";
+import { roadbooksRoutes } from "./routes/roadbooks.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
 import { scrapeNews } from "./lib/newsScraper.js";
 import { startTelegramPolling } from "./lib/telegramBot.js";
@@ -65,6 +66,7 @@ export function buildServer() {
       api.register(newsRoutes);
       api.register(notificationsRoutes);
       api.register(pbpRoutesRoutes);
+      api.register(roadbooksRoutes);
     },
     { prefix: "/api" },
   );

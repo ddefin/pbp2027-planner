@@ -42,6 +42,19 @@ export default defineConfig({
             },
           },
           {
+            // Son propre roadbook (tracé, contrôles, allure) : relu hors-ligne si le
+            // réseau tombe en plein brevet — le statut avance/retard se calcule ensuite
+            // sur le téléphone, sans serveur (web/src/lib/roadbook.ts).
+            urlPattern: /\/api\/roadbooks\/[^/]+$/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "roadbook-data",
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 20, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Parcours PBP déjà consulté (tracé, contrôles, météo calculée) : relu
             // hors-ligne en bord de route si le réseau tombe — la carte reste utile
             // sans 4G au milieu de la Bretagne intérieure.

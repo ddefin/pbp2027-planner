@@ -1552,3 +1552,334 @@ button.link {
     font-size: 12px;
   }
 }
+
+/* ===== Roadbook BRM ===== */
+.dropzone {
+  border: 2px dashed var(--line);
+  border-radius: 14px;
+  padding: 28px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover,
+.dropzone.is-over {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+.dropzone-icon {
+  font-size: 34px;
+}
+.dropzone-title {
+  font: 700 18px var(--font-display);
+  text-transform: uppercase;
+  margin: 4px 0;
+}
+.rb-list-item {
+  align-items: center;
+  color: var(--fg);
+  text-decoration: none;
+}
+.rb-list-item:hover {
+  text-decoration: none;
+  border-color: var(--accent);
+}
+.rb-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12.5px;
+  color: var(--fg-muted);
+}
+.rb-map {
+  margin-top: 12px;
+}
+.rb-h3 {
+  font: 700 15px var(--font-display);
+  text-transform: uppercase;
+  margin: 14px 0 8px;
+}
+
+/* Statut live : couleurs PLEINES et chiffres très gros, lisibles d'un coup d'œil. */
+.status-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.status-tile {
+  border-radius: 12px;
+  padding: 12px;
+  color: #fff;
+}
+.status-tile.lvl-ok {
+  background: #15803d;
+}
+.status-tile.lvl-tight {
+  background: #f59e0b;
+  color: #111;
+}
+.status-tile.lvl-late {
+  background: #b91c1c;
+}
+.status-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.9;
+}
+.status-big {
+  font: 700 38px/1.05 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  margin: 4px 0;
+}
+.status-sub {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.status-facts {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.status-facts span {
+  display: block;
+  font-size: 11px;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.status-facts strong {
+  font-size: 15px;
+}
+.status-asof {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
+.lvl-text-ok {
+  color: #15803d;
+}
+.lvl-text-tight {
+  color: #b45309;
+}
+.lvl-text-late {
+  color: #b91c1c;
+}
+
+.live-tracker {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.live-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+.live-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.live-on {
+  background: #b91c1c !important;
+}
+.live-warn {
+  color: #b45309 !important;
+  font-weight: 700;
+}
+.rb-input {
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 8px;
+  font: inherit;
+  min-width: 0;
+}
+.rb-table .rb-input {
+  width: 100%;
+  min-width: 110px;
+}
+.rb-input-num {
+  width: 72px !important;
+  min-width: 0 !important;
+  text-align: right;
+}
+.rb-table tr.is-passed td {
+  opacity: 0.55;
+}
+.rb-window {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.rb-margin {
+  font-weight: 800;
+}
+.rb-del {
+  padding: 4px 8px;
+}
+.linklike {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+.rb-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rb-summary > div {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.rb-summary span {
+  display: block;
+  font-size: 11px;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.rb-summary strong {
+  font-size: 16px;
+}
+.rb-pois {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rb-poi {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.rb-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.rb-share {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.rb-share .rb-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.rb-danger {
+  color: var(--bad) !important;
+}
+
+/* Mode plein soleil : fond blanc, texte noir, traits épais, quel que soit le thème
+   du téléphone (le thème sombre est illisible au soleil). Variables redéfinies sur
+   la page seulement. */
+.sun-mode {
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --fg: #000000;
+  --fg-muted: #1f2937;
+  --line: #111827;
+  background: #fff;
+  color: #000;
+  font-weight: 500;
+}
+.sun-mode .panel {
+  border-width: 2px;
+}
+.sun-mode .status-big {
+  font-size: 46px;
+}
+
+.print-only {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .status-big {
+    font-size: 32px;
+  }
+  .rb-table .rb-window {
+    white-space: normal;
+  }
+}
+
+/* Export PDF via l'impression du navigateur : seulement le roadbook (titre,
+   réglages, profil, table des passages), sans carte (tuiles mal imprimées) ni
+   commandes. Fond blanc forcé, une page A4 portrait lisible plastifiée sur le cintre. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+  :root {
+    --bg: #fff;
+    --panel: #fff;
+    --fg: #000;
+    --fg-muted: #333;
+    --line: #999;
+  }
+  body {
+    background: #fff !important;
+  }
+  .topbar,
+  .no-print,
+  .status-panel,
+  .leaflet-container {
+    display: none !important;
+  }
+  .print-only {
+    display: block;
+  }
+  .rb-print-head {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+  .panel {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 0 8px !important;
+  }
+  .wrap-wide {
+    max-width: none;
+    padding: 0;
+  }
+  .ctrl-table {
+    font-size: 11px;
+  }
+  .ctrl-table tr {
+    break-inside: avoid;
+  }
+  .rb-table tr.is-passed td {
+    opacity: 1;
+  }
+  /* Les champs éditables (nom, pause) s'impriment comme du texte simple. */
+  .rb-input {
+    border: none !important;
+    background: none !important;
+    padding: 0 !important;
+    font-weight: 700;
+  }
+}
