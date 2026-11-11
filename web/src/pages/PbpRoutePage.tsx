@@ -132,6 +132,25 @@ export function PbpRoutePage() {
             provisoire (section « Tracés ») pour un vrai profil et un kilométrage exact.
           </div>
         )}
+        {r.meta?.officialRoute && (
+          <div className="pbp-banner">
+            {r.meta.officialRoute.pending ? (
+              <>
+                🔎 Tracé officiel pas encore publié (vérifié automatiquement chaque heure, dernière fois à{" "}
+                {new Date(r.meta.officialRoute.checkedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}). Les administrateurs sont prévenus dès la
+                parution.
+              </>
+            ) : (
+              <>
+                🗺️ <strong>Le site officiel semble avoir publié le parcours</strong> —{" "}
+                <a href={r.meta.officialRoute.links[0] ?? r.meta.officialRoute.pageUrl} target="_blank" rel="noreferrer">
+                  voir la page officielle
+                </a>
+                , puis importe le GPX dans « Tracés » (type officiel).
+              </>
+            )}
+          </div>
+        )}
         {r.error && <div className="error-banner">{r.error}</div>}
         {geoError && <div className="error-banner">{geoError}</div>}
 

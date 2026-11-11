@@ -423,6 +423,7 @@ model Roadbook {
   lastAnnounceError       String?
   lastAnnounceAttemptAt   DateTime?
   checkins                RoadbookCheckin[]
+  alerts                  RoadbookAlert[]
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt
 
@@ -440,7 +441,12 @@ model RoadbookCheckin {
   lon        Float?
   source     String // "gps" | "manuel" | "controle"
   at         DateTime @default(now())
+  // Identifiant généré par le téléphone : un pointage mis en file hors réseau puis
+  // renvoyé (parfois alors que le premier envoi était en fait passé, réponse perdue) ne
+  // doit jamais être enregistré deux fois. Nul pour les pointages sans file (Telegram).
+  clientId   String?
 
+  @@unique([roadbookId, clientId])
   @@index([roadbookId, at])
 }
 
@@ -454,4 +460,33 @@ model TelegramChat {
   type      String // "channel" | "supergroup" | "group"
   botStatus String? // "administrator" | "member" | "left" | "kicked" | null si inconnu
   updatedAt DateTime @updatedAt
+}
+
+// Alertes déjà envoyées sur le canal pour un roadbook (silence prolongé, fermeture de
+// contrôle dépassée, météo à venir...) : évite de répéter la même alerte à chaque passage
+// de la vérification périodique. `key` décrit la situation (ex. "silence:<dernier
+// pointage>:2", "weather:vent_de_face") ; `sentAt` sert aux alertes qui peuvent se
+// répéter après un délai.
+model RoadbookAlert {
+  id         String   @id @default(cuid())
+  roadbookId String
+  roadbook   Roadbook @relation(fields: [roadbookId], references: [id], onDelete: Cascade)
+  key        String
+  sentAt     DateTime @default(now())
+
+  @@unique([roadbookId, key])
+}
+
+// Page du site officiel surveillée pour détecter un changement (ex. publication du
+// parcours détaillé du PBP) : dernière empreinte du contenu, état « parcours annoncé
+// pour plus tard » et liens de parcours trouvés, pour ne signaler que les VRAIS
+// changements (voir src/lib/pbpRouteWatch.ts).
+model WatchedPage {
+  key          String    @id
+  contentHash  String
+  routePending Boolean
+  routeLinks   String // JSON : liens vers un tracé (gpx, OpenRunner, Komoot...) trouvés
+  checkedAt    DateTime
+  changedAt    DateTime?
+  lastNotifiedAt DateTime?
 }

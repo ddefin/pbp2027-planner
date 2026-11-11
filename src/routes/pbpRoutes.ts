@@ -8,6 +8,7 @@ import { fromCompactPoint, projectOntoRoute, toCompactPoint, type CompactPoint, 
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 import { PBP_2027_CONTROLS, PBP_2027_TOTAL_KM, PBP_2027_WAVES, buildIndicativeRoute, projectControls, type ProjectedControl } from "../lib/pbpControls.js";
 import { computeRouteWeather } from "../lib/routeWeather.js";
+import { officialRouteState } from "../lib/pbpRouteWatch.js";
 import { fetchForecastAt } from "../lib/openWeather.js";
 
 export const ROUTE_KINDS = ["officiel", "provisoire", "communautaire"] as const;
@@ -135,6 +136,7 @@ export async function pbpRoutesRoutes(app: FastifyInstance) {
       waves: PBP_2027_WAVES,
       totalKm: PBP_2027_TOTAL_KM,
       weatherConfigured: Boolean(config.openWeatherApiKey),
+      officialRoute: await officialRouteState(),
     });
   });
 

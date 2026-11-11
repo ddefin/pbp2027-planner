@@ -4,6 +4,7 @@ import { fromCompactPoint, pointAtKm, routeBearingAt, type CompactPoint, type Ro
 import { fetchCurrentAt, fetchForecastAt, pickForecastSlot, reverseGeocode, type PointForecastSlot } from "./openWeather.js";
 import { alertsFor, windAlongRoute, type WeatherAlert, type WindRelation } from "./routeWeather.js";
 import { escapeHtml, sendTelegramLong } from "./telegram.js";
+import { isAlertDue, markAlertSent } from "./alertState.js";
 import {
   buildSchedule,
   computeLiveStatus,
@@ -31,7 +32,13 @@ export interface WeatherPoint {
   alerts: WeatherAlert[];
 }
 
+// Un pointage plus ancien que ça à l'arrivée est considéré « différé » (envoyé après coup,
+// typiquement parce que le réseau était coupé) : la météo « maintenant » n'aurait aucun
+// sens pour une position vieille de plusieurs heures.
+const DELAYED_AFTER_MS = 20 * 60_000;
+
 export interface Situation {
+  delayed: boolean;
   km: number;
   totalKm: number;
   kmLeft: number;
@@ -66,7 +73,7 @@ const addMin = (d: Date, min: number) => new Date(d.getTime() + min * 60_000);
 
 // Partie déterministe (sans réseau) : tout ce qui se déduit du roadbook, du km pointé
 // et de l'heure. Testée telle quelle ; la ville et la météo sont ajoutées ensuite.
-export function computeSituation(rb: RoadbookForSituation, km: number, at: Date): Omit<Situation, "place" | "weather"> {
+export function computeSituation(rb: RoadbookForSituation, km: number, at: Date, now = new Date()): Omit<Situation, "place" | "weather"> {
   const settings: PacingSettings = {
     movingSpeedKmh: rb.movingSpeedKmh,
     climbPenaltyMinPer100m: rb.climbPenaltyMinPer100m,
@@ -88,6 +95,7 @@ export function computeSituation(rb: RoadbookForSituation, km: number, at: Date)
   const avgAllKmh = valid && km > 0 ? (km / elapsedMin) * 60 : null;
 
   return {
+    delayed: now.getTime() - at.getTime() > DELAYED_AFTER_MS,
     km,
     totalKm,
     kmLeft,
@@ -117,11 +125,13 @@ async function weatherAt(points: RoutePoint[], label: string, km: number, at: Da
 }
 
 // Ville + météo maintenant, au prochain contrôle et à l'arrivée (aux heures estimées).
-export async function gatherSituation(rb: RoadbookForSituation, km: number, at: Date, position: { lat: number; lon: number } | null): Promise<Situation> {
-  const base = computeSituation(rb, km, at);
+export async function gatherSituation(rb: RoadbookForSituation, km: number, at: Date, position: { lat: number; lon: number } | null, now = new Date()): Promise<Situation> {
+  const base = computeSituation(rb, km, at, now);
   const here = position ?? pointAtKm(rb.points, km);
 
-  const targets: { label: string; km: number; at: Date }[] = [{ label: "Maintenant", km, at }];
+  // Pointage différé : pas de météo « maintenant » (elle serait celle d'un autre endroit
+  // et d'une autre heure) ; les prévisions à venir restent calculées.
+  const targets: { label: string; km: number; at: Date }[] = base.delayed ? [] : [{ label: "Maintenant", km, at }];
   if (base.nextControl && base.nextControlEta && base.nextControl.km < base.totalKm - 0.5) {
     targets.push({ label: base.nextControl.name, km: base.nextControl.km, at: base.nextControlEta });
   }
@@ -129,7 +139,7 @@ export async function gatherSituation(rb: RoadbookForSituation, km: number, at: 
 
   const [place, ...weather] = await Promise.all([
     reverseGeocode(here.lat, here.lon),
-    ...targets.map((t, i) => weatherAt(rb.points, t.label, t.km, t.at, i === 0)),
+    ...targets.map((t) => weatherAt(rb.points, t.label, t.km, t.at, t.label === "Maintenant")),
   ]);
   return { ...base, place, weather: weather.filter((w): w is WeatherPoint => w !== null) };
 }
@@ -169,7 +179,23 @@ function weatherBlock(w: WeatherPoint, ref: Date): string {
 // Message HTML Telegram, en blocs titrés : l'essentiel (où, combien, dans les temps ?)
 // en tête, le détail ensuite. Chaque bloc ou ligne disparaît quand l'info manque (pas
 // d'heure de départ, pas de météo configurée...) plutôt que d'afficher des "?".
-export function formatSituationMessage(s: Situation, meta: { author: string; title: string; classKm: number; limitMinutes: number; liveTrackUrl: string | null; shareUrl: string | null }): string {
+export interface SituationMeta {
+  author: string;
+  title: string;
+  classKm: number;
+  limitMinutes: number;
+  liveTrackUrl: string | null;
+  shareUrl: string | null;
+}
+
+export function linksLine(meta: Pick<SituationMeta, "liveTrackUrl" | "shareUrl">): string | null {
+  const links: string[] = [];
+  if (meta.liveTrackUrl) links.push(`<a href="${escapeHtml(meta.liveTrackUrl)}">📡 Garmin LiveTrack</a>`);
+  if (meta.shareUrl) links.push(`<a href="${escapeHtml(meta.shareUrl)}">🗺️ Roadbook et suivi</a>`);
+  return links.length ? links.join("  ·  ") : null;
+}
+
+export function formatSituationMessage(s: Situation, meta: SituationMeta): string {
   const blocks: string[][] = [];
   const st = s.status;
   const finished = s.kmLeft === 0;
@@ -177,6 +203,7 @@ export function formatSituationMessage(s: Situation, meta: { author: string; tit
   // En-tête : qui, quel brevet, où, quand.
   const head = [`🚴 <b>${escapeHtml(meta.author)}</b> · ${escapeHtml(meta.title)}`];
   head.push(`📍 ${s.place ? `Près de <b>${escapeHtml(s.place)}</b> — ` : ""}pointage à ${time(s.at)}`);
+  if (s.delayed) head.push("⏳ <i>Pointage envoyé avec retard (réseau indisponible) : la position date de l'heure indiquée.</i>");
   blocks.push(head);
 
   // Progression.
@@ -245,10 +272,8 @@ export function formatSituationMessage(s: Situation, meta: { author: string; tit
     if (alerts.length) blocks.push([`⚠️ <b>Vigilance</b> : ${alerts.map((a) => ALERT_TXT[a]).join(", ")}`]);
   }
 
-  const links: string[] = [];
-  if (meta.liveTrackUrl) links.push(`<a href="${escapeHtml(meta.liveTrackUrl)}">📡 Garmin LiveTrack</a>`);
-  if (meta.shareUrl) links.push(`<a href="${escapeHtml(meta.shareUrl)}">🗺️ Roadbook et suivi</a>`);
-  if (links.length) blocks.push([links.join("  ·  ")]);
+  const links = linksLine(meta);
+  if (links) blocks.push([links]);
 
   return blocks.map((b) => b.join("\n")).join("\n\n");
 }
@@ -271,12 +296,66 @@ export function toSituationInput(r: RoadbookRow): RoadbookForSituation {
   };
 }
 
-export async function buildSituationMessage(roadbookId: string, checkin: { km: number; lat: number | null; lon: number | null; at: Date }): Promise<string | null> {
+export interface SituationContext {
+  situation: Situation;
+  meta: SituationMeta;
+  telegramAnnounce: boolean;
+}
+
+export async function buildSituation(
+  roadbookId: string,
+  checkin: { km: number; lat: number | null; lon: number | null; at: Date },
+  now = new Date(),
+): Promise<SituationContext | null> {
   const r = await prisma.roadbook.findUnique({ where: { id: roadbookId }, include: { user: { select: { prenom: true } } } });
   if (!r) return null;
-  const situation = await gatherSituation(toSituationInput(r), checkin.km, checkin.at, checkin.lat !== null && checkin.lon !== null ? { lat: checkin.lat, lon: checkin.lon } : null);
+  const situation = await gatherSituation(toSituationInput(r), checkin.km, checkin.at, checkin.lat !== null && checkin.lon !== null ? { lat: checkin.lat, lon: checkin.lon } : null, now);
+  return { situation, meta: roadbookMeta(r), telegramAnnounce: r.telegramAnnounce };
+}
+
+export function roadbookMeta(r: RoadbookRow & { user: { prenom: string } }): SituationMeta {
   const shareUrl = r.shareToken && config.publicUrl ? `${config.publicUrl.replace(/\/$/, "")}/r/${r.shareToken}` : null;
-  return formatSituationMessage(situation, { author: r.user.prenom, title: r.title, classKm: r.classKm, limitMinutes: r.limitMinutes, liveTrackUrl: r.liveTrackUrl, shareUrl });
+  return { author: r.user.prenom, title: r.title, classKm: r.classKm, limitMinutes: r.limitMinutes, liveTrackUrl: r.liveTrackUrl, shareUrl };
+}
+
+export async function buildSituationMessage(roadbookId: string, checkin: { km: number; lat: number | null; lon: number | null; at: Date }): Promise<string | null> {
+  const ctx = await buildSituation(roadbookId, checkin);
+  return ctx ? formatSituationMessage(ctx.situation, ctx.meta) : null;
+}
+
+// ─── Alerte « barrière horaire en danger », envoyée à part du résumé ───
+
+export function formatBarrierAlert(s: Situation, meta: SituationMeta): string | null {
+  const st = s.status;
+  if (!st?.nextControl || s.kmLeft === 0) return null;
+  const closeAt = s.startAt ? addMin(s.startAt, st.nextControl.closeMin) : null;
+  const L = [`🚨 <b>${escapeHtml(meta.author)}</b> · ${escapeHtml(meta.title)}`, ""];
+  L.push(
+    st.closedAlready
+      ? `<b>Barrière horaire dépassée</b> : ${escapeHtml(st.nextControl.name)} (km ${Math.round(st.nextControl.km)}) est déjà fermé${closeAt ? ` depuis ${dayTime(closeAt, s.at)}` : ""}.`
+      : `<b>Barrière horaire en danger</b> : à son allure actuelle, ${escapeHtml(st.nextControl.name)} (km ${Math.round(st.nextControl.km)}) serait atteint avec <b>${st.barrierMarginMin !== null ? signed(st.barrierMarginMin) : "—"}</b> de marge${closeAt ? ` (fermeture ${dayTime(closeAt, s.at)})` : ""}.`,
+  );
+  if (!st.closedAlready && st.requiredSpeedNextKmh) L.push(`Il faudrait rouler à <b>${kmFmt(st.requiredSpeedNextKmh)} km/h</b> en moyenne pour y arriver à temps (à ${kmFmt(st.nextControl.km - s.km)} km).`);
+  L.push(`📍 km ${kmFmt(s.km)} / ${kmFmt(s.totalKm)} · pointage à ${time(s.at)}`);
+  const links = linksLine(meta);
+  if (links) L.push("", links);
+  return L.join("\n");
+}
+
+// Au pointage : si la barrière du prochain contrôle est perdue, alerte séparée (une seule
+// fois par contrôle). Pas pour un pointage différé : sa position est trop ancienne pour
+// dire où en est le randonneur MAINTENANT.
+async function maybeSendBarrierAlert(roadbookId: string, ctx: SituationContext): Promise<void> {
+  const chatId = config.telegramTrackingChatId;
+  const st = ctx.situation.status;
+  if (!ctx.telegramAnnounce || !chatId || ctx.situation.delayed || !st?.nextControl) return;
+  if (!st.closedAlready && st.barrierLevel !== "late") return;
+  const key = `barrier:${Math.round(st.nextControl.km * 10)}`;
+  if (!(await isAlertDue(roadbookId, key, Infinity))) return;
+  const html = formatBarrierAlert(ctx.situation, ctx.meta);
+  if (!html) return;
+  const sent = await sendTelegramLong(chatId, html, { linkPreview: false });
+  if (sent.ok) await markAlertSent(roadbookId, [key]);
 }
 
 // Même résumé, au format WhatsApp : gras en *texte*, liens écrits en clair (WhatsApp
@@ -309,24 +388,63 @@ export async function latestSituationMessage(roadbookId: string): Promise<{ html
 
 export type AnnounceOutcome = {
   message: string | null;
-  publication: { status: "published" } | { status: "disabled" } | { status: "cooldown" } | { status: "error"; error: string };
+  publication:
+    | { status: "published" }
+    | { status: "disabled" }
+    | { status: "cooldown" }
+    | { status: "skipped" } // publication volontairement omise (lot de pointages rattrapés) ou doublon
+    | { status: "error"; error: string };
 };
+
+export type CheckinInput = {
+  km: number;
+  lat: number | null;
+  lon: number | null;
+  source: "gps" | "manuel" | "controle";
+  // Heure réelle du pointage (file hors réseau) ; par défaut, maintenant.
+  at?: Date;
+  // Identifiant fourni par le téléphone : un renvoi du même pointage ne crée pas de doublon.
+  clientId?: string | null;
+  // false : enregistre sans publier (pointages rattrapés en lot : seul le dernier publie).
+  announce?: boolean;
+};
+
+type StoredCheckin = { id: string; km: number; lat: number | null; lon: number | null; source: string; at: Date };
 
 // Enregistre un pointage (web ou Telegram), borne l'historique et publie le résumé sur
 // le canal si le randonneur l'a accepté. La publication n'est jamais bloquante ni
 // fatale : un canal mal configuré ne doit pas empêcher de pointer.
 export async function recordCheckin(
   roadbookId: string,
-  input: { km: number; lat: number | null; lon: number | null; source: "gps" | "manuel" | "controle" },
-): Promise<{ checkin: { km: number; lat: number | null; lon: number | null; source: string; at: Date }; announced: Promise<AnnounceOutcome> }> {
-  const checkin = await prisma.roadbookCheckin.create({ data: { roadbookId, ...input } });
+  input: CheckinInput,
+): Promise<{ checkin: StoredCheckin; duplicate: boolean; announced: Promise<AnnounceOutcome> }> {
+  const { announce = true, clientId = null, at, ...data } = input;
+
+  if (clientId) {
+    const existing = await prisma.roadbookCheckin.findUnique({ where: { roadbookId_clientId: { roadbookId, clientId } } });
+    if (existing) return { checkin: existing, duplicate: true, announced: Promise.resolve({ message: null, publication: { status: "skipped" } }) };
+  }
+
+  let checkin: StoredCheckin;
+  try {
+    checkin = await prisma.roadbookCheckin.create({ data: { roadbookId, ...data, clientId, ...(at ? { at } : {}) } });
+  } catch (err) {
+    // Deux envois simultanés du même pointage (réseau qui rejoue la requête) : le second
+    // heurte la contrainte d'unicité — on renvoie le pointage déjà enregistré.
+    const existing = clientId ? await prisma.roadbookCheckin.findUnique({ where: { roadbookId_clientId: { roadbookId, clientId } } }) : null;
+    if (existing) return { checkin: existing, duplicate: true, announced: Promise.resolve({ message: null, publication: { status: "skipped" } }) };
+    throw err;
+  }
 
   const old = await prisma.roadbookCheckin.findMany({ where: { roadbookId }, orderBy: { at: "desc" }, skip: MAX_CHECKINS_KEPT, select: { id: true } });
   if (old.length) await prisma.roadbookCheckin.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
 
+  if (!announce) return { checkin, duplicate: false, announced: Promise.resolve({ message: null, publication: { status: "skipped" } }) };
+
   const announced = (async (): Promise<AnnounceOutcome> => {
-    const message = await buildSituationMessage(roadbookId, checkin);
-    if (!message) return { message: null, publication: { status: "error", error: "Résumé indisponible" } };
+    const ctx = await buildSituation(roadbookId, checkin);
+    if (!ctx) return { message: null, publication: { status: "error", error: "Résumé indisponible" } };
+    const message = formatSituationMessage(ctx.situation, ctx.meta);
     const r = await prisma.roadbook.findUnique({ where: { id: roadbookId }, select: { telegramAnnounce: true, lastAnnouncedAt: true } });
     if (!r?.telegramAnnounce) return { message, publication: { status: "disabled" } };
     const cooledDown = !r.lastAnnouncedAt || Date.now() - r.lastAnnouncedAt.getTime() >= ANNOUNCE_COOLDOWN_MS;
@@ -344,11 +462,14 @@ export async function recordCheckin(
         ...(result.ok ? { lastAnnouncedAt: new Date() } : {}),
       },
     });
+    // L'alerte de barrière passe même si le résumé a été limité par l'anti-doublon (elle a
+    // sa propre mémoire) ; une erreur ici ne doit jamais faire échouer le pointage.
+    await maybeSendBarrierAlert(roadbookId, ctx).catch((err) => console.error("[roadbook] alerte barrière impossible :", err));
     return { message, publication: result.ok ? { status: "published" } : { status: "error", error: result.error } };
   })().catch((err): AnnounceOutcome => {
     console.error("[roadbook] résumé de situation impossible :", err);
     return { message: null, publication: { status: "error", error: err instanceof Error ? err.message : "erreur interne" } };
   });
 
-  return { checkin, announced };
+  return { checkin, duplicate: false, announced };
 }

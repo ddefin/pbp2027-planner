@@ -15,6 +15,7 @@ import { RoadbookView, type RoadbookData } from "../components/roadbook/Roadbook
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
 import { Disclosure } from "../components/Disclosure";
 import { LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
+import { enqueue, flushQueue, isNetworkError, newClientId, queuedFor } from "../lib/checkinQueue";
 import { QuickShare, ShareLinkCard, WhatsAppCard } from "../components/roadbook/ShareCards";
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -78,26 +79,64 @@ export function RoadbookPage() {
   // tri ni de cadence, il n'y a plus de suivi continu). Renvoie false si l'envoi a
   // échoué (pas de réseau), pour que l'écran le dise au lieu de laisser croire que
   // les proches voient la position.
+  const [queued, setQueued] = useState(0);
+
+  const afterSend = useCallback(() => {
+    if (!id) return;
+    refreshSituation();
+    // La publication sur le canal se fait en arrière-plan côté serveur (météo +
+    // Telegram) : on relit son résultat quelques secondes plus tard pour l'afficher.
+    setTimeout(() => {
+      getRoadbook(id)
+        .then(({ roadbook }) => setData((prev) => (prev ? { ...prev, announceStatus: roadbook.announceStatus } : prev)))
+        .catch(() => undefined);
+    }, 6000);
+  }, [id, refreshSituation]);
+
+  // Renvoie les pointages faits hors réseau dès que la connexion revient.
+  const flush = useCallback(async () => {
+    if (!id || queuedFor(id).length === 0) return;
+    const n = await flushQueue(id, (c, announce) =>
+      postCheckin(id, { km: c.km, lat: c.lat, lon: c.lon, source: c.source, at: c.at, clientId: c.clientId, announce }),
+    );
+    setQueued(queuedFor(id).length);
+    if (n > 0) afterSend();
+  }, [id, afterSend]);
+
+  useEffect(() => {
+    if (!id) return;
+    setQueued(queuedFor(id).length);
+    void flush();
+    const onQueue = () => setQueued(queuedFor(id).length);
+    window.addEventListener("online", flush);
+    window.addEventListener("pbp-checkin-queue", onQueue);
+    const t = setInterval(flush, 30_000);
+    return () => {
+      window.removeEventListener("online", flush);
+      window.removeEventListener("pbp-checkin-queue", onQueue);
+      clearInterval(t);
+    };
+  }, [id, flush]);
+
+  // Chaque pointage est une action volontaire du randonneur. Sans réseau, il est gardé
+  // dans le téléphone (avec son heure réelle) et renvoyé automatiquement : "queued".
   const handlePosition = useCallback(
-    async (p: LivePosition): Promise<boolean> => {
+    async (p: LivePosition): Promise<"sent" | "queued" | false> => {
       if (!id) return false;
       setPosition(p);
+      const entry = { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source, at: p.at, clientId: newClientId() };
       try {
-        await postCheckin(id, { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source });
-        refreshSituation();
-        // La publication sur le canal se fait en arrière-plan côté serveur (météo +
-        // Telegram) : on relit son résultat quelques secondes plus tard pour l'afficher.
-        setTimeout(() => {
-          getRoadbook(id)
-            .then(({ roadbook }) => setData((prev) => (prev ? { ...prev, announceStatus: roadbook.announceStatus } : prev)))
-            .catch(() => undefined);
-        }, 6000);
-        return true;
-      } catch {
-        return false;
+        await postCheckin(id, entry);
+        afterSend();
+        void flush();
+        return "sent";
+      } catch (err) {
+        if (!isNetworkError(err)) return false;
+        enqueue({ roadbookId: id, ...entry });
+        return "queued";
       }
     },
-    [id, refreshSituation],
+    [id, afterSend, flush],
   );
 
   if (error) return <div className="wrap"><div className="error-banner">{error}</div></div>;
@@ -117,6 +156,11 @@ export function RoadbookPage() {
         pointage: (
           <>
             <h3 className="rb-h3">Pointer ma position</h3>
+            {queued > 0 && (
+              <div className="live-feedback live-feedback-warn" role="status">
+                📵 {queued} pointage{queued > 1 ? "s" : ""} en attente d'envoi : {queued > 1 ? "ils seront envoyés" : "il sera envoyé"} automatiquement dès que le réseau revient.
+              </div>
+            )}
             <LiveTracker
               points={data.points}
               controls={[...data.controls].sort((a, b) => a.km - b.km)}

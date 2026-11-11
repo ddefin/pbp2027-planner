@@ -59,6 +59,10 @@ const checkinSchema = z.object({
   lat: z.number().min(-90).max(90).nullable().optional(),
   lon: z.number().min(-180).max(180).nullable().optional(),
   source: z.enum(["gps", "manuel", "controle"]),
+  // File hors réseau : heure réelle du pointage, identifiant anti-doublon, publication.
+  at: z.string().datetime().optional(),
+  clientId: z.string().min(8).max(64).optional(),
+  announce: z.boolean().optional(),
 });
 
 type ControlEntry = z.infer<typeof controlSchema>;
@@ -297,14 +301,25 @@ export async function roadbooksRoutes(app: FastifyInstance) {
 
     // Publication sur le canal Telegram en arrière-plan : la réponse n'attend pas
     // OpenWeatherMap ni Telegram (voir src/lib/roadbookSituation.ts).
-    const { checkin } = await recordCheckin(id, {
+    // Heure réelle d'un pointage rattrapé : jamais dans le futur, pas plus de 7 jours.
+    let at: Date | undefined;
+    if (parsed.data.at) {
+      const t = new Date(parsed.data.at).getTime();
+      const now = Date.now();
+      if (now - t > 7 * 86_400_000) return reply.code(400).send({ error: "invalid_input" });
+      at = new Date(Math.min(t, now));
+    }
+    const { checkin, duplicate } = await recordCheckin(id, {
       km: parsed.data.km,
       lat: parsed.data.lat ?? null,
       lon: parsed.data.lon ?? null,
       source: parsed.data.source,
+      at,
+      clientId: parsed.data.clientId ?? null,
+      announce: parsed.data.announce,
     });
 
-    return reply.code(201).send({ checkin: serializeCheckin(checkin) });
+    return reply.code(duplicate ? 200 : 201).send({ checkin: serializeCheckin(checkin), duplicate });
   });
 
   // Nouvelle tentative / remise à zéro du suivi (le roadbook lui-même est conservé).

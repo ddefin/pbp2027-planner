@@ -23,6 +23,8 @@ import { pbpRoutesRoutes } from "./routes/pbpRoutes.js";
 import { roadbooksRoutes } from "./routes/roadbooks.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
 import { scrapeNews } from "./lib/newsScraper.js";
+import { checkRoadbookAlerts } from "./lib/roadbookAlerts.js";
+import { checkOfficialRoute } from "./lib/pbpRouteWatch.js";
 import { startTelegramPolling } from "./lib/telegramBot.js";
 
 const WIND_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -128,6 +130,17 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       scrapeNews().catch((err) => app.log.error(err, "scrapeNews a échoué"));
     }, NEWS_SCRAPE_INTERVAL_MS);
   }, 60_000);
+
+  // Alertes proactives du canal de suivi (silence, contrôle fermé, météo) toutes les 10 min,
+  // et surveillance de la page officielle du parcours toutes les heures.
+  setTimeout(() => {
+    const alerts = () => checkRoadbookAlerts().catch((err) => app.log.error(err, "checkRoadbookAlerts a échoué"));
+    const route = () => checkOfficialRoute().catch((err) => app.log.error(err, "checkOfficialRoute a échoué"));
+    void alerts();
+    void route();
+    setInterval(alerts, 10 * 60_000);
+    setInterval(route, 60 * 60_000);
+  }, 90_000);
 
   // Pas de délai ici (contrairement aux deux ci-dessus) : c'est une boucle de
   // long-polling, pas un appel ponctuel — no-op immédiat si TELEGRAM_BOT_TOKEN

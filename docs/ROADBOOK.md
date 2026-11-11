@@ -219,3 +219,22 @@ l'organisateur fait foi** : l'interface le rappelle sous le tableau.
 
 Toutes les routes sauf la dernière sont réservées au propriétaire : un roadbook
 d'un autre utilisateur répond 404, sans même confirmer son existence.
+
+## Pointage sans réseau
+
+Hors réseau, « Pointer ma position » / « Je suis à ce km » / « Pointé ✔ » ne sont plus perdus : le pointage est gardé dans le téléphone (localStorage, `pbp.checkinQueue`) avec son **heure réelle** et un identifiant anti-doublon (`clientId`). Dès que le réseau revient (événement `online`, ou toutes les 30 s page ouverte), la file est renvoyée dans l'ordre ; seul le **dernier** pointage est publié sur le canal (les autres sont enregistrés avec `announce:false`). Un renvoi du même `clientId` est ignoré par le serveur (HTTP 200, `duplicate:true`). Un pointage reçu plus de 20 min après son heure réelle est annoncé « envoyé avec retard » et sans météo « maintenant ». La session est mémorisée pour que la page reste utilisable sans réseau (seule une vraie réponse 401 déconnecte).
+
+## Alertes proactives sur le canal
+
+Un passage toutes les 10 min (`src/lib/roadbookAlerts.ts`) pour les roadbooks avec départ renseigné et publication activée :
+
+- **Silence** : aucun pointage depuis `ROADBOOK_SILENCE_HOURS` (3 h par défaut), une fois par dernier pointage.
+- **Contrôle fermé sans pointage** : l'heure de fermeture du prochain contrôle est passée, une fois par contrôle.
+- **Météo à venir** : pluie / vent fort / vent de face / froid / chaleur prévus au prochain contrôle ou à l'arrivée dans les 3 h (position de moins de 90 min), au plus toutes les 6 h par situation.
+- **Barrière en danger** : au pointage, message à part si la marge au prochain contrôle est négative (une fois par contrôle).
+
+Les alertes déjà envoyées sont mémorisées (`RoadbookAlert`) ; un envoi refusé par Telegram est retenté au passage suivant.
+
+## Surveillance du parcours officiel
+
+Toutes les heures (`src/lib/pbpRouteWatch.ts`), la page https://www.paris-brest-paris.org/parcours/ est lue. Tant que « Retrouvez bientôt tous les liens vers les fichiers GPX » y figure, le tracé n'est pas publié. Quand la mention disparaît ou que des liens GPX/cartes apparaissent : notification dans l'app à tous les admins + message sur le canal actualités, et bandeau sur la page Parcours PBP. La première lecture ne notifie jamais.

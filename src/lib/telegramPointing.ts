@@ -45,7 +45,9 @@ async function confirmation(announced: Promise<AnnounceOutcome>): Promise<string
         ? "✅ Pointage enregistré (publication sur le canal désactivée dans ton roadbook)."
         : publication.status === "cooldown"
           ? "✅ Pointage enregistré (déjà publié il y a moins de 2 min : pas republié sur le canal)."
-          : `⚠️ Pointage enregistré, mais PAS publié sur le canal.\nMotif : ${escapeHtml(publication.error)}\n${escapeHtml(explainTelegramError(publication.error))}`;
+          : publication.status === "skipped"
+            ? "✅ Pointage enregistré."
+            : `⚠️ Pointage enregistré, mais PAS publié sur le canal.\nMotif : ${escapeHtml(publication.error)}\n${escapeHtml(explainTelegramError(publication.error))}`;
   return message ? `${status}\n\n${message}` : status;
 }
 

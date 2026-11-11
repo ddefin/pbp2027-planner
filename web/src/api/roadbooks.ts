@@ -99,7 +99,10 @@ export function setRoadbookSharing(id: string, enabled: boolean) {
   return request<{ shareToken: string | null }>(`/roadbooks/${id}/share`, { method: "POST", body: JSON.stringify({ enabled }) }).then((r) => r.shareToken);
 }
 
-export function postCheckin(id: string, input: { km: number; lat?: number | null; lon?: number | null; source: Checkin["source"] }) {
+export function postCheckin(
+  id: string,
+  input: { km: number; lat?: number | null; lon?: number | null; source: Checkin["source"]; at?: string; clientId?: string; announce?: boolean },
+) {
   return request<{ checkin: Checkin }>(`/roadbooks/${id}/checkins`, { method: "POST", body: JSON.stringify(input) }).then((r) => r.checkin);
 }
 

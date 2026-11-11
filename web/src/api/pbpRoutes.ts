@@ -57,6 +57,8 @@ export interface PbpMeta {
   waves: DepartureWave[];
   totalKm: number;
   weatherConfigured: boolean;
+  // Surveillance de la page officielle (null tant qu'aucune vérification n'a eu lieu).
+  officialRoute?: { pending: boolean; links: string[]; checkedAt: string; pageUrl: string } | null;
 }
 
 export type WindRelation = "dos" | "face" | "travers";

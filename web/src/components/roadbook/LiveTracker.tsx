@@ -33,7 +33,7 @@ export function LiveTracker({
   points: TrackPoint[];
   controls: RoadbookControl[];
   lastKm: number | null;
-  onPosition: (p: LivePosition) => Promise<boolean>;
+  onPosition: (p: LivePosition) => Promise<"sent" | "queued" | false>;
   onReset: () => void;
 }) {
   const [locating, setLocating] = useState(false);
@@ -47,7 +47,9 @@ export function LiveTracker({
   async function submit(p: LivePosition, label: string) {
     const sent = await onPosition(p);
     setFeedback(
-      sent
+      sent === "queued"
+        ? { kind: "warn", text: `${label} — pas de réseau : pointage gardé dans le téléphone, il partira tout seul dès que la connexion revient (avec l'heure de ${time()}).` }
+        : sent
         ? { kind: p.offsetKm !== undefined && p.offsetKm > OFF_ROUTE_KM ? "warn" : "ok", text: `${label} — partagé à ${time()}` }
         : { kind: "error", text: `${label} — affiché ici mais PAS envoyé (pas de réseau ?). Réessaie un peu plus loin.` },
     );
