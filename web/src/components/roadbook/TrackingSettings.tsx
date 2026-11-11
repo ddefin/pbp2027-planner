@@ -32,7 +32,13 @@ export function TrackingSettings({
   onSaved: (patch: { liveTrackUrl?: string | null; telegramAnnounce?: boolean }) => void;
 }) {
   const { user } = useAuth();
-  const [test, setTest] = useState<{ busy: boolean; text: string | null; ok?: boolean }>({ busy: false, text: null });
+  const [test, setTest] = useState<{
+    busy: boolean;
+    text: string | null;
+    ok?: boolean;
+    configured?: string | null;
+    chats?: { chatId: string; title: string; type: string; botStatus: string | null }[];
+  }>({ busy: false, text: null });
   const [url, setUrl] = useState(liveTrackUrl ?? "");
   const [urlState, setUrlState] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
@@ -127,12 +133,15 @@ export function TrackingSettings({
               setTest({ busy: true, text: null });
               try {
                 const r = await testTrackingChannel();
+                const source = r.usingFallback ? " — c'est le canal des ACTUALITÉS, TELEGRAM_TRACKING_CHAT_ID n'est pas lue" : "";
                 setTest({
                   busy: false,
                   ok: r.ok,
+                  configured: r.chatId,
+                  chats: r.knownChats,
                   text: r.ok
-                    ? `✓ Message de test publié sur le canal ${r.chatId}${r.usingFallback ? " (canal des actualités, TELEGRAM_TRACKING_CHAT_ID absente)" : ""}.`
-                    : `⚠️ ${r.hint} — Réponse : ${r.error}${r.chatId ? ` (canal ${r.chatId})` : ""}`,
+                    ? `✓ Message de test publié sur le canal ${r.chatId}${source}.`
+                    : `⚠️ ${r.hint} — Réponse de Telegram : ${r.error}${r.chatId ? ` (identifiant utilisé : ${r.chatId}${source})` : ""}`,
                 });
               } catch {
                 setTest({ busy: false, ok: false, text: "Test impossible (serveur injoignable)." });
@@ -142,6 +151,33 @@ export function TrackingSettings({
             {test.busy ? "Test en cours…" : "🔧 Tester la publication sur le canal (admin)"}
           </button>
           {test.text && <div className={`live-feedback live-feedback-${test.ok ? "ok" : "error"}`}>{test.text}</div>}
+          {test.chats && (
+            <div className="rb-known-chats">
+              <strong>Canaux et groupes connus du bot</strong>
+              {test.chats.length === 0 ? (
+                <p className="hint" style={{ margin: "4px 0 0" }}>
+                  Aucun pour l'instant. Ajoute le bot comme administrateur du canal (ou retire-le puis rajoute-le s'il y était
+                  déjà), publie un message dans le canal, puis relance le test.
+                </p>
+              ) : (
+                <ul className="hint" style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                  {test.chats.map((c) => (
+                    <li key={c.chatId}>
+                      « {c.title} » → <code>{c.chatId}</code>
+                      {c.botStatus === "administrator" ? " · bot administrateur ✓" : c.botStatus ? ` · bot : ${c.botStatus} ✗ (doit être administrateur)` : ""}
+                      {c.chatId === test.configured ? " · ← identifiant configuré" : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {test.chats.length > 0 && !test.chats.some((c) => c.chatId === test.configured) && (
+                <p className="hint" style={{ margin: "4px 0 0" }}>
+                  L'identifiant configuré ne correspond à aucun de ces canaux : mets la bonne valeur dans TELEGRAM_TRACKING_CHAT_ID
+                  (fichier <code>.env.production</code>), puis <code>sudo docker compose up -d --force-recreate</code>.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

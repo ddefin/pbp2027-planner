@@ -54,7 +54,8 @@ export async function sendTelegramMessage(chatId: string, text: string, options:
 // Traduit les refus Telegram les plus courants en action concrète à faire.
 export function explainTelegramError(error: string): string {
   const e = error.toLowerCase();
-  if (e.includes("chat not found")) return "Canal introuvable : vérifie TELEGRAM_TRACKING_CHAT_ID (nombre commençant par -100) et que le bot a bien été ajouté au canal.";
+  if (e.includes("chat not found"))
+    return "Canal introuvable pour le bot : il n'en est pas (encore) administrateur, ou l'identifiant ne correspond pas à ce canal. Ajoute le bot comme administrateur du canal, publie un message dans le canal, puis relance ce test : l'identifiant exact s'affichera ici.";
   if (e.includes("not a member") || e.includes("administrator") || e.includes("not enough rights") || e.includes("have no rights"))
     return "Le bot n'a pas le droit de publier : ajoute-le comme ADMINISTRATEUR du canal avec le droit « Publier des messages ».";
   if (e.includes("kicked") || e.includes("blocked")) return "Le bot a été retiré ou bloqué du canal : rajoute-le comme administrateur.";
@@ -78,10 +79,14 @@ export type TelegramUpdate = {
   // Telegram n'envoie ensuite que des edited_message, volontairement ignorés (pas de
   // suivi continu, un pointage = un message).
   message?: {
-    chat: { id: number; type?: string };
+    chat: { id: number; type?: string; title?: string };
     text?: string;
     location?: { latitude: number; longitude: number };
   };
+  // Le bot a été ajouté / promu / retiré d'un groupe ou canal.
+  my_chat_member?: { chat: { id: number; type: string; title?: string }; new_chat_member: { status: string } };
+  // Message publié dans un canal où le bot est administrateur.
+  channel_post?: { chat: { id: number; type: string; title?: string } };
 };
 
 // Long-polling (pas de webhook public à exposer/configurer) : timeout=25 fait
@@ -96,7 +101,10 @@ export async function getTelegramUpdates(offset: number): Promise<TelegramUpdate
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 35_000);
   try {
-    const res = await fetch(`${apiUrl("getUpdates")}?timeout=25&offset=${offset}`, { signal: controller.signal });
+    // allowed_updates explicite : Telegram mémorise la dernière liste demandée ; on veut
+    // les messages privés (pointages), et savoir dans quels canaux le bot est ajouté.
+    const allowed = encodeURIComponent(JSON.stringify(["message", "channel_post", "my_chat_member"]));
+    const res = await fetch(`${apiUrl("getUpdates")}?timeout=25&offset=${offset}&allowed_updates=${allowed}`, { signal: controller.signal });
     if (!res.ok) throw new Error(`getUpdates: HTTP ${res.status}`);
     const data = (await res.json()) as { result?: TelegramUpdate[] };
     return data.result ?? [];

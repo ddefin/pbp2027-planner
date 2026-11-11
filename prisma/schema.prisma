@@ -443,3 +443,15 @@ model RoadbookCheckin {
 
   @@index([roadbookId, at])
 }
+
+// Groupes/canaux où le bot a été ajouté (ou dans lesquels il voit passer des messages),
+// découverts automatiquement via les mises à jour Telegram : sert à afficher à l'admin
+// l'identifiant EXACT du canal à mettre dans TELEGRAM_TRACKING_CHAT_ID, au lieu de le
+// chercher à la main (source d'erreurs "chat not found").
+model TelegramChat {
+  chatId    String   @id
+  title     String
+  type      String // "channel" | "supergroup" | "group"
+  botStatus String? // "administrator" | "member" | "left" | "kicked" | null si inconnu
+  updatedAt DateTime @updatedAt
+}

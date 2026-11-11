@@ -280,12 +280,36 @@ describe("Pointage depuis Telegram", () => {
     channelError = "Bad Request: chat not found";
     const ko = await server.inject({ method: "POST", url: "/api/roadbooks/telegram/test", headers: { cookie } });
     expect(ko.json()).toMatchObject({ ok: false, chatId: CHANNEL, error: "Bad Request: chat not found" });
-    expect(ko.json().hint).toContain("TELEGRAM_TRACKING_CHAT_ID");
+    expect(ko.json().hint).toContain("administrateur du canal");
 
     channelError = null;
     const ok = await server.inject({ method: "POST", url: "/api/roadbooks/telegram/test", headers: { cookie } });
     expect(ok.json().ok).toBe(true);
     expect(sent.find((m) => m.chatId === CHANNEL)?.text).toContain("Test de publication");
+  });
+
+  it("découvre seul l'identifiant des canaux où le bot est ajouté, et l'affiche au test admin", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    await prisma.user.updateMany({ data: { isAdmin: true } });
+    // Format réel des mises à jour Telegram.
+    await bot.handleTelegramUpdate({
+      update_id: 10,
+      my_chat_member: { chat: { id: -1002222222222, type: "channel", title: "Objectif PBP 2027" }, new_chat_member: { status: "administrator" } },
+    });
+    await bot.handleTelegramUpdate({ update_id: 11, channel_post: { chat: { id: -1003333333333, type: "channel", title: "Autre canal" } } });
+    await bot.handleTelegramUpdate({
+      update_id: 12,
+      my_chat_member: { chat: { id: -1004444444444, type: "supergroup", title: "Groupe retiré" }, new_chat_member: { status: "left" } },
+    });
+    expect(sent).toEqual([]); // ces événements ne déclenchent aucun message
+
+    channelError = "Bad Request: chat not found";
+    const res = await server.inject({ method: "POST", url: "/api/roadbooks/telegram/test", headers: { cookie } });
+    const chats = res.json().knownChats as { chatId: string; title: string; botStatus: string | null }[];
+    expect(chats.find((c) => c.title === "Objectif PBP 2027")).toMatchObject({ chatId: "-1002222222222", botStatus: "administrator" });
+    expect(chats.find((c) => c.title === "Autre canal")?.botStatus).toBe("administrator");
+    expect(chats.find((c) => c.title === "Groupe retiré")?.botStatus).toBe("left");
+    expect(res.json().hint).toContain("administrateur");
   });
 
   it("publie aussi le résumé quand on pointe depuis le site", async () => {

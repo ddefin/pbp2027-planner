@@ -117,5 +117,12 @@ export async function getSharedRoadbook(token: string): Promise<{ roadbook: Shar
 }
 
 export function testTrackingChannel() {
-  return request<{ ok: boolean; chatId: string | null; usingFallback: boolean; error?: string; hint?: string }>("/roadbooks/telegram/test", { method: "POST" });
+  return request<{
+    ok: boolean;
+    chatId: string | null;
+    usingFallback: boolean;
+    error?: string;
+    hint?: string;
+    knownChats: { chatId: string; title: string; type: string; botStatus: string | null }[];
+  }>("/roadbooks/telegram/test", { method: "POST" });
 }

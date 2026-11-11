@@ -51,10 +51,35 @@ export async function handleTelegramStartCommand(chatId: string, code: string): 
 // Point d'entrée de chaque message reçu (exporté pour les tests). Uniquement les
 // conversations PRIVÉES avec le bot : dans un groupe ou un canal, on ne réagit pas
 // (les positions et commandes de pointage sont personnelles).
+// Mémorise un groupe/canal vu par le bot, avec son identifiant exact.
+async function rememberChat(chat: { id: number; type: string; title?: string }, botStatus: string | null): Promise<void> {
+  if (chat.type === "private") return;
+  const chatId = String(chat.id);
+  const title = (chat.title ?? "").slice(0, 200) || chatId;
+  await prisma.telegramChat.upsert({
+    where: { chatId },
+    create: { chatId, title, type: chat.type, botStatus },
+    update: { title, type: chat.type, ...(botStatus ? { botStatus } : {}) },
+  });
+  console.info(`[telegram] canal/groupe vu : « ${title} » id=${chatId}${botStatus ? ` (bot : ${botStatus})` : ""}`);
+}
+
 export async function handleTelegramUpdate(update: TelegramUpdate): Promise<void> {
+  if (update.my_chat_member) {
+    await rememberChat(update.my_chat_member.chat, update.my_chat_member.new_chat_member.status);
+    return;
+  }
+  if (update.channel_post) {
+    // Le bot ne reçoit les publications d'un canal que s'il en est administrateur.
+    await rememberChat(update.channel_post.chat, "administrator");
+    return;
+  }
   const msg = update.message;
+  if (msg && msg.chat.type && msg.chat.type !== "private") {
+    await rememberChat({ id: msg.chat.id, type: msg.chat.type, title: msg.chat.title }, null);
+    return;
+  }
   if (!msg) return;
-  if (msg.chat.type && msg.chat.type !== "private") return;
   const chatId = String(msg.chat.id);
   const text = msg.text?.trim() ?? "";
 

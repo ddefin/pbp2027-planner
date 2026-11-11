@@ -1946,3 +1946,10 @@ button.link {
   gap: 6px;
   align-items: flex-start;
 }
+.rb-known-chats {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  width: 100%;
+}

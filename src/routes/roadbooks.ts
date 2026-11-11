@@ -314,10 +314,20 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     const usingFallback = !process.env.TELEGRAM_TRACKING_CHAT_ID && Boolean(chatId);
     if (!config.telegramBotToken) return reply.send({ ok: false, chatId, usingFallback, error: "TELEGRAM_BOT_TOKEN absent", hint: "Renseigne TELEGRAM_BOT_TOKEN dans .env.production puis redémarre le conteneur." });
     if (!chatId)
-      return reply.send({ ok: false, chatId: null, usingFallback, error: "Aucun canal configuré", hint: "Ajoute TELEGRAM_TRACKING_CHAT_ID=-100… dans .env.production (fichier avec le point au début), puis : sudo docker compose up -d --force-recreate" });
+      return reply.send({ ok: false, chatId: null, usingFallback, knownChats: [], error: "Aucun canal configuré", hint: "Ajoute TELEGRAM_TRACKING_CHAT_ID=-100… dans .env.production (fichier avec le point au début), puis : sudo docker compose up -d --force-recreate" });
 
+    const knownChats = (await prisma.telegramChat.findMany({ orderBy: { updatedAt: "desc" } })).map((c) => ({
+      chatId: c.chatId,
+      title: c.title,
+      type: c.type,
+      botStatus: c.botStatus,
+    }));
     const result = await sendTelegram(chatId, `✅ Test de publication depuis PBP2027 Planner (${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}) : les résumés de situation des randonneurs arriveront ici.`);
-    return reply.send(result.ok ? { ok: true, chatId, usingFallback } : { ok: false, chatId, usingFallback, error: result.error, hint: explainTelegramError(result.error) });
+    return reply.send(
+      result.ok
+        ? { ok: true, chatId, usingFallback, knownChats }
+        : { ok: false, chatId, usingFallback, knownChats, error: result.error, hint: explainTelegramError(result.error) },
+    );
   });
 
   // Lien public en lecture seule : SANS session. N'expose ni email ni identifiant
