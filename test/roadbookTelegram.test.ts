@@ -210,6 +210,14 @@ describe("Robustesse du résumé", () => {
   });
 });
 
+describe("Format WhatsApp", () => {
+  it("convertit gras, liens et entités, sans aucune balise HTML", () => {
+    const html = '🚴 <b>Didier</b> · BRM &lt;200&gt; &amp; co\n<b>📏 PROGRESSION </b>\n<a href="https://x.example/r/a?b=1&amp;c=2">🗺️ Roadbook</a>';
+    const wa = situationLib.toWhatsAppText(html);
+    expect(wa).toBe("🚴 *Didier* · BRM <200> & co\n*📏 PROGRESSION* \n🗺️ Roadbook : https://x.example/r/a?b=1&c=2");
+  });
+});
+
 describe("Pointage depuis Telegram", () => {
   let server: ReturnType<typeof buildServer>;
   let cookie: string;
@@ -370,6 +378,25 @@ describe("Pointage depuis Telegram", () => {
     expect(chats.find((c) => c.title === "Autre canal")?.botStatus).toBe("administrator");
     expect(chats.find((c) => c.title === "Groupe retiré")?.botStatus).toBe("left");
     expect(res.json().hint).toContain("administrateur");
+  });
+
+  it("fournit le résumé au format WhatsApp au propriétaire et sur le lien de suivi, sans fuite", async () => {
+    const own = await server.inject({ method: "GET", url: `/api/roadbooks/${roadbookId}/situation`, headers: { cookie } });
+    expect(own.statusCode).toBe(200);
+    expect(own.json().whatsapp).toMatch(/^🚴 \*Didier\*/);
+    expect(own.json().whatsapp).toContain("*📏 PROGRESSION*");
+    expect(own.json().whatsapp).not.toMatch(/<\/?b>|<a /);
+
+    const share = await server.inject({ method: "POST", url: `/api/roadbooks/${roadbookId}/share`, headers: { cookie }, payload: { enabled: true } });
+    const pub = await server.inject({ method: "GET", url: `/api/roadbooks/shared/${share.json().shareToken}/situation` });
+    expect(pub.statusCode).toBe(200);
+    expect(pub.json().whatsapp).toContain("PROGRESSION");
+    expect(pub.body).not.toContain("@example.com");
+    expect(pub.body).not.toContain(roadbookId);
+
+    expect((await server.inject({ method: "GET", url: "/api/roadbooks/shared/jetoninexistant1234/situation" })).statusCode).toBe(404);
+    const other = await server.inject({ method: "GET", url: `/api/roadbooks/${roadbookId}/situation` });
+    expect(other.statusCode).toBe(401);
   });
 
   it("publie aussi le résumé quand on pointe depuis le site", async () => {

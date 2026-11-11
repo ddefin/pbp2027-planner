@@ -279,6 +279,34 @@ export async function buildSituationMessage(roadbookId: string, checkin: { km: n
   return formatSituationMessage(situation, { author: r.user.prenom, title: r.title, classKm: r.classKm, limitMinutes: r.limitMinutes, liveTrackUrl: r.liveTrackUrl, shareUrl });
 }
 
+// Même résumé, au format WhatsApp : gras en *texte*, liens écrits en clair (WhatsApp
+// ne sait pas afficher un lien derrière un libellé), aucune balise HTML. La conversion
+// part du message Telegram pour que les deux restent toujours identiques sur le fond.
+export function toWhatsAppText(html: string): string {
+  return html
+    .replace(/<a href="([^"]*)">([^<]*)<\/a>/g, (_m, url: string, label: string) => `${label} : ${url.replace(/&amp;/g, "&")}`)
+    .replace(/<b>([\s\S]*?)<\/b>/g, (_m, inner: string) => {
+      // WhatsApp n'applique le gras que si l'astérisque touche du texte (pas d'espace).
+      const lead = inner.match(/^\s*/)![0];
+      const trail = inner.match(/\s*$/)![0];
+      const core = inner.trim();
+      return core ? `${lead}*${core}*${trail}` : inner;
+    })
+    .replace(/<\/?[a-z][^>]*>/gi, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&");
+}
+
+// Résumé à partir du DERNIER pointage d'un roadbook (bouton « Partager sur WhatsApp »).
+export async function latestSituationMessage(roadbookId: string): Promise<{ html: string; at: Date } | null> {
+  const last = await prisma.roadbookCheckin.findFirst({ where: { roadbookId }, orderBy: { at: "desc" } });
+  if (!last) return null;
+  const html = await buildSituationMessage(roadbookId, last);
+  return html ? { html, at: last.at } : null;
+}
+
 export type AnnounceOutcome = {
   message: string | null;
   publication: { status: "published" } | { status: "disabled" } | { status: "cooldown" } | { status: "error"; error: string };

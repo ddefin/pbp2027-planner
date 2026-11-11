@@ -126,3 +126,11 @@ export function testTrackingChannel() {
     knownChats: { chatId: string; title: string; type: string; botStatus: string | null }[];
   }>("/roadbooks/telegram/test", { method: "POST" });
 }
+
+export function getRoadbookSituation(id: string) {
+  return request<{ whatsapp: string; at: string }>(`/roadbooks/${id}/situation`);
+}
+
+export function getSharedSituation(token: string) {
+  return request<{ whatsapp: string; at: string }>(`/roadbooks/shared/${encodeURIComponent(token)}/situation`);
+}

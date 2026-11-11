@@ -9,7 +9,7 @@ import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/f
 import { OFFICIAL_LIMIT_MINUTES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
 import { looksLikeControl } from "../shared/roadbookCalc.js";
-import { recordCheckin } from "../lib/roadbookSituation.js";
+import { latestSituationMessage, recordCheckin, toWhatsAppText } from "../lib/roadbookSituation.js";
 import { explainTelegramError, sendTelegram } from "../lib/telegram.js";
 import { config } from "../config.js";
 
@@ -318,6 +318,19 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     return reply.code(204).send();
   });
 
+  // Résumé de situation (dernier pointage) au format WhatsApp, pour le bouton de partage :
+  // WhatsApp n'a pas d'API pour publier dans un groupe, c'est la personne qui envoie.
+  app.get("/roadbooks/:id/situation", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    const { id } = request.params as { id: string };
+    const r = await ownedRoadbook(id, user.id);
+    if (!r) return reply.code(404).send({ error: "not_found" });
+    const situation = await latestSituationMessage(id);
+    if (!situation) return reply.code(404).send({ error: "no_checkin" });
+    return reply.send({ whatsapp: toWhatsAppText(situation.html), at: situation.at.toISOString() });
+  });
+
   // Test de publication sur le canal de suivi (admin) : envoie un message de test et
   // renvoie la réponse EXACTE de Telegram, avec l'action à faire en cas de refus.
   app.post("/roadbooks/telegram/test", async (request, reply) => {
@@ -348,6 +361,18 @@ export async function roadbooksRoutes(app: FastifyInstance) {
   // Lien public en lecture seule : SANS session. N'expose ni email ni identifiant
   // interne de l'utilisateur, seulement le prénom affiché et ce que le roadbook
   // contient déjà (tracé, horaires, positions déclarées).
+  // Même résumé pour les proches (lien de suivi), sans session.
+  app.get("/roadbooks/shared/:token/situation", async (request, reply) => {
+    const { token } = request.params as { token: string };
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return reply.code(404).send({ error: "not_found" });
+    const r = await prisma.roadbook.findUnique({ where: { shareToken: token }, select: { id: true } });
+    if (!r) return reply.code(404).send({ error: "not_found" });
+    const situation = await latestSituationMessage(r.id);
+    if (!situation) return reply.code(404).send({ error: "no_checkin" });
+    reply.header("cache-control", "no-store");
+    return reply.send({ whatsapp: toWhatsAppText(situation.html), at: situation.at.toISOString() });
+  });
+
   app.get("/roadbooks/shared/:token", async (request, reply) => {
     const { token } = request.params as { token: string };
     if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return reply.code(404).send({ error: "not_found" });

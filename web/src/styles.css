@@ -1953,3 +1953,23 @@ button.link {
   font-size: 13px;
   width: 100%;
 }
+.wa-share-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  margin: 10px 0;
+}
+.wa-share {
+  display: inline-block;
+  background: #25d366;
+  color: #0b3d1f !important;
+  font-weight: 800;
+  padding: 10px 16px;
+  border-radius: 10px;
+  text-decoration: none;
+}
+.wa-share:hover {
+  text-decoration: none;
+  filter: brightness(0.95);
+}

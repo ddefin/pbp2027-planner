@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
   deleteRoadbook,
   getRoadbook,
+  getRoadbookSituation,
   postCheckin,
   resetCheckins,
   roadbookGpxUrl,
@@ -14,6 +15,7 @@ import {
 import { RoadbookView, type RoadbookData } from "../components/roadbook/RoadbookView";
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
 import { TrackingSettings } from "../components/roadbook/TrackingSettings";
+import { WhatsAppShare } from "../components/roadbook/WhatsAppShare";
 
 const SAVE_DEBOUNCE_MS = 700;
 
@@ -26,6 +28,11 @@ export function RoadbookPage() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [situation, setSituation] = useState<{ whatsapp: string; at: string } | null>(null);
+  const refreshSituation = useCallback(() => {
+    if (!id) return;
+    getRoadbookSituation(id).then(setSituation).catch(() => setSituation(null));
+  }, [id]);
 
   const pending = useRef<Partial<RoadbookSettings>>({});
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -37,6 +44,7 @@ export function RoadbookPage() {
         setData(roadbook);
         setShareToken(roadbook.shareToken);
         const last = checkins[0];
+        if (last) refreshSituation();
         if (last) {
           setPosition({ km: last.km, lat: last.lat, lon: last.lon, at: last.at, source: last.source });
         }
@@ -77,6 +85,7 @@ export function RoadbookPage() {
       setPosition(p);
       try {
         await postCheckin(id, { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source });
+        refreshSituation();
         // La publication sur le canal se fait en arrière-plan côté serveur (météo +
         // Telegram) : on relit son résultat quelques secondes plus tard pour l'afficher.
         setTimeout(() => {
@@ -89,7 +98,7 @@ export function RoadbookPage() {
         return false;
       }
     },
-    [id],
+    [id, refreshSituation],
   );
 
   if (error) return <div className="wrap"><div className="error-banner">{error}</div></div>;
@@ -114,8 +123,10 @@ export function RoadbookPage() {
             onReset={async () => {
               await resetCheckins(data.id);
               setPosition(null);
+              setSituation(null);
             }}
           />
+          <WhatsAppShare text={situation?.whatsapp ?? null} at={situation?.at} />
         </div>
       }
       actions={
