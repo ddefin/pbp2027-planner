@@ -48,7 +48,6 @@ export function ShareLinkCard({
       title="🔗 Lien de suivi pour mes proches"
       summary={url ? "✓ Actif — partageable avec tes proches" : "Pas encore créé"}
       tone={url ? "ok" : "warn"}
-      defaultOpen={!url}
       storageKey="rb.partage.lien"
     >
       {url ? (

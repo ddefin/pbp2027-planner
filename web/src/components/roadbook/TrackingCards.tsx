@@ -147,7 +147,6 @@ export function TelegramCard({
       title="✈️ Canal Telegram du groupe"
       summary={summary}
       tone={!telegramAnnounce ? "muted" : failed ? "error" : announceStatus?.lastAttemptAt ? "ok" : "muted"}
-      defaultOpen={failed}
       storageKey="rb.partage.telegram"
     >
 

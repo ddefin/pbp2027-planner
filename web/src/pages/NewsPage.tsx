@@ -59,7 +59,6 @@ export function NewsPage() {
   const [source, setSource] = useState<NewsSource | "">("");
   const [search, setSearch] = useState("");
 
-  const isWide = typeof window !== "undefined" && window.matchMedia("(min-width: 701px)").matches;
   const filterSummary = [source ? SOURCE_LABEL[source] : "Toutes sources", search.trim() ? `« ${search.trim()} »` : null].filter(Boolean).join(" · ");
 
   const filtered = useMemo(() => {
@@ -89,7 +88,7 @@ export function NewsPage() {
 
         {error && <div className="error-banner">{error}</div>}
 
-        <Disclosure title="Filtres" summary={filterSummary} defaultOpen={isWide} storageKey="actualites.filtres">
+        <Disclosure title="Filtres" summary={filterSummary} storageKey="actualites.filtres">
         <div className="cal-filters">
           <div className="cal-chips">
             <button type="button" className={`cal-chip${source === "" ? " active" : ""}`} onClick={() => setSource("")}>

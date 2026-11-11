@@ -39,7 +39,7 @@ function CollapsibleSection({ title, defaultOpen = false, children }: { title: s
 export function ProfilePage() {
   return (
     <div className="wrap">
-      <CollapsibleSection title="Mon profil" defaultOpen>
+      <CollapsibleSection title="Mon profil">
         <ProfileSection />
       </CollapsibleSection>
       <CollapsibleSection title="Ma licence">

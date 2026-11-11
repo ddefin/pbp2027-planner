@@ -389,7 +389,6 @@ export function RoadbookView({
                   : "⚠ Heure de départ à renseigner"
               }
               tone={data.startAt ? "muted" : "warn"}
-              defaultOpen={!data.startAt}
               storageKey="rb.reglages.brevet"
             >
               <div className="field" style={{ marginBottom: 0 }}>

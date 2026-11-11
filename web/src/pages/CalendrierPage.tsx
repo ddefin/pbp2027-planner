@@ -36,7 +36,6 @@ export function CalendrierPage() {
 
   // Filtres repliés sur téléphone (ils occupaient un écran entier avant la liste) ; le
   // résumé rappelle ce qui est actif.
-  const isWide = typeof window !== "undefined" && window.matchMedia("(min-width: 701px)").matches;
   const activeFilters = (distances.size > 0 ? 1 : 0) + (region ? 1 : 0) + (search.trim() ? 1 : 0);
   const filterSummary = [
     activeFilters > 0 ? `${activeFilters} filtre${activeFilters > 1 ? "s" : ""} actif${activeFilters > 1 ? "s" : ""}` : "Aucun filtre",
@@ -93,7 +92,7 @@ export function CalendrierPage() {
 
         {error && <div className="error-banner">{error}</div>}
 
-        <Disclosure title="Filtres" summary={filterSummary} defaultOpen={isWide} storageKey="calendrier.filtres">
+        <Disclosure title="Filtres" summary={filterSummary} storageKey="calendrier.filtres">
         <div className="cal-filters">
           <div className="cal-chips">
             <button type="button" className={`cal-chip${distances.size === 0 ? " active" : ""}`} onClick={() => setDistances(new Set())}>

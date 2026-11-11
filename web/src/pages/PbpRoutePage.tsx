@@ -20,7 +20,7 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function Section({ title, children, defaultOpen = true, right }: { title: string; children: ReactNode; defaultOpen?: boolean; right?: ReactNode }) {
+function Section({ title, children, defaultOpen = false, right }: { title: string; children: ReactNode; defaultOpen?: boolean; right?: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="panel">
@@ -288,7 +288,7 @@ export function PbpRoutePage() {
         )}
       </Section>
 
-      <Section title="Tracés" defaultOpen={false}>
+      <Section title="Tracés">
         {r.routes && (
           <RouteManager
             routes={r.routes}
