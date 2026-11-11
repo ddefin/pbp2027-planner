@@ -25,6 +25,13 @@ set -u
 cd "$(dirname "$0")/.."
 LOG=deploy.log
 
+# Docker inaccessible (lancé sans sudo par un compte hors du groupe docker) : on le
+# dit tout de suite, plutôt qu'une erreur trompeuse sur git plus bas.
+if ! docker info > /dev/null 2>&1; then
+  echo "Docker inaccessible pour cet utilisateur : relance avec sudo (sudo sh scripts/auto-deploy.sh)." >&2
+  exit 1
+fi
+
 # safe.directory : le conteneur git tourne en root alors que le dépôt appartient à
 # l'utilisateur du NAS — sans ça, git refuse d'y travailler ("dubious ownership").
 git_() { docker run --rm -v "$(pwd):/repo" -w /repo alpine/git -c safe.directory=/repo "$@"; }
