@@ -232,7 +232,7 @@ describe("API Webhooks", () => {
     // triggerWebhooks n'est pas attendu par la route : on laisse le event loop tourner.
     await new Promise((r) => setTimeout(r, 50));
 
-    const discordCalls = fetchMock.mock.calls.filter(([url]: [string]) => url.includes("discord.com"));
+    const discordCalls = fetchMock.mock.calls.filter(([url]: any[]) => url.includes("discord.com"));
     expect(discordCalls).toHaveLength(1); // seul le webhook de A écoute brm.participation_changed
     const [url, init] = discordCalls[0];
     expect(url).toBe("https://discord.com/api/webhooks/aaa");

@@ -98,7 +98,7 @@ describe("Scraping des actualités", () => {
     expect(known?.publishedAt.toISOString().slice(0, 10)).toBe("2026-11-09");
     expect(known?.imageUrl).toContain("richardext.jpg");
 
-    const telegramCalls = fetchMock.mock.calls.filter(([url]: [string]) => String(url).includes("api.telegram.org/bot") && String(url).includes("sendMessage"));
+    const telegramCalls = fetchMock.mock.calls.filter(([url]: any[]) => String(url).includes("api.telegram.org/bot") && String(url).includes("sendMessage"));
     expect(telegramCalls).toHaveLength(20); // une diffusion par nouvel article
   });
 
@@ -113,7 +113,7 @@ describe("Scraping des actualités", () => {
     const items = await prisma.newsItem.findMany();
     expect(items).toHaveLength(20);
 
-    const telegramCalls = fetchMock.mock.calls.filter(([url]: [string]) => String(url).includes("sendMessage"));
+    const telegramCalls = fetchMock.mock.calls.filter(([url]: any[]) => String(url).includes("sendMessage"));
     expect(telegramCalls).toHaveLength(0); // rien de nouveau à rediffuser
   });
 

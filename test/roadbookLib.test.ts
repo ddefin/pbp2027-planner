@@ -8,7 +8,7 @@ import {
   plannedMinuteAt,
   snapToRoute,
   type PacingSettings,
-} from "../src/shared/roadbookCalc";
+} from "../src/shared/roadbookCalc.js";
 
 const brm200: PacingSettings = { movingSpeedKmh: 25, climbPenaltyMinPer100m: 0, classKm: 200, limitMinutes: 810 };
 
