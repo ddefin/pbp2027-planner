@@ -2238,3 +2238,6 @@ button.link {
 .sun-mode .disc-error {
   filter: contrast(1.3);
 }
+
+.brand-link { display: inline-flex; align-items: center; gap: 8px; }
+.brand-logo { border-radius: 6px; flex: none; }

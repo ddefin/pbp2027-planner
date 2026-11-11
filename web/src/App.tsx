@@ -48,8 +48,11 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
   return (
     <div>
       <div className="topbar">
-        <strong>
-          PBP<span style={{ color: "var(--accent)" }}>2027</span>
+        <strong className="brand-link">
+          <img src="/favicon.svg" alt="" width={28} height={28} className="brand-logo" />
+          <span>
+            PBP<span style={{ color: "var(--accent)" }}>2027</span>
+          </span>
         </strong>
         <button
           type="button"
