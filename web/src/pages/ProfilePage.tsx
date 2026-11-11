@@ -20,13 +20,16 @@ const PdfPreview = lazy(() => import("../components/PdfPreview").then((m) => ({ 
 
 // Replié par défaut (sauf la première section) : quatre blocs complets l'un sous
 // l'autre forçaient beaucoup de défilement avant même de voir ce qu'on cherche.
-function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: ReactNode }) {
+function CollapsibleSection({ title, summary, defaultOpen = false, children }: { title: string; summary?: string; defaultOpen?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
     <section className="panel">
       <button type="button" className="collapsible-header" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <h2>{title}</h2>
+        <span className="collapsible-text">
+          <h2>{title}</h2>
+          {!open && summary && <span className="collapsible-sub">{summary}</span>}
+        </span>
         <span className={`collapsible-caret${open ? " open" : ""}`} aria-hidden="true">
           ▾
         </span>
@@ -39,22 +42,22 @@ function CollapsibleSection({ title, defaultOpen = false, children }: { title: s
 export function ProfilePage() {
   return (
     <div className="wrap">
-      <CollapsibleSection title="Mon profil">
+      <CollapsibleSection title="Mon profil" summary="Prénom, adresse e-mail">
         <ProfileSection />
       </CollapsibleSection>
-      <CollapsibleSection title="Ma licence">
+      <CollapsibleSection title="Ma licence" summary="Numéro, club, justificatif">
         <LicenseSection />
       </CollapsibleSection>
-      <CollapsibleSection title="Mot de passe">
+      <CollapsibleSection title="Mot de passe" summary="Changer ton mot de passe">
         <PasswordSection />
       </CollapsibleSection>
-      <CollapsibleSection title="Carnet de bord">
+      <CollapsibleSection title="Carnet de bord" summary="Matériel, nutrition, notes de brevet">
         <NotebookSection />
       </CollapsibleSection>
-      <CollapsibleSection title="Mes événements">
+      <CollapsibleSection title="Mes événements" summary="Tes sorties perso dans le calendrier">
         <PersonalEventsSection />
       </CollapsibleSection>
-      <CollapsibleSection title="Telegram">
+      <CollapsibleSection title="Telegram" summary="Notifications et pointage par message">
         <TelegramSection />
       </CollapsibleSection>
       <DeployedVersion />

@@ -31,9 +31,9 @@ export function BrmChoicesOverview() {
 
   return (
     <section className="panel">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px 12px", marginBottom: 16 }}>
         <h2 style={{ marginBottom: 0 }}>BRM choisis par le groupe</h2>
-        <Link to="/calendrier" className="hint" style={{ textDecoration: "underline" }}>
+        <Link to="/calendrier" className="hint" style={{ textDecoration: "underline", whiteSpace: "nowrap", margin: 0 }}>
           Voir le calendrier →
         </Link>
       </div>

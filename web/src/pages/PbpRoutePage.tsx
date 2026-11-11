@@ -20,13 +20,16 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function Section({ title, children, defaultOpen = false, right }: { title: string; children: ReactNode; defaultOpen?: boolean; right?: ReactNode }) {
+function Section({ title, summary, children, defaultOpen = false, right }: { title: string; summary?: string; children: ReactNode; defaultOpen?: boolean; right?: ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <section className="panel">
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button type="button" className="collapsible-header" onClick={() => setOpen((v) => !v)} aria-expanded={open} style={{ flex: 1 }}>
-          <h2>{title}</h2>
+          <span className="collapsible-text">
+            <h2>{title}</h2>
+            {!open && summary && <span className="collapsible-sub">{summary}</span>}
+          </span>
           <span className={`collapsible-caret${open ? " open" : ""}`} aria-hidden="true">
             ▾
           </span>
@@ -193,7 +196,7 @@ export function PbpRoutePage() {
         )}
       </section>
 
-      <Section title="Simulation de passage">
+      <Section title="Simulation de passage" summary="Heures de passage selon ta vague de départ et ta vitesse">
         <div className="sim-grid">
           <div className="field" style={{ marginBottom: 0 }}>
             <label htmlFor="sim-wave">Départ</label>
@@ -258,7 +261,7 @@ export function PbpRoutePage() {
         )}
       </Section>
 
-      <Section title="Météo le long du parcours" right={weatherLoading ? <span className="hint" style={{ margin: 0 }}>…</span> : undefined}>
+      <Section title="Météo le long du parcours" summary="Vent, pluie et température heure par heure" right={weatherLoading ? <span className="hint" style={{ margin: 0 }}>…</span> : undefined}>
         {!r.meta?.weatherConfigured ? (
           <p className="hint">Météo non configurée sur ce serveur (OPENWEATHER_API_KEY absente).</p>
         ) : weather && weather.samples.length > 0 ? (
@@ -282,13 +285,13 @@ export function PbpRoutePage() {
         )}
       </Section>
 
-      <Section title="Contrôles et accueils">
+      <Section title="Contrôles et accueils" summary="Villes de contrôle, distances et horaires">
         {r.primary && (
           <ControlsTable controls={r.primary.controls} points={points} start={start} speedKmh={speed} indicative={indicative} onSelectKm={setCursorKm} />
         )}
       </Section>
 
-      <Section title="Tracés">
+      <Section title="Tracés" summary="Parcours provisoires, officiels ou communautaires">
         {r.routes && (
           <RouteManager
             routes={r.routes}

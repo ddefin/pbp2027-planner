@@ -45,7 +45,7 @@ function waitingMessage(editable: boolean, startAt: string | null, author?: stri
   if (editable) {
     return startAt
       ? "Le statut avance/retard s'affichera ici dès la première position (GPS ou pointage)."
-      : "Renseigne l'heure de départ (section « Mon allure ») pour obtenir les heures de passage et le suivi avance/retard.";
+      : "Renseigne l'heure de départ (Réglages → « Brevet et départ ») pour obtenir les heures de passage et le suivi avance/retard.";
   }
   if (!startAt) return `${who} n'a pas encore indiqué son heure de départ : les horaires de passage s'afficheront ici dès que ce sera fait. Le parcours et le roadbook sont déjà consultables ci-dessous.`;
   const start = new Date(startAt);

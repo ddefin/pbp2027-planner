@@ -2253,3 +2253,7 @@ button.link {
 .rb-live { margin: 12px auto; max-width: 1100px; }
 .rb-live-weather { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
 .rb-live-w { display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; }
+
+.collapsible-text { display: grid; gap: 2px; text-align: left; }
+.collapsible-text h2 { margin: 0; }
+.collapsible-sub { font-size: 13px; color: var(--fg-muted); font-weight: 400; }
