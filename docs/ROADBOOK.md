@@ -118,6 +118,14 @@ Sans cette variable, le canal des actualités (`TELEGRAM_NEWS_CHAT_ID`) sert de 
 Pour que le lien vers la page de suivi figure dans le message, `PUBLIC_URL` doit être
 renseignée.
 
+**Si rien n'arrive sur le canal** : sur la page d'un roadbook, bouton
+« 🔧 Tester la publication sur le canal » (admin). Il envoie un message de test et
+affiche la réponse exacte de Telegram avec l'action à faire. Les causes courantes :
+bot pas administrateur du canal, identifiant faux, variable absente de
+`.env.production`, conteneur pas redémarré. Chaque roadbook affiche aussi le résultat
+de sa dernière publication, et le bot dit au randonneur si son pointage n'a pas pu
+être publié. Côté serveur : `sudo docker logs pbp2027-planner 2>&1 | grep telegram`.
+
 ### Garmin LiveTrack
 
 Le randonneur colle dans son roadbook le lien LiveTrack de sa sortie (reçu par email

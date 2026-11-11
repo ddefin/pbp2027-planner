@@ -10,6 +10,8 @@ import { OFFICIAL_LIMIT_MINUTES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
 import { looksLikeControl } from "../shared/roadbookCalc.js";
 import { recordCheckin } from "../lib/roadbookSituation.js";
+import { explainTelegramError, sendTelegram } from "../lib/telegram.js";
+import { config } from "../config.js";
 
 const MAX_GPX_BYTES = 25 * 1024 * 1024;
 const DEFAULT_STOP_MINUTES = 15;
@@ -132,6 +134,12 @@ function serialize(r: RoadbookRow, withPoints: boolean) {
     shareToken: r.shareToken,
     liveTrackUrl: r.liveTrackUrl,
     telegramAnnounce: r.telegramAnnounce,
+    announceStatus: {
+      lastPublishedAt: r.lastAnnouncedAt?.toISOString() ?? null,
+      lastAttemptAt: r.lastAnnounceAttemptAt?.toISOString() ?? null,
+      lastError: r.lastAnnounceError,
+      hint: r.lastAnnounceError ? explainTelegramError(r.lastAnnounceError) : null,
+    },
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
     ...(withPoints ? { points: JSON.parse(r.points) as CompactPoint[] } : {}),
@@ -295,6 +303,23 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     return reply.code(204).send();
   });
 
+  // Test de publication sur le canal de suivi (admin) : envoie un message de test et
+  // renvoie la réponse EXACTE de Telegram, avec l'action à faire en cas de refus.
+  app.post("/roadbooks/telegram/test", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!user.isAdmin) return reply.code(403).send({ error: "forbidden" });
+
+    const chatId = config.telegramTrackingChatId;
+    const usingFallback = !process.env.TELEGRAM_TRACKING_CHAT_ID && Boolean(chatId);
+    if (!config.telegramBotToken) return reply.send({ ok: false, chatId, usingFallback, error: "TELEGRAM_BOT_TOKEN absent", hint: "Renseigne TELEGRAM_BOT_TOKEN dans .env.production puis redémarre le conteneur." });
+    if (!chatId)
+      return reply.send({ ok: false, chatId: null, usingFallback, error: "Aucun canal configuré", hint: "Ajoute TELEGRAM_TRACKING_CHAT_ID=-100… dans .env.production (fichier avec le point au début), puis : sudo docker compose up -d --force-recreate" });
+
+    const result = await sendTelegram(chatId, `✅ Test de publication depuis PBP2027 Planner (${new Date().toLocaleString("fr-FR", { timeZone: "Europe/Paris" })}) : les résumés de situation des randonneurs arriveront ici.`);
+    return reply.send(result.ok ? { ok: true, chatId, usingFallback } : { ok: false, chatId, usingFallback, error: result.error, hint: explainTelegramError(result.error) });
+  });
+
   // Lien public en lecture seule : SANS session. N'expose ni email ni identifiant
   // interne de l'utilisateur, seulement le prénom affiché et ce que le roadbook
   // contient déjà (tracé, horaires, positions déclarées).
@@ -304,7 +329,7 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     const r = await prisma.roadbook.findUnique({ where: { shareToken: token }, include: { user: { select: { prenom: true } } } });
     if (!r) return reply.code(404).send({ error: "not_found" });
     const checkins = await prisma.roadbookCheckin.findMany({ where: { roadbookId: r.id }, orderBy: { at: "desc" }, take: 200 });
-    const { shareToken: _token, id: _id, telegramAnnounce: _announce, ...rest } = serialize(r, true);
+    const { shareToken: _token, id: _id, telegramAnnounce: _announce, announceStatus: _status, ...rest } = serialize(r, true);
     reply.header("cache-control", "no-store");
     return reply.send({ roadbook: { ...rest, author: publicName(r.user) }, checkins: checkins.map(serializeCheckin) });
   });

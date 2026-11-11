@@ -418,6 +418,10 @@ model Roadbook {
   // (opt-out possible : ce sont les positions de la personne).
   telegramAnnounce        Boolean           @default(true)
   lastAnnouncedAt         DateTime?
+  // Résultat de la DERNIÈRE tentative de publication sur le canal : null = réussie,
+  // sinon le motif renvoyé par Telegram (affiché au randonneur dans son roadbook).
+  lastAnnounceError       String?
+  lastAnnounceAttemptAt   DateTime?
   checkins                RoadbookCheckin[]
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt

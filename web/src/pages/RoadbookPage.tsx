@@ -8,6 +8,7 @@ import {
   roadbookGpxUrl,
   setRoadbookSharing,
   updateRoadbook,
+  type AnnounceStatus,
   type RoadbookSettings,
 } from "../api/roadbooks";
 import { RoadbookView, type RoadbookData } from "../components/roadbook/RoadbookView";
@@ -19,7 +20,7 @@ const SAVE_DEBOUNCE_MS = 700;
 export function RoadbookPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [data, setData] = useState<(RoadbookData & { id: string }) | null>(null);
+  const [data, setData] = useState<(RoadbookData & { id: string; announceStatus?: AnnounceStatus }) | null>(null);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [position, setPosition] = useState<LivePosition | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -76,6 +77,13 @@ export function RoadbookPage() {
       setPosition(p);
       try {
         await postCheckin(id, { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source });
+        // La publication sur le canal se fait en arrière-plan côté serveur (météo +
+        // Telegram) : on relit son résultat quelques secondes plus tard pour l'afficher.
+        setTimeout(() => {
+          getRoadbook(id)
+            .then(({ roadbook }) => setData((prev) => (prev ? { ...prev, announceStatus: roadbook.announceStatus } : prev)))
+            .catch(() => undefined);
+        }, 6000);
         return true;
       } catch {
         return false;
@@ -126,6 +134,7 @@ export function RoadbookPage() {
             roadbookId={data.id}
             liveTrackUrl={data.liveTrackUrl ?? null}
             telegramAnnounce={data.telegramAnnounce ?? true}
+            announceStatus={data.announceStatus}
             onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))}
           />
 

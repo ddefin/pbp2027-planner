@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiError } from "../../api/auth";
 import { getTelegramStatus, type TelegramStatus } from "../../api/profile";
-import { updateRoadbook } from "../../api/roadbooks";
+import { testTrackingChannel, updateRoadbook, type AnnounceStatus } from "../../api/roadbooks";
+import { useAuth } from "../../context/AuthContext";
 
 const GARMIN_HOSTS = ["livetrack.garmin.com", "share.garmin.com", "connect.garmin.com", "gar.mn"];
 
@@ -21,13 +22,17 @@ export function TrackingSettings({
   roadbookId,
   liveTrackUrl,
   telegramAnnounce,
+  announceStatus,
   onSaved,
 }: {
   roadbookId: string;
   liveTrackUrl: string | null;
   telegramAnnounce: boolean;
+  announceStatus?: AnnounceStatus;
   onSaved: (patch: { liveTrackUrl?: string | null; telegramAnnounce?: boolean }) => void;
 }) {
+  const { user } = useAuth();
+  const [test, setTest] = useState<{ busy: boolean; text: string | null; ok?: boolean }>({ busy: false, text: null });
   const [url, setUrl] = useState(liveTrackUrl ?? "");
   const [urlState, setUrlState] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
@@ -97,6 +102,48 @@ export function TrackingSettings({
           moyennes, ville, arrivée estimée, météo)</span>
         </span>
       </label>
+
+      {telegramAnnounce && announceStatus?.lastAttemptAt && (
+        <div className={`live-feedback live-feedback-${announceStatus.lastError ? "error" : "ok"}`}>
+          {announceStatus.lastError ? (
+            <>
+              ⚠️ Dernière publication sur le canal ÉCHOUÉE ({new Date(announceStatus.lastAttemptAt).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" })}) :{" "}
+              {announceStatus.hint}
+              <div style={{ fontWeight: 400, fontSize: 12, marginTop: 2 }}>Réponse de Telegram : {announceStatus.lastError}</div>
+            </>
+          ) : (
+            <>✓ Dernière publication sur le canal réussie ({new Date(announceStatus.lastAttemptAt).toLocaleString("fr-FR", { weekday: "short", hour: "2-digit", minute: "2-digit" })})</>
+          )}
+        </div>
+      )}
+
+      {user?.isAdmin && (
+        <div className="rb-admin-test">
+          <button
+            type="button"
+            className="ghost"
+            disabled={test.busy}
+            onClick={async () => {
+              setTest({ busy: true, text: null });
+              try {
+                const r = await testTrackingChannel();
+                setTest({
+                  busy: false,
+                  ok: r.ok,
+                  text: r.ok
+                    ? `✓ Message de test publié sur le canal ${r.chatId}${r.usingFallback ? " (canal des actualités, TELEGRAM_TRACKING_CHAT_ID absente)" : ""}.`
+                    : `⚠️ ${r.hint} — Réponse : ${r.error}${r.chatId ? ` (canal ${r.chatId})` : ""}`,
+                });
+              } catch {
+                setTest({ busy: false, ok: false, text: "Test impossible (serveur injoignable)." });
+              }
+            }}
+          >
+            {test.busy ? "Test en cours…" : "🔧 Tester la publication sur le canal (admin)"}
+          </button>
+          {test.text && <div className={`live-feedback live-feedback-${test.ok ? "ok" : "error"}`}>{test.text}</div>}
+        </div>
+      )}
 
       <div className="rb-telegram-help">
         <strong>Pointer depuis Telegram</strong> (sans ouvrir le site)

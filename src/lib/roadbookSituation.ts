@@ -3,7 +3,7 @@ import { config } from "../config.js";
 import { fromCompactPoint, pointAtKm, routeBearingAt, type CompactPoint, type RoutePoint } from "./geo.js";
 import { fetchForecastAt, reverseGeocode, type PointForecastSlot } from "./openWeather.js";
 import { alertsFor, windAlongRoute, type WeatherAlert, type WindRelation } from "./routeWeather.js";
-import { escapeHtml, sendTelegramMessage } from "./telegram.js";
+import { escapeHtml, sendTelegram } from "./telegram.js";
 import {
   buildSchedule,
   computeLiveStatus,
@@ -251,30 +251,48 @@ export async function buildSituationMessage(roadbookId: string, checkin: { km: n
   return formatSituationMessage(situation, { author: r.user.prenom, title: r.title, classKm: r.classKm, limitMinutes: r.limitMinutes, liveTrackUrl: r.liveTrackUrl, shareUrl });
 }
 
+export type AnnounceOutcome = {
+  message: string | null;
+  publication: { status: "published" } | { status: "disabled" } | { status: "cooldown" } | { status: "error"; error: string };
+};
+
 // Enregistre un pointage (web ou Telegram), borne l'historique et publie le résumé sur
 // le canal si le randonneur l'a accepté. La publication n'est jamais bloquante ni
 // fatale : un canal mal configuré ne doit pas empêcher de pointer.
 export async function recordCheckin(
   roadbookId: string,
   input: { km: number; lat: number | null; lon: number | null; source: "gps" | "manuel" | "controle" },
-): Promise<{ checkin: { km: number; lat: number | null; lon: number | null; source: string; at: Date }; announced: Promise<string | null> }> {
+): Promise<{ checkin: { km: number; lat: number | null; lon: number | null; source: string; at: Date }; announced: Promise<AnnounceOutcome> }> {
   const checkin = await prisma.roadbookCheckin.create({ data: { roadbookId, ...input } });
 
   const old = await prisma.roadbookCheckin.findMany({ where: { roadbookId }, orderBy: { at: "desc" }, skip: MAX_CHECKINS_KEPT, select: { id: true } });
   if (old.length) await prisma.roadbookCheckin.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
 
-  const announced = (async () => {
+  const announced = (async (): Promise<AnnounceOutcome> => {
     const message = await buildSituationMessage(roadbookId, checkin);
-    if (!message) return null;
+    if (!message) return { message: null, publication: { status: "error", error: "Résumé indisponible" } };
     const r = await prisma.roadbook.findUnique({ where: { id: roadbookId }, select: { telegramAnnounce: true, lastAnnouncedAt: true } });
+    if (!r?.telegramAnnounce) return { message, publication: { status: "disabled" } };
+    const cooledDown = !r.lastAnnouncedAt || Date.now() - r.lastAnnouncedAt.getTime() >= ANNOUNCE_COOLDOWN_MS;
+    if (!cooledDown) return { message, publication: { status: "cooldown" } };
+
     const chatId = config.telegramTrackingChatId;
-    const cooledDown = !r?.lastAnnouncedAt || Date.now() - r.lastAnnouncedAt.getTime() >= ANNOUNCE_COOLDOWN_MS;
-    if (r?.telegramAnnounce && chatId && cooledDown) {
-      const sent = await sendTelegramMessage(chatId, message, { linkPreview: false });
-      if (sent) await prisma.roadbook.update({ where: { id: roadbookId }, data: { lastAnnouncedAt: new Date() } });
-    }
-    return message;
-  })().catch(() => null);
+    const result = chatId
+      ? await sendTelegram(chatId, message, { linkPreview: false })
+      : { ok: false as const, error: "Canal non configuré sur le serveur (TELEGRAM_TRACKING_CHAT_ID absente de .env.production)" };
+    await prisma.roadbook.update({
+      where: { id: roadbookId },
+      data: {
+        lastAnnounceAttemptAt: new Date(),
+        lastAnnounceError: result.ok ? null : result.error,
+        ...(result.ok ? { lastAnnouncedAt: new Date() } : {}),
+      },
+    });
+    return { message, publication: result.ok ? { status: "published" } : { status: "error", error: result.error } };
+  })().catch((err): AnnounceOutcome => {
+    console.error("[roadbook] résumé de situation impossible :", err);
+    return { message: null, publication: { status: "error", error: err instanceof Error ? err.message : "erreur interne" } };
+  });
 
   return { checkin, announced };
 }

@@ -14,12 +14,17 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-// false = bot non configuré (l'appelant continue sans notification plutôt que de
-// planter, même logique que sendPasswordResetEmail) ou envoi échoué.
-export async function sendTelegramMessage(chatId: string, text: string, options: { linkPreview?: boolean } = {}): Promise<boolean> {
-  if (!config.telegramBotToken) return false;
+export type TelegramSendResult = { ok: true } | { ok: false; error: string };
+
+// Envoi avec le motif EXACT d'un refus (Telegram répond par ex. "Bad Request: chat not
+// found" ou "Forbidden: bot is not a member of the channel chat") : sans lui, un canal
+// mal configuré échoue sans que personne ne sache pourquoi. Le refus est aussi écrit
+// dans les logs du conteneur (docker logs). Jamais d'exception : l'appelant continue.
+export async function sendTelegram(chatId: string, text: string, options: { linkPreview?: boolean } = {}): Promise<TelegramSendResult> {
+  if (!config.telegramBotToken) return { ok: false, error: "TELEGRAM_BOT_TOKEN absent" };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
+  let result: TelegramSendResult;
   try {
     const res = await fetch(apiUrl("sendMessage"), {
       method: "POST",
@@ -27,12 +32,37 @@ export async function sendTelegramMessage(chatId: string, text: string, options:
       body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: options.linkPreview === false }),
       signal: controller.signal,
     });
-    return res.ok;
-  } catch {
-    return false;
+    if (res.ok) {
+      result = { ok: true };
+    } else {
+      const body = (await res.json().catch(() => ({}))) as { description?: string };
+      result = { ok: false, error: body.description ?? `HTTP ${res.status}` };
+    }
+  } catch (err) {
+    result = { ok: false, error: `Telegram injoignable depuis le serveur (${err instanceof Error ? err.message : "erreur réseau"})` };
   } finally {
     clearTimeout(timeout);
   }
+  if (!result.ok) console.error(`[telegram] envoi vers ${chatId} refusé : ${result.error}`);
+  return result;
+}
+
+export async function sendTelegramMessage(chatId: string, text: string, options: { linkPreview?: boolean } = {}): Promise<boolean> {
+  return (await sendTelegram(chatId, text, options)).ok;
+}
+
+// Traduit les refus Telegram les plus courants en action concrète à faire.
+export function explainTelegramError(error: string): string {
+  const e = error.toLowerCase();
+  if (e.includes("chat not found")) return "Canal introuvable : vérifie TELEGRAM_TRACKING_CHAT_ID (nombre commençant par -100) et que le bot a bien été ajouté au canal.";
+  if (e.includes("not a member") || e.includes("administrator") || e.includes("not enough rights") || e.includes("have no rights"))
+    return "Le bot n'a pas le droit de publier : ajoute-le comme ADMINISTRATEUR du canal avec le droit « Publier des messages ».";
+  if (e.includes("kicked") || e.includes("blocked")) return "Le bot a été retiré ou bloqué du canal : rajoute-le comme administrateur.";
+  if (e.includes("unauthorized") || e.includes("token")) return "Token du bot invalide : vérifie TELEGRAM_BOT_TOKEN.";
+  if (e.includes("can't parse entities")) return "Message mal formé (bug de mise en forme côté application) : signale-le avec ce message d'erreur.";
+  if (e.includes("injoignable")) return "Le serveur n'arrive pas à joindre api.telegram.org (réseau, pare-feu).";
+  if (e.includes("too many requests")) return "Telegram limite temporairement les envois : réessaie dans une minute.";
+  return "Refus inattendu de Telegram : voir le message d'erreur ci-dessus.";
 }
 
 // Diffusion de groupe (actualités) sur le salon/canal configuré — distinct des

@@ -1940,3 +1940,9 @@ button.link {
   padding: 10px 12px;
   font-size: 13.5px;
 }
+.rb-admin-test {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}

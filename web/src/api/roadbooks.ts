@@ -21,8 +21,16 @@ export interface RoadbookSettings {
   controls: RoadbookControl[];
 }
 
+export interface AnnounceStatus {
+  lastPublishedAt: string | null;
+  lastAttemptAt: string | null;
+  lastError: string | null;
+  hint: string | null;
+}
+
 export interface Roadbook extends RoadbookSettings {
   id: string;
+  announceStatus?: AnnounceStatus;
   pois: RoadbookPoi[];
   distanceKm: number;
   elevationGainM: number | null;
@@ -45,7 +53,7 @@ export interface Checkin {
   at: string;
 }
 
-export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken" | "telegramAnnounce"> {
+export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken" | "telegramAnnounce" | "announceStatus"> {
   author: string;
 }
 
@@ -106,4 +114,8 @@ export function roadbookGpxUrl(id: string) {
 export async function getSharedRoadbook(token: string): Promise<{ roadbook: SharedRoadbook; checkins: Checkin[] }> {
   const raw = await request<{ roadbook: SharedRoadbook & { points: CompactPoint[] }; checkins: Checkin[] }>(`/roadbooks/shared/${encodeURIComponent(token)}`);
   return { roadbook: { ...raw.roadbook, points: decode(raw.roadbook.points as unknown as CompactPoint[]) }, checkins: raw.checkins };
+}
+
+export function testTrackingChannel() {
+  return request<{ ok: boolean; chatId: string | null; usingFallback: boolean; error?: string; hint?: string }>("/roadbooks/telegram/test", { method: "POST" });
 }

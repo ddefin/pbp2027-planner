@@ -48,6 +48,8 @@ function owmForecast() {
 }
 
 let sent: { chatId: string; text: string }[] = [];
+// Réponse d'erreur réelle de l'API Telegram quand le bot ne peut pas écrire dans le canal.
+let channelError: string | null = null;
 
 beforeAll(async () => {
   cleanup();
@@ -74,12 +76,16 @@ afterAll(async () => {
 
 beforeEach(() => {
   sent = [];
+  channelError = null;
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       const u = String(url);
       if (u.includes("api.telegram.org")) {
         const body = JSON.parse(String(init?.body));
+        if (channelError && String(body.chat_id) === CHANNEL) {
+          return new Response(JSON.stringify({ ok: false, error_code: 400, description: channelError }), { status: 400 });
+        }
         sent.push({ chatId: String(body.chat_id), text: body.text });
         return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
       }
@@ -250,6 +256,36 @@ describe("Pointage depuis Telegram", () => {
     const pub = await server.inject({ method: "GET", url: `/api/roadbooks/shared/${share.json().shareToken}` });
     expect(pub.json().roadbook.liveTrackUrl).toContain("livetrack.garmin.com");
     expect(pub.body).not.toContain("telegramAnnounce");
+    expect(pub.body).not.toContain("announceStatus");
+  });
+
+  it("dit la vérité quand Telegram refuse la publication, et garde le motif dans le roadbook", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    await prisma.roadbook.update({ where: { id: roadbookId }, data: { lastAnnouncedAt: null, telegramAnnounce: true } });
+    channelError = "Forbidden: bot is not a member of the channel chat";
+    await msg({ text: "/km 70" });
+    const reply = sent.find((m) => m.chatId === CHAT)!.text;
+    expect(reply).toContain("PAS publié sur le canal");
+    expect(reply).toContain("bot is not a member");
+    expect(reply).toContain("ADMINISTRATEUR du canal");
+    expect(reply).not.toContain("✅ Pointage enregistré et publié");
+
+    const detail = await server.inject({ method: "GET", url: `/api/roadbooks/${roadbookId}`, headers: { cookie } });
+    expect(detail.json().roadbook.announceStatus.lastError).toContain("not a member");
+    expect(detail.json().roadbook.announceStatus.hint).toContain("ADMINISTRATEUR");
+  });
+
+  it("propose à l'admin un test du canal qui renvoie la réponse exacte de Telegram", async () => {
+    await prisma.user.updateMany({ data: { isAdmin: true } });
+    channelError = "Bad Request: chat not found";
+    const ko = await server.inject({ method: "POST", url: "/api/roadbooks/telegram/test", headers: { cookie } });
+    expect(ko.json()).toMatchObject({ ok: false, chatId: CHANNEL, error: "Bad Request: chat not found" });
+    expect(ko.json().hint).toContain("TELEGRAM_TRACKING_CHAT_ID");
+
+    channelError = null;
+    const ok = await server.inject({ method: "POST", url: "/api/roadbooks/telegram/test", headers: { cookie } });
+    expect(ok.json().ok).toBe(true);
+    expect(sent.find((m) => m.chatId === CHANNEL)?.text).toContain("Test de publication");
   });
 
   it("publie aussi le résumé quand on pointe depuis le site", async () => {

@@ -1,8 +1,7 @@
 import { prisma } from "../db.js";
 import { snapToRoute, type RoadbookControl } from "../shared/roadbookCalc.js";
-import { buildSituationMessage, decodeRoadbookPoints, recordCheckin } from "./roadbookSituation.js";
-import { config } from "../config.js";
-import { escapeHtml } from "./telegram.js";
+import { buildSituationMessage, decodeRoadbookPoints, recordCheckin, type AnnounceOutcome } from "./roadbookSituation.js";
+import { escapeHtml, explainTelegramError } from "./telegram.js";
 
 // Au-delà, la position n'est sans doute pas sur ce brevet (mauvais roadbook actif,
 // position envoyée depuis la maison...) : on refuse plutôt que d'enregistrer un km
@@ -35,10 +34,19 @@ export async function findActiveRoadbook(userId: string, now = new Date()) {
 
 type Incoming = { text?: string; location?: { latitude: number; longitude: number } };
 
-async function confirmation(roadbookId: string, announced: Promise<string | null>, telegramAnnounce: boolean): Promise<string> {
-  const summary = await announced;
-  const where = telegramAnnounce && config.telegramTrackingChatId ? "✅ Pointage enregistré et publié sur le canal." : "✅ Pointage enregistré (publication sur le canal désactivée dans ton roadbook).";
-  return summary ? `${where}\n\n${summary}` : where;
+// Réponse au randonneur : son résumé + ce qui s'est RÉELLEMENT passé côté canal (pas
+// un "publié" de principe si Telegram a refusé).
+async function confirmation(announced: Promise<AnnounceOutcome>): Promise<string> {
+  const { message, publication } = await announced;
+  const status =
+    publication.status === "published"
+      ? "✅ Pointage enregistré et publié sur le canal."
+      : publication.status === "disabled"
+        ? "✅ Pointage enregistré (publication sur le canal désactivée dans ton roadbook)."
+        : publication.status === "cooldown"
+          ? "✅ Pointage enregistré (déjà publié il y a moins de 2 min : pas republié sur le canal)."
+          : `⚠️ Pointage enregistré, mais PAS publié sur le canal.\nMotif : ${escapeHtml(publication.error)}\n${escapeHtml(explainTelegramError(publication.error))}`;
+  return message ? `${status}\n\n${message}` : status;
 }
 
 // Traite un message privé d'un randonneur déjà lié (TelegramLink). Renvoie la réponse
@@ -72,14 +80,14 @@ export async function handleTrackingMessage(chatId: string, msg: Incoming): Prom
     const c = controls[Number(n)];
     if (!c) return `Pas de contrôle n°${n} : envoie <code>/cp</code> pour la liste.`;
     const { announced } = await recordCheckin(rb.id, { km: c.km, lat: c.lat ?? null, lon: c.lon ?? null, source: "controle" });
-    return confirmation(rb.id, announced, rb.telegramAnnounce);
+    return confirmation(announced);
   }
 
   if (/^\/km\b/i.test(text)) {
     const km = Number((/^\/km\s+([\d.,]+)/i.exec(text)?.[1] ?? "").replace(",", "."));
     if (!Number.isFinite(km) || km < 0 || km > rb.distanceKm + 1) return `Km invalide : envoie par exemple <code>/km 125</code> (0 à ${Math.round(rb.distanceKm)}).`;
     const { announced } = await recordCheckin(rb.id, { km, lat: null, lon: null, source: "manuel" });
-    return confirmation(rb.id, announced, rb.telegramAnnounce);
+    return confirmation(announced);
   }
 
   // Position GPS envoyée depuis Telegram.
@@ -91,6 +99,6 @@ export async function handleTrackingMessage(chatId: string, msg: Incoming): Prom
     return `📍 Tu es à ${Math.round(snapped.offsetKm)} km du tracé de ${title} : pointage non enregistré. Si tu es bien sur ce brevet, envoie plutôt <code>/km &lt;kilomètre&gt;</code>.`;
   }
   const { announced } = await recordCheckin(rb.id, { km: Math.round(snapped.km * 100) / 100, lat: loc.latitude, lon: loc.longitude, source: "gps" });
-  const reply = await confirmation(rb.id, announced, rb.telegramAnnounce);
+  const reply = await confirmation(announced);
   return snapped.offsetKm > 0.5 ? `⚠️ Position à ${snapped.offsetKm.toFixed(1)} km du tracé, rattachée au km ${Math.round(snapped.km)}.\n${reply}` : reply;
 }
