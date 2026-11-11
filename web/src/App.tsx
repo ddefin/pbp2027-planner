@@ -8,9 +8,11 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { MessagesPage } from "./pages/MessagesPage";
 import { CalendrierPage } from "./pages/CalendrierPage";
+import { NewsPage } from "./pages/NewsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
+import { NotificationBell } from "./components/NotificationBell";
 
 function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
   const { status, user, logout } = useAuth();
@@ -25,6 +27,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
   const links = [
     { to: "/", label: "Tableau de bord" },
     { to: "/calendrier", label: "Calendrier BRM" },
+    { to: "/actualites", label: "Actualités" },
     { to: "/messagerie", label: "Messagerie" },
     { to: "/profil", label: "Mon profil" },
     ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }] : []),
@@ -53,6 +56,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
               {l.label}
             </Link>
           ))}
+          {user && <NotificationBell />}
           {user && <span className="hint nav-greeting">Bonjour, {user.prenom}</span>}
           <button
             className="ghost"
@@ -92,6 +96,14 @@ export default function App() {
           element={
             <ProtectedLayout>
               <CalendrierPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/actualites"
+          element={
+            <ProtectedLayout>
+              <NewsPage />
             </ProtectedLayout>
           }
         />

@@ -39,4 +39,18 @@ export const config = {
   // D'où partent les liens de réinitialisation (ex. https://pbp2027.lameteoducyclo.fr) :
   // sans elle, dérivé de l'en-tête Host de la requête (voir src/routes/auth.ts).
   publicUrl: process.env.PUBLIC_URL || null,
+  // Toutes optionnelles : sans TELEGRAM_BOT_TOKEN, ni la diffusion des actualités, ni
+  // les notifications personnalisées, ni la liaison de compte ne sont actives — le
+  // reste de l'app fonctionne normalement (même logique que SMTP/OpenWeather plus haut).
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || null,
+  // Chat/canal/groupe où sont diffusées les actualités ACP/PBP (voir
+  // src/lib/newsScraper.ts) — distinct des messages privés de notification
+  // personnalisée, qui vont au chat lié par chaque utilisateur (TelegramLink).
+  telegramNewsChatId: process.env.TELEGRAM_NEWS_CHAT_ID || null,
+  // Nom d'utilisateur du bot (sans @), pour générer un lien direct
+  // https://t.me/<username>?start=<code> dans "Mon profil" — sans ça, l'utilisateur
+  // doit chercher le bot à la main dans Telegram avant de coller le code.
+  telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+  // Fréquence du scraping des actualités (voir le scheduler dans src/server.ts).
+  newsScrapeIntervalHours: Number(process.env.NEWS_SCRAPE_INTERVAL_HOURS ?? 24),
 };

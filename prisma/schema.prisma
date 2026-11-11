@@ -34,6 +34,9 @@ model User {
   catalogTracks          CatalogTrack[]
   catalogTrackVariants   CatalogTrackVariant[]
   catalogControlPoints   CatalogControlPoint[]
+  telegramLink           TelegramLink?
+  telegramLinkCodes      TelegramLinkCode[]
+  notifications          Notification[]
 }
 
 model Session {
@@ -287,6 +290,65 @@ model LicenseDocument {
   fileMimeType String
   filePath     String
   createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// Actualité agrégée depuis les sites sources (ACP, PBP) — voir
+// src/lib/newsScraper.ts. url sert de clé de dédoublonnage : un article déjà vu
+// n'est jamais ré-inséré ni rediffusé sur Telegram, même si le scraping
+// quotidien retombe dessus (les pages sources listent les derniers articles à
+// chaque passage, pas seulement les nouveaux depuis la dernière fois).
+model NewsItem {
+  id           String   @id @default(cuid())
+  source       String // "acp" | "pbp"
+  title        String
+  url          String   @unique
+  excerpt      String?
+  imageUrl     String?
+  publishedAt  DateTime // date affichée sur le site source
+  discoveredAt DateTime @default(now()) // quand NOUS l'avons vu pour la 1re fois
+
+  @@index([source, publishedAt])
+}
+
+// Lien entre un compte de l'app et un chat Telegram, pour les notifications
+// personnalisées en message privé (ex. changement de statut sur un BRM), en plus
+// de la diffusion de groupe des actualités (voir TELEGRAM_NEWS_CHAT_ID).
+// Établi en envoyant "/start <code>" au bot (voir src/lib/telegramBot.ts), le
+// code venant de TelegramLinkCode ci-dessous.
+model TelegramLink {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chatId   String   @unique
+  linkedAt DateTime @default(now())
+}
+
+// Code à usage unique affiché dans "Mon profil" le temps que l'utilisateur
+// l'envoie au bot ("/start <code>") — consommé dès la liaison réussie, courte
+// durée de vie pour qu'un code affiché puis oublié ne traîne pas indéfiniment.
+model TelegramLinkCode {
+  code      String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+// Notification personnelle in-app (cloche dans la barre du haut) : créée en plus
+// — pas à la place — d'une notif Telegram si le compte est lié, pour que
+// l'information reste visible dans l'app même sans rien configurer. readAt nul
+// = non lue.
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String // "brm_status" pour l'instant, pensé extensible
+  message   String
+  link      String?
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
 
   @@index([userId, createdAt])
 }

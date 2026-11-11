@@ -1,10 +1,17 @@
-import { lazy, Suspense, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useProfile } from "../hooks/useProfile";
 import { usePersonalEvents } from "../hooks/usePersonalEvents";
 import { useLicenseDocuments } from "../hooks/useLicenseDocuments";
 import { ApiError } from "../api/auth";
-import { changePassword, licenseFileUrl } from "../api/profile";
+import {
+  changePassword,
+  createTelegramLinkCode,
+  getTelegramStatus,
+  licenseFileUrl,
+  unlinkTelegram,
+  type TelegramStatus,
+} from "../api/profile";
 
 // pdf.js (~350 Ko) n'a aucune raison d'alourdir le chargement initial de toute
 // l'app pour tout le monde — chargé à la demande seulement quand une licence PDF
@@ -46,6 +53,9 @@ export function ProfilePage() {
       </CollapsibleSection>
       <CollapsibleSection title="Mes événements">
         <PersonalEventsSection />
+      </CollapsibleSection>
+      <CollapsibleSection title="Telegram">
+        <TelegramSection />
       </CollapsibleSection>
     </div>
   );
@@ -441,6 +451,126 @@ function LicenseSection() {
             ))}
           </div>
         </div>
+      )}
+    </>
+  );
+}
+
+function TelegramSection() {
+  const [status, setStatus] = useState<TelegramStatus | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      setStatus(await getTelegramStatus());
+    } catch {
+      setError("Impossible de récupérer le statut Telegram.");
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  // Pendant qu'un code est affiché (en attente d'être envoyé au bot), vérifie
+  // périodiquement si la liaison a été faite entre-temps — évite d'avoir à
+  // recharger la page après avoir envoyé /start au bot sur son téléphone.
+  useEffect(() => {
+    if (!code) return;
+    const id = setInterval(async () => {
+      const s = await getTelegramStatus().catch(() => null);
+      if (s?.linked) {
+        setStatus(s);
+        setCode(null);
+      }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [code]);
+
+  async function handleGenerate() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await createTelegramLinkCode();
+      setCode(result.code);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.code === "not_configured"
+          ? "Le bot Telegram n'est pas configuré sur ce serveur."
+          : "Impossible de générer un code, réessaie.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleUnlink() {
+    if (!confirm("Délier ton compte Telegram ? Tu ne recevras plus les notifications personnalisées par ce canal.")) return;
+    setBusy(true);
+    try {
+      await unlinkTelegram();
+      setStatus((prev) => (prev ? { ...prev, linked: false, linkedAt: null } : prev));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!status) return null;
+
+  if (!status.configured) {
+    return (
+      <p className="hint" style={{ margin: 0 }}>
+        Le bot Telegram n'est pas configuré sur ce serveur (variable TELEGRAM_BOT_TOKEN absente) — demande à
+        l'administrateur si tu veux recevoir tes notifications par Telegram.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <p className="hint" style={{ marginTop: 0 }}>
+        Reçois en message privé tes notifications personnalisées (changement de statut sur un BRM choisi), en plus de
+        la cloche de l'application.
+      </p>
+      {error && <div className="error-banner">{error}</div>}
+
+      {status.linked ? (
+        <div className="security-row">
+          <div className="t">✅ Compte Telegram lié{status.linkedAt && ` depuis le ${new Date(status.linkedAt).toLocaleDateString("fr-FR")}`}</div>
+          <button type="button" className="ghost" onClick={handleUnlink} disabled={busy}>
+            Délier
+          </button>
+        </div>
+      ) : code ? (
+        <div>
+          <p style={{ marginTop: 0 }}>
+            {status.botUsername ? (
+              <a
+                className="primary"
+                style={{ display: "inline-block", width: "auto", padding: "10px 20px", textDecoration: "none" }}
+                href={`https://t.me/${status.botUsername}?start=${code}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ouvrir Telegram et lier mon compte
+              </a>
+            ) : (
+              <>
+                Ouvre Telegram, cherche le bot configuré par l'administrateur, puis envoie :{" "}
+                <code style={{ padding: "2px 6px", background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 6 }}>
+                  /start {code}
+                </code>
+              </>
+            )}
+          </p>
+          <p className="hint">Code valable 15 minutes. Cette page se met à jour automatiquement une fois lié.</p>
+        </div>
+      ) : (
+        <button type="button" className="primary" style={{ width: "auto", padding: "10px 20px" }} onClick={handleGenerate} disabled={busy}>
+          {busy ? "Génération…" : "Lier mon compte Telegram"}
+        </button>
       )}
     </>
   );

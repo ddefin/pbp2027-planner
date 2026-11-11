@@ -17,9 +17,14 @@ import { parcoursRoutes } from "./routes/parcours.js";
 import { meteoRoutes } from "./routes/meteo.js";
 import { messagingRoutes } from "./routes/messaging.js";
 import { messagingWsRoutes } from "./ws/messaging.js";
+import { newsRoutes } from "./routes/news.js";
+import { notificationsRoutes } from "./routes/notifications.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
+import { scrapeNews } from "./lib/newsScraper.js";
+import { startTelegramPolling } from "./lib/telegramBot.js";
 
 const WIND_ALERT_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const NEWS_SCRAPE_INTERVAL_MS = config.newsScrapeIntervalHours * 60 * 60 * 1000;
 
 export function buildServer() {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
@@ -56,6 +61,8 @@ export function buildServer() {
       api.register(meteoRoutes);
       api.register(messagingRoutes);
       api.register(messagingWsRoutes);
+      api.register(newsRoutes);
+      api.register(notificationsRoutes);
     },
     { prefix: "/api" },
   );
@@ -107,4 +114,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       checkWindAlerts().catch((err) => app.log.error(err, "checkWindAlerts a échoué"));
     }, WIND_ALERT_INTERVAL_MS);
   }, 60_000);
+
+  // Même logique de décalage initial que checkWindAlerts ci-dessus. scrapeNews
+  // est un no-op silencieux si les deux sites sources sont injoignables (voir
+  // src/lib/newsScraper.ts), jamais bloquant pour le reste du serveur.
+  setTimeout(() => {
+    scrapeNews().catch((err) => app.log.error(err, "scrapeNews a échoué"));
+    setInterval(() => {
+      scrapeNews().catch((err) => app.log.error(err, "scrapeNews a échoué"));
+    }, NEWS_SCRAPE_INTERVAL_MS);
+  }, 60_000);
+
+  // Pas de délai ici (contrairement aux deux ci-dessus) : c'est une boucle de
+  // long-polling, pas un appel ponctuel — no-op immédiat si TELEGRAM_BOT_TOKEN
+  // n'est pas configuré (voir src/lib/telegramBot.ts).
+  startTelegramPolling();
 }

@@ -9,6 +9,17 @@ import { triggerWebhooks } from "../lib/webhooks.js";
 import { fetchCityWeather } from "../lib/openWeather.js";
 import { config } from "../config.js";
 import { parseGpxStats, parseGpxProfile } from "../lib/gpx.js";
+import { notifyUser } from "../lib/notify.js";
+
+// Formulations à la 2e personne pour la notification personnalisée (distinct du
+// texte de EVENT_LABEL/humanText dans src/lib/webhooks.ts, qui s'adresse au
+// groupe et parle de l'utilisateur à la 3e personne).
+const STATUS_LABEL: Record<string, string> = {
+  prevu: "prévu",
+  inscrit: "inscrit",
+  fait: "fait",
+  homologue: "homologué",
+};
 
 // Fenêtre de qualification PBP 2027 demandée : saison précédant le départ.
 const CATALOG_FROM = "2027-01-01";
@@ -88,13 +99,22 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
       .then((events) => {
         const match = events.find((e) => e.id === id);
         if (!match) return;
-        return triggerWebhooks("brm.participation_changed", {
-          who: publicName(user),
-          status: participation.status,
-          distance: match.distance,
-          ville: match.ville,
-          date: match.date,
-        });
+        const dateLabel = new Date(match.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+        return Promise.all([
+          triggerWebhooks("brm.participation_changed", {
+            who: publicName(user),
+            status: participation.status,
+            distance: match.distance,
+            ville: match.ville,
+            date: match.date,
+          }),
+          notifyUser(
+            user.id,
+            "brm_status",
+            `Bonjour ${user.prenom}, ton statut sur le BRM ${match.distance} km de ${match.ville} (${dateLabel}) est maintenant : ${STATUS_LABEL[participation.status] ?? participation.status}.`,
+            "/calendrier",
+          ),
+        ]);
       })
       .catch(() => undefined);
 
@@ -109,6 +129,21 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
     if (!catalogIdSchema.safeParse(id).success) return reply.code(400).send({ error: "invalid_id" });
 
     await prisma.brmParticipation.deleteMany({ where: { userId: user.id, catalogEventId: id } });
+
+    void fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: VALID_DISTANCES })
+      .then((events) => {
+        const match = events.find((e) => e.id === id);
+        if (!match) return;
+        const dateLabel = new Date(match.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+        return notifyUser(
+          user.id,
+          "brm_status",
+          `Bonjour ${user.prenom}, tu as retiré ton choix sur le BRM ${match.distance} km de ${match.ville} (${dateLabel}).`,
+          "/calendrier",
+        );
+      })
+      .catch(() => undefined);
+
     return reply.code(204).send();
   });
 

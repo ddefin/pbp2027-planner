@@ -83,3 +83,22 @@ export function licenseFileUrl(id: string) {
 export function deleteLicenseDocument(id: string) {
   return request<void>(`/profile/license/${id}`, { method: "DELETE" });
 }
+
+export interface TelegramStatus {
+  linked: boolean;
+  linkedAt: string | null;
+  configured: boolean;
+  botUsername: string | null;
+}
+
+export function getTelegramStatus() {
+  return request<TelegramStatus>("/profile/telegram");
+}
+
+export function createTelegramLinkCode() {
+  return request<{ code: string; expiresAt: string }>("/profile/telegram/link-code", { method: "POST" });
+}
+
+export function unlinkTelegram() {
+  return request<void>("/profile/telegram", { method: "DELETE" });
+}

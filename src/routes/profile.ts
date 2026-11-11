@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "../db.js";
+import { config } from "../config.js";
 import { getSessionUser } from "../lib/session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
+import { createTelegramLinkCode } from "../lib/telegramBot.js";
 
 const MAX_LICENSE_FILE_BYTES = 10 * 1024 * 1024; // 10 Mo : large pour un scan/une photo
 const LICENSE_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
@@ -219,6 +221,42 @@ export async function profileRoutes(app: FastifyInstance) {
 
     await deleteUploadedFile(doc.filePath);
     await prisma.licenseDocument.delete({ where: { id } });
+    return reply.code(204).send();
+  });
+
+  // Statut de la liaison Telegram (section "Telegram" de "Mon profil") : jamais
+  // le chatId lui-même, c'est un identifiant Telegram interne sans utilité
+  // côté client une fois la liaison faite.
+  app.get("/profile/telegram", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const link = await prisma.telegramLink.findUnique({ where: { userId: user.id } });
+    return reply.send({
+      linked: link !== null,
+      linkedAt: link?.linkedAt.toISOString() ?? null,
+      configured: Boolean(config.telegramBotToken),
+      botUsername: config.telegramBotUsername,
+    });
+  });
+
+  // Génère (ou renouvelle) le code à envoyer au bot via "/start <code>" — voir
+  // src/lib/telegramBot.ts. Le bot doit être configuré (TELEGRAM_BOT_TOKEN) :
+  // sans ça, aucun code n'ouvrirait jamais de liaison, inutile d'en créer un.
+  app.post("/profile/telegram/link-code", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!config.telegramBotToken) return reply.code(503).send({ error: "not_configured" });
+
+    const { code, expiresAt } = await createTelegramLinkCode(user.id);
+    return reply.send({ code, expiresAt: expiresAt.toISOString() });
+  });
+
+  app.delete("/profile/telegram", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    await prisma.telegramLink.deleteMany({ where: { userId: user.id } });
     return reply.code(204).send();
   });
 }

@@ -42,5 +42,11 @@ Ouvrir `http://localhost:5173`.
 
 - `/inscription` — création de compte.
 - `/login` — email + mot de passe.
+- `/mot-de-passe-oublie`, `/reinitialiser-mot-de-passe` — mot de passe oublié par email.
 - `/` — tableau de bord (compte à rebours, suivi BRM, BRM choisis par le groupe).
-- `/securite` — déconnexion des autres sessions.
+- `/calendrier` — calendrier des BRM officiels (ACP), choix de statut par utilisateur.
+- `/actualites` — actualités agrégées depuis les sites ACP et PBP (filtres, recherche).
+- `/messagerie` — messagerie temps réel (salon général + messages privés).
+- `/profil` — licence, mot de passe, carnet de bord, événements personnels, liaison Telegram.
+- `/brm/:brmEventId/parcours` — parcours GPX d'un BRM personnel (tracé, météo, notes).
+- `/webhooks` — (admin) notifications de groupe Discord/Slack/générique.

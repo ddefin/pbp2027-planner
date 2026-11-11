@@ -387,4 +387,37 @@ describe("API catalogue BRM (ACP)", () => {
     const listAfter = await server.inject({ method: "GET", url: `/api/brm/catalog/${eventId}/track-variants`, headers: { cookie: a } });
     expect(listAfter.json().variants).toHaveLength(1);
   });
+
+  it("crée une notification personnelle quand le statut change ou est retiré", async () => {
+    const cookie = await registerWithSession(server, `catalog-notif-${Date.now()}@example.com`);
+    const listRes = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } });
+    const eventId = listRes.json().events.find((e: { ville: string }) => e.ville === "Rambouillet").id;
+
+    await server.inject({
+      method: "PUT",
+      url: `/api/brm/catalog/${eventId}/participation`,
+      headers: { cookie },
+      payload: { status: "prevu" },
+    });
+    // La notification est créée après la réponse HTTP (void fetchFranceBrmCatalog().then(...)),
+    // même pattern async que triggerWebhooks (voir test/webhooks.test.ts).
+    await new Promise((r) => setTimeout(r, 50));
+
+    const notifList = await server.inject({ method: "GET", url: "/api/notifications", headers: { cookie } });
+    expect(notifList.statusCode).toBe(200);
+    expect(notifList.json().unreadCount).toBe(1);
+    expect(notifList.json().notifications[0].message).toMatch(/Rambouillet.*prévu/);
+    expect(notifList.json().notifications[0].link).toBe("/calendrier");
+
+    await server.inject({
+      method: "DELETE",
+      url: `/api/brm/catalog/${eventId}/participation`,
+      headers: { cookie },
+    });
+    await new Promise((r) => setTimeout(r, 50));
+
+    const notifList2 = await server.inject({ method: "GET", url: "/api/notifications", headers: { cookie } });
+    expect(notifList2.json().notifications).toHaveLength(2);
+    expect(notifList2.json().notifications[0].message).toMatch(/retiré ton choix/);
+  });
 });

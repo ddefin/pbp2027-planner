@@ -91,6 +91,53 @@ Nécessite `OPENWEATHER_API_KEY` (clé gratuite sur [openweathermap.org](https:/
 
 **Cette clé est une variable d'environnement du serveur qui fait tourner le backend, pas un secret GitHub Actions** : un secret GitHub n'est injecté que dans les workflows CI, jamais automatiquement dans le process qui tourne en prod. Pose `OPENWEATHER_API_KEY` directement dans l'environnement d'exécution (fichier `.env` non committé en dev, variable d'environnement de l'hébergeur en prod). Un secret GitHub Actions n'aurait de sens ici que si un pipeline de déploiement existait et écrivait explicitement cette valeur sur le serveur au moment du déploiement — ce n'est pas encore le cas (voir "Pour la suite").
 
+### Actualités (agrégées depuis ACP et PBP)
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/news` | Liste les actualités (filtres `?source=acp\|pbp` et `?q=recherche`), avec `lastUpdatedAt` |
+| POST | `/api/news/refresh` | (admin) Déclenche un scraping immédiat des deux sites sources, sans attendre le prochain passage planifié |
+
+Récupère chaque jour (`NEWS_SCRAPE_INTERVAL_HOURS`, 24h par défaut) les pages
+`https://www.paris-brest-paris.org/actualites/` et
+`https://www.audax-club-parisien.com/actualites/`, extrait titre/date/résumé/lien de
+chaque article (`src/lib/newsScraper.ts`, via `cheerio`), et insère les nouveaux
+(dédoublonnés par URL — contrainte unique en base, pas une vérification préalable
+sujette à une course). Chaque nouvel article est aussitôt diffusé sur le chat/canal
+Telegram configuré (`TELEGRAM_NEWS_CHAT_ID`) si le bot est configuré. Les deux sites
+sources ont chacun leur propre gabarit HTML (WordPress/Astra pour l'ACP, un gabarit
+maison pour PBP) : si l'un des deux change de mise en page, son scraping échoue
+silencieusement (l'autre continue) plutôt que de planter le job périodique — à
+surveiller si la page `/actualites` cesse de se mettre à jour pour une seule des
+deux sources.
+
+### Notifications personnalisées (changement de statut BRM)
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/notifications` | (authentifié) Liste ses notifications (50 dernières) + nombre non lues |
+| POST | `/api/notifications/:id/read` | Marque une notification comme lue |
+| POST | `/api/notifications/read-all` | Marque toutes les notifications comme lues |
+
+Déclenchées quand l'utilisateur choisit un BRM du calendrier ou change son statut
+(`PUT`/`DELETE` sur `/api/brm/catalog/:id/participation`, voir `src/lib/notify.ts`) :
+toujours créées en base (cloche de l'app), et envoyées en plus sur Telegram si le
+compte y est lié. Distinct des webhooks (`brm.participation_changed`) qui diffusent
+au groupe entier — ici, un message adressé uniquement à l'utilisateur concerné.
+
+### Liaison de compte Telegram
+
+| Méthode | Route | Description |
+|---|---|---|
+| GET | `/api/profile/telegram` | Statut de la liaison (`linked`, `configured`, `botUsername` pour le lien direct) |
+| POST | `/api/profile/telegram/link-code` | Génère un code à usage unique (15 min), à envoyer au bot via `/start <code>` |
+| DELETE | `/api/profile/telegram` | Délie le compte |
+
+Le bot tourne en long-polling (`src/lib/telegramBot.ts`, démarré au lancement du
+serveur si `TELEGRAM_BOT_TOKEN` est configuré) plutôt qu'en webhook public : pas de
+route à exposer ni d'appel `setWebhook` à faire soi-même, adapté à un service
+auto-hébergé sur une IP résidentielle/NAS.
+
 ## Tests
 
 ```bash
@@ -102,7 +149,51 @@ ACP (mock réseau), messagerie WebSocket (diffusion temps réel, auth au handsha
 persistance), webhooks (diffusion de groupe filtrée par événement, isolation par
 propriétaire, signature HMAC), parcours (récupération automatique mockée,
 upload/téléchargement GPX, isolation), météo (conversions d'unités, cache par ville,
-503 propre sans clé configurée), profil (événements personnels isolés par utilisateur).
+503 propre sans clé configurée), profil (événements personnels isolés par utilisateur),
+actualités (scraping des deux sites sources à partir de fixtures HTML réelles,
+dédoublonnage par URL, diffusion Telegram, isolation admin de `/news/refresh`),
+liaison Telegram (génération/consommation de code, isolation par utilisateur),
+notifications personnalisées (créées sur changement de statut BRM).
+
+### Guide de test rapide — actualités, Telegram, notifications
+
+**Scraping des actualités** (sans toucher à Telegram) :
+
+```bash
+# En tant qu'administrateur (isAdmin=true en base) :
+curl -X POST http://localhost:3001/api/news/refresh -b cookies.txt
+# → {"added": N, "checked": M} — N nouveaux articles insérés sur M trouvés sur les
+# deux sites. Recharger la page "Actualités" doit maintenant les afficher.
+```
+
+Si `added` reste à 0 à chaque appel alors que les sites ont publié du nouveau : vérifier
+que les sélecteurs CSS dans `src/lib/newsScraper.ts` (`article.ast-article-post` pour
+l'ACP, `article.tease-post` pour PBP) correspondent toujours à la mise en page actuelle
+des deux sites — un changement de thème côté source est la cause la plus probable.
+
+**Bot Telegram** :
+
+1. Créer un bot via [@BotFather](https://t.me/BotFather) sur Telegram (`/newbot`),
+   récupérer le token et le nom d'utilisateur.
+2. Poser `TELEGRAM_BOT_TOKEN` (et `TELEGRAM_BOT_USERNAME` pour le lien direct) dans
+   l'environnement du serveur, puis le redémarrer.
+3. Pour la diffusion des actualités : ajouter le bot à un groupe/canal Telegram, lui
+   donner les droits de poster, puis récupérer l'identifiant du chat — le plus simple
+   est d'envoyer un message dans ce groupe puis d'appeler
+   `https://api.telegram.org/bot<TOKEN>/getUpdates` et de lire `message.chat.id`
+   (négatif pour un groupe/canal). Poser ce nombre dans `TELEGRAM_NEWS_CHAT_ID`.
+4. Pour les notifications personnalisées : se connecter sur le site, ouvrir
+   "Mon profil" → section "Telegram" → "Lier mon compte Telegram", puis suivre le
+   lien (ou envoyer `/start <code>` au bot manuellement). La page se met à jour
+   automatiquement une fois la liaison faite.
+5. Choisir un BRM dans le calendrier (ou changer son statut) : un message
+   personnalisé doit arriver en privé sur Telegram dans les secondes qui suivent, et
+   la cloche de notification de l'app doit aussi se mettre à jour.
+
+**Sans token configuré**, tout le reste de l'app continue de fonctionner normalement :
+le scraping tourne et alimente quand même la page "Actualités" (juste sans diffusion
+Telegram), la section "Telegram" de "Mon profil" affiche un message explicite, et les
+notifications restent visibles dans la cloche de l'app.
 
 ## Frontend
 
@@ -131,3 +222,5 @@ DSM, déploiement automatique).
 - Les webhooks n'ont ni file de retry ni historique des livraisons (un seul essai, timeout 5s, dernier statut seulement) — correct pour un petit groupe, à muscler (délais exponentiels, DLQ) si le volume grossit.
 - Météo par nom de ville plutôt que par coordonnées précises du parcours — à affiner si `BrmEvent.lieu` ne correspond pas toujours à une ville reconnue par OpenWeatherMap.
 - Récupération automatique du parcours limitée à OpenRunner pour l'instant ; Komoot/Garmin Connect/Strava nécessiteraient chacun leur propre adaptateur (et souvent une vraie API avec clé, contrairement à OpenRunner).
+- Scraping des actualités basé sur des sélecteurs CSS propres à la mise en page actuelle de chaque site source — à surveiller en cas de refonte de l'un des deux (voir le guide de test plus haut).
+- Notifications personnalisées limitées à Telegram + in-app pour l'instant ; un canal email suivrait le même schéma que `sendPasswordResetEmail` (`src/lib/mailer.ts`) si besoin.
