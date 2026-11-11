@@ -12,6 +12,7 @@ import {
 } from "../api/roadbooks";
 import { RoadbookView, type RoadbookData } from "../components/roadbook/RoadbookView";
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
+import { TrackingSettings } from "../components/roadbook/TrackingSettings";
 
 const SAVE_DEBOUNCE_MS = 700;
 
@@ -120,6 +121,13 @@ export function RoadbookPage() {
           <a className="ghost-link" href={roadbookGpxUrl(data.id)} download>
             Télécharger le GPX
           </a>
+
+          <TrackingSettings
+            roadbookId={data.id}
+            liveTrackUrl={data.liveTrackUrl ?? null}
+            telegramAnnounce={data.telegramAnnounce ?? true}
+            onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))}
+          />
 
           <div className="rb-share">
             <strong>Lien de suivi</strong>

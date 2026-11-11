@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
 import { config } from "../config.js";
-import { getTelegramUpdates, sendTelegramMessage } from "./telegram.js";
+import { getTelegramUpdates, sendTelegramMessage, type TelegramUpdate } from "./telegram.js";
+import { handleTrackingMessage, TRACKING_HELP } from "./telegramPointing.js";
 
 const LINK_CODE_TTL_MS = 15 * 60 * 1000;
 // Délai entre deux tentatives après une erreur réseau sur getUpdates (le bot
@@ -43,8 +44,35 @@ export async function handleTelegramStartCommand(chatId: string, code: string): 
 
   await sendTelegramMessage(
     chatId,
-    `C'est fait${user ? `, ${user.prenom}` : ""} ! Tu recevras ici tes notifications personnalisées (changement de statut sur un BRM choisi).`,
+    `C'est fait${user ? `, ${user.prenom}` : ""} ! Tu recevras ici tes notifications personnalisées (changement de statut sur un BRM choisi), et tu pourras pointer pendant tes brevets : envoie /aide pour voir comment.`,
   );
+}
+
+// Point d'entrée de chaque message reçu (exporté pour les tests). Uniquement les
+// conversations PRIVÉES avec le bot : dans un groupe ou un canal, on ne réagit pas
+// (les positions et commandes de pointage sont personnelles).
+export async function handleTelegramUpdate(update: TelegramUpdate): Promise<void> {
+  const msg = update.message;
+  if (!msg) return;
+  if (msg.chat.type && msg.chat.type !== "private") return;
+  const chatId = String(msg.chat.id);
+  const text = msg.text?.trim() ?? "";
+
+  const startWithCode = /^\/start(?:@\w+)?\s+([A-Za-z0-9]+)$/.exec(text);
+  if (startWithCode) {
+    await handleTelegramStartCommand(chatId, startWithCode[1].toUpperCase());
+    return;
+  }
+  if (/^\/start(?:@\w+)?$/.test(text)) {
+    await sendTelegramMessage(
+      chatId,
+      `Pour lier ton compte, récupère ton code depuis « Mon profil » sur le site (section Telegram), puis renvoie-le ici précédé de /start.\n\n${TRACKING_HELP}`,
+    );
+    return;
+  }
+
+  const reply = await handleTrackingMessage(chatId, { text, location: msg.location });
+  if (reply) await sendTelegramMessage(chatId, reply, { linkPreview: false });
 }
 
 let pollingActive = false;
@@ -72,19 +100,7 @@ export function startTelegramPolling(): void {
 
       for (const update of updates) {
         offset = update.update_id + 1;
-        const chatId = update.message?.chat.id;
-        const text = update.message?.text?.trim();
-        if (chatId === undefined || !text) continue;
-
-        const match = /^\/start(?:@\w+)?\s+([A-Za-z0-9]+)$/.exec(text);
-        if (match) {
-          await handleTelegramStartCommand(String(chatId), match[1].toUpperCase()).catch(() => undefined);
-        } else if (/^\/start(?:@\w+)?$/.test(text)) {
-          await sendTelegramMessage(
-            String(chatId),
-            "Pour lier ton compte, récupère ton code depuis « Mon profil » sur le site (section Telegram), puis renvoie-le ici précédé de /start.",
-          ).catch(() => undefined);
-        }
+        await handleTelegramUpdate(update).catch(() => undefined);
       }
     }
   })().catch(() => {

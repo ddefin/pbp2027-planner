@@ -120,6 +120,60 @@ export function nearestPointIndex(points: GeoPoint[], target: GeoPoint): { index
   return { index: best, distanceM: bestD };
 }
 
+// Projection d'un point sur le TRACÉ (segments), pas seulement sur ses sommets : après
+// simplification, une longue ligne droite n'a plus que deux sommets parfois distants
+// de plusieurs km — rattacher une position au sommet le plus proche donnait alors un
+// km faux d'autant (et un contrôle "à 3 km du tracé" alors qu'il est dessus).
+// Recherche limitée aux segments [fromIdx, toIdx] si précisé.
+export function projectOntoRoute(
+  points: RoutePoint[],
+  target: GeoPoint,
+  fromIdx = 0,
+  toIdx = points.length - 1,
+): { km: number; distanceM: number; segIndex: number } {
+  const cosLat = Math.cos(toRad(target.lat));
+  const mx = (p: GeoPoint) => toRad(p.lon) * cosLat * EARTH_RADIUS_M;
+  const my = (p: GeoPoint) => toRad(p.lat) * EARTH_RADIUS_M;
+  const tx = mx(target);
+  const ty = my(target);
+  let best = { km: points[fromIdx]?.distKm ?? 0, distanceM: Infinity, segIndex: fromIdx };
+  const last = Math.min(toIdx, points.length - 1);
+  if (fromIdx >= last) {
+    const p = points[Math.min(fromIdx, points.length - 1)];
+    return { km: p.distKm, distanceM: haversineMeters(p, target), segIndex: fromIdx };
+  }
+  for (let i = fromIdx; i < last; i++) {
+    const a = points[i];
+    const b = points[i + 1];
+    const ax = mx(a), ay = my(a), bx = mx(b), by = my(b);
+    const dx = bx - ax, dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((tx - ax) * dx + (ty - ay) * dy) / len2)) : 0;
+    const ex = ax + t * dx - tx, ey = ay + t * dy - ty;
+    const d = Math.sqrt(ex * ex + ey * ey);
+    if (d < best.distanceM) best = { km: a.distKm + t * (b.distKm - a.distKm), distanceM: d, segIndex: i };
+  }
+  return best;
+}
+
+// Premier passage du tracé à moins de radiusM du point, à partir du segment fromIdx :
+// on entre dans la "fenêtre" de proximité, on garde le meilleur point de CE passage,
+// et on s'arrête dès qu'on en ressort. Indispensable sur un aller-retour par la même
+// route, où le point est à égale distance de l'aller et du retour. null si le tracé
+// ne passe jamais à moins de radiusM.
+export function projectFirstPassage(points: RoutePoint[], target: GeoPoint, fromIdx: number, radiusM: number): { km: number; distanceM: number; segIndex: number } | null {
+  let best: { km: number; distanceM: number; segIndex: number } | null = null;
+  for (let i = fromIdx; i < points.length - 1; i++) {
+    const r = projectOntoRoute(points, target, i, i + 1);
+    if (r.distanceM <= radiusM) {
+      if (!best || r.distanceM < best.distanceM) best = r;
+    } else if (best) {
+      break;
+    }
+  }
+  return best;
+}
+
 // Position interpolée au kilomètre donné (points triés par distKm croissante).
 export function pointAtKm(points: RoutePoint[], km: number): RoutePoint {
   if (km <= points[0].distKm) return points[0];

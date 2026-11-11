@@ -16,7 +16,7 @@ export function escapeHtml(s: string): string {
 
 // false = bot non configuré (l'appelant continue sans notification plutôt que de
 // planter, même logique que sendPasswordResetEmail) ou envoi échoué.
-export async function sendTelegramMessage(chatId: string, text: string): Promise<boolean> {
+export async function sendTelegramMessage(chatId: string, text: string, options: { linkPreview?: boolean } = {}): Promise<boolean> {
   if (!config.telegramBotToken) return false;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
@@ -24,7 +24,7 @@ export async function sendTelegramMessage(chatId: string, text: string): Promise
     const res = await fetch(apiUrl("sendMessage"), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: false }),
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: options.linkPreview === false }),
       signal: controller.signal,
     });
     return res.ok;
@@ -44,7 +44,14 @@ export async function sendTelegramNewsMessage(text: string): Promise<boolean> {
 
 export type TelegramUpdate = {
   update_id: number;
-  message?: { chat: { id: number }; text?: string };
+  // Seuls les messages NEUFS sont traités : une position "en direct" partagée dans
+  // Telegram n'envoie ensuite que des edited_message, volontairement ignorés (pas de
+  // suivi continu, un pointage = un message).
+  message?: {
+    chat: { id: number; type?: string };
+    text?: string;
+    location?: { latitude: number; longitude: number };
+  };
 };
 
 // Long-polling (pas de webhook public à exposer/configurer) : timeout=25 fait

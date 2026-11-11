@@ -1,4 +1,4 @@
-import { haversineMeters, type RoutePoint } from "./geo.js";
+import { haversineMeters, projectOntoRoute, type RoutePoint } from "./geo.js";
 
 // Données publiées sur https://www.paris-brest-paris.org/parcours/ (novembre 2026) :
 // la liste des étapes est connue, pas encore le tracé détaillé. Coordonnées = centre
@@ -154,7 +154,10 @@ export function projectControls(points: RoutePoint[], controls: PbpControl[] = P
     if (bestIdx === -1) {
       result.push({ ...c, km: null, offsetKm: null });
     } else {
-      result.push({ ...c, km: Math.round(points[bestIdx].distKm * 10) / 10, offsetKm: Math.round(bestD / 100) / 10 });
+      // Affinage sur les deux segments autour du sommet retenu (km exact, pas celui
+      // d'un sommet qui peut être loin sur une ligne droite simplifiée).
+      const refined = projectOntoRoute(points, c, Math.max(0, bestIdx - 1), Math.min(points.length - 1, bestIdx + 1));
+      result.push({ ...c, km: Math.round(refined.km * 10) / 10, offsetKm: Math.round(Math.min(bestD, refined.distanceM) / 100) / 10 });
       startIdx = bestIdx + 1;
     }
   }

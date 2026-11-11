@@ -51,6 +51,11 @@ export const config = {
   // https://t.me/<username>?start=<code> dans "Mon profil" — sans ça, l'utilisateur
   // doit chercher le bot à la main dans Telegram avant de coller le code.
   telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME || null,
+  // Canal où sont publiés les résumés de situation des randonneurs en brevet (à
+  // chaque pointage, voir src/lib/roadbookSituation.ts). Sans lui, repli sur le canal
+  // des actualités ; sans aucun des deux, rien n'est publié (le pointage marche quand
+  // même). Le bot doit être administrateur du canal pour pouvoir y écrire.
+  telegramTrackingChatId: process.env.TELEGRAM_TRACKING_CHAT_ID || process.env.TELEGRAM_NEWS_CHAT_ID || null,
   // Fréquence du scraping des actualités (voir le scheduler dans src/server.ts).
   newsScrapeIntervalHours: Number(process.env.NEWS_SCRAPE_INTERVAL_HOURS ?? 24),
 };

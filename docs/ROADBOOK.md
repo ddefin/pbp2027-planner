@@ -5,7 +5,8 @@ Pages `/roadbooks` (liste + import), `/roadbooks/:id` (tableau de bord personnel
 
 ## Déploiement
 
-**Aucune nouvelle variable d'environnement.** La migration Prisma
+**Une seule variable, optionnelle : `TELEGRAM_TRACKING_CHAT_ID`** (canal où publier les
+résumés de situation, voir plus bas). La migration Prisma
 `add_roadbook` (deux tables : `Roadbook`, `RoadbookCheckin`) s'applique toute seule
 au démarrage du conteneur (`prisma migrate deploy` dans la commande de démarrage).
 Les GPX importés sont stockés dans `./data/uploads/roadbooks/`, donc sur le même
@@ -63,6 +64,70 @@ Points d'attention côté hébergement :
    identifiant de compte, seulement le prénom, le tracé, les horaires et les
    positions déclarées.
 
+## Suivi par les proches : Telegram et Garmin LiveTrack
+
+### Pointer depuis Telegram
+
+Une fois son compte lié (« Mon profil » → Telegram), le randonneur écrit **en privé**
+au bot :
+
+| Message | Effet |
+|---|---|
+| 📎 → Position → « Envoyer ma position actuelle » | Pointage GPS (un seul relevé, recalé sur le tracé ; refusé à plus de 10 km du tracé) |
+| `/km 125` | Je suis au km 125 |
+| `/cp` puis `/cp 2` | Liste des contrôles, puis pointé au contrôle n°2 |
+| `/statut` | Ma situation, sans pointer ni publier |
+| `/aide` | Mode d'emploi |
+
+Le pointage s'applique au roadbook **en cours** : départ passé et délai (+ 6 h) pas
+écoulé, sinon le prochain à partir, sinon le dernier modifié. La position « en
+direct » de Telegram est volontairement ignorée après son premier point : pas de
+suivi continu, un pointage = un message. Les messages venant d'un groupe ou d'un
+canal sont ignorés.
+
+### Résumé de situation publié sur le canal
+
+À chaque pointage (depuis Telegram **ou** depuis le site), si le randonneur ne l'a pas
+désactivé (case « Publier un résumé… » du roadbook, cochée par défaut), le bot publie
+sur `TELEGRAM_TRACKING_CHAT_ID` :
+
+- km parcourus / total, km restants, commune la plus proche (géocodage inverse
+  OpenWeatherMap) ;
+- temps écoulé depuis le départ, heure du pointage ;
+- délais du BRM : marge sur le prochain contrôle (heure de fermeture comprise),
+  verte/orange/rouge, et avance/retard sur son propre roadbook ;
+- moyenne pauses comprises, et estimation hors pauses (pauses prévues aux contrôles
+  déjà passés déduites) ;
+- arrivée estimée à l'allure prévue (montées et pauses restantes comprises), au
+  rythme moyen actuel, et marge sur le délai officiel ;
+- D+ restant, moyenne minimale pour finir, distance et heure estimée du prochain
+  contrôle ;
+- météo maintenant, au prochain contrôle et à l'arrivée **aux heures estimées de
+  passage** : température et ressenti, vent (rafales, de face/dos/travers selon le
+  sens de la route), pluie, alertes ;
+- liens Garmin LiveTrack et page de suivi (si activés).
+
+Le randonneur reçoit le même résumé en privé. Deux pointages à moins de 2 min
+d'intervalle ne publient qu'un message. Une erreur de publication (canal mal
+configuré, bot pas administrateur) n'empêche jamais le pointage.
+
+**Mise en place du canal** : ajouter le bot comme **administrateur** du canal
+(droit « Publier des messages »), puis renseigner son identifiant (nombre négatif
+commençant par `-100`) dans `TELEGRAM_TRACKING_CHAT_ID`, et redémarrer le conteneur.
+Sans cette variable, le canal des actualités (`TELEGRAM_NEWS_CHAT_ID`) sert de repli.
+Pour que le lien vers la page de suivi figure dans le message, `PUBLIC_URL` doit être
+renseignée.
+
+### Garmin LiveTrack
+
+Le randonneur colle dans son roadbook le lien LiveTrack de sa sortie (reçu par email
+ou dans Garmin Connect). C'est le compteur qui suit la position, sans rien demander au
+téléphone ni au serveur. Le lien apparaît en tête de la page de suivi des proches et
+dans les résumés du canal. Seuls les liens Garmin (`livetrack.garmin.com`,
+`share.garmin.com`, `connect.garmin.com`, `gar.mn`) sont acceptés, puisqu'ils sont
+republiés au groupe. Garmin n'offrant pas d'API ouverte, ces positions n'alimentent
+pas le calcul d'avance/retard : seuls les pointages le font.
+
 ## Calcul des barrières horaires
 
 `web/src/lib/roadbook.ts` → `controlWindow()`, barème standard des calculateurs
@@ -79,13 +144,17 @@ l'organisateur fait foi** : l'interface le rappelle sous le tableau.
 
 ## Choix techniques
 
-- **Calculs côté client, fonctions pures** (`web/src/lib/roadbook.ts`) : le serveur ne
-  stocke que les réglages et les positions. Changer la vitesse recalcule tout
+- **Calculs en fonctions pures, source unique** (`src/shared/roadbookCalc.ts`, sans
+  aucun import) : utilisée par le serveur (résumés Telegram) et ré-exportée par le
+  frontend (`web/src/lib/roadbook.ts`). Le build Docker du frontend copie ce dossier.
+  Le serveur ne stocke que les réglages et les positions. Changer la vitesse recalcule tout
   instantanément, le statut fonctionne hors-ligne (le roadbook est mis en cache par
   le service worker), et le lien public calcule le même statut que le propriétaire.
   Ces fonctions sont testées par Vitest depuis la racine du dépôt.
-- **Recalage GPS** (`snapToRoute`) : recherche d'abord autour du dernier km connu,
-  puis en avant, puis partout. Sans ça, sur une boucle, l'arrivée serait prise pour
+- **Recalage GPS** (`snapToRoute`) : projection sur les segments du tracé (pas
+  seulement ses sommets : une ligne droite simplifiée peut n'en avoir que deux sur
+  plusieurs km), recherche d'abord autour du dernier km connu, puis en avant, puis
+  partout. Sans ça, sur une boucle, l'arrivée serait prise pour
   le départ, et sur un aller-retour le retour pour l'aller.
 - **Envoi des positions** : uniquement à chaque pointage volontaire, sans cadence
   automatique. Historique borné à 500 positions par roadbook.

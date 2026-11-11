@@ -4,18 +4,16 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { parseGpxRoute, type GpxWaypoint } from "../lib/gpx.js";
-import { fromCompactPoint, haversineMeters, toCompactPoint, type CompactPoint, type RoutePoint } from "../lib/geo.js";
+import { projectFirstPassage, projectOntoRoute, toCompactPoint, type CompactPoint, type RoutePoint } from "../lib/geo.js";
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 import { OFFICIAL_LIMIT_MINUTES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
+import { looksLikeControl } from "../shared/roadbookCalc.js";
+import { recordCheckin } from "../lib/roadbookSituation.js";
 
 const MAX_GPX_BYTES = 25 * 1024 * 1024;
-const MAX_CHECKINS_KEPT = 500;
 const DEFAULT_STOP_MINUTES = 15;
 
-// Même règle que looksLikeControl() dans web/src/lib/roadbook.ts (le backend ne peut
-// pas importer le code du frontend) : à garder synchronisées.
-const CONTROL_NAME = /(contr[oô]le|\bcp\s?\d*\b|check|pointage|tampon|control|d[ée]part|arriv[ée]e|start|finish|secret)/i;
 
 const controlSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -25,7 +23,26 @@ const controlSchema = z.object({
   lon: z.number().min(-180).max(180).nullable().optional(),
 });
 
+// Domaines Garmin acceptés pour le lien LiveTrack : ce lien est republié tel quel aux
+// proches et sur le canal Telegram du groupe, pas question d'y laisser passer
+// n'importe quelle URL (hameçonnage).
+const LIVETRACK_HOSTS = new Set(["livetrack.garmin.com", "share.garmin.com", "connect.garmin.com", "gar.mn"]);
+const liveTrackSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((v) => {
+    try {
+      const u = new URL(v);
+      return u.protocol === "https:" && LIVETRACK_HOSTS.has(u.hostname);
+    } catch {
+      return false;
+    }
+  });
+
 const patchSchema = z.object({
+  liveTrackUrl: liveTrackSchema.nullable().optional(),
+  telegramAnnounce: z.boolean().optional(),
   title: z.string().trim().min(1).max(100).optional(),
   classKm: z.number().int().min(50).max(1300).optional(),
   limitMinutes: z.number().int().min(60).max(6000).optional(),
@@ -64,22 +81,9 @@ export function guessClassKm(distanceKm: number): { classKm: number; limitMinute
 function projectWaypoints(points: RoutePoint[], waypoints: GpxWaypoint[]): (GpxWaypoint & { km: number; offsetKm: number })[] {
   let fromIdx = 0;
   return waypoints.map((w) => {
-    const scan = (start: number) => {
-      let best = -1;
-      let bestD = Infinity;
-      for (let i = start; i < points.length; i++) {
-        const d = haversineMeters(points[i], w);
-        if (d < bestD) {
-          bestD = d;
-          best = i;
-        }
-      }
-      return { best, bestD };
-    };
-    let r = scan(fromIdx);
-    if (r.best === -1 || r.bestD > 2000) r = scan(0);
-    fromIdx = r.best;
-    return { ...w, km: Math.round(points[r.best].distKm * 10) / 10, offsetKm: Math.round(r.bestD / 100) / 10 };
+    const r = projectFirstPassage(points, w, fromIdx, 1000) ?? projectOntoRoute(points, w);
+    fromIdx = r.segIndex;
+    return { ...w, km: Math.round(r.km * 10) / 10, offsetKm: Math.round(r.distanceM / 100) / 10 };
   });
 }
 
@@ -94,7 +98,7 @@ export function initialControls(points: RoutePoint[], waypoints: GpxWaypoint[]):
   const pois: PoiEntry[] = [];
 
   for (const w of projectWaypoints(points, waypoints)) {
-    const isControl = CONTROL_NAME.test(w.name) && w.offsetKm <= 2;
+    const isControl = looksLikeControl(w.name) && w.offsetKm <= 2;
     if (!isControl) {
       pois.push({ name: w.name, km: w.km, lat: w.lat, lon: w.lon });
       continue;
@@ -126,6 +130,8 @@ function serialize(r: RoadbookRow, withPoints: boolean) {
     elevationLossM: r.elevationLossM,
     fileName: r.fileName,
     shareToken: r.shareToken,
+    liveTrackUrl: r.liveTrackUrl,
+    telegramAnnounce: r.telegramAnnounce,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
     ...(withPoints ? { points: JSON.parse(r.points) as CompactPoint[] } : {}),
@@ -266,18 +272,14 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     const parsed = checkinSchema.safeParse(request.body);
     if (!parsed.success || parsed.data.km > r.distanceKm + 1) return reply.code(400).send({ error: "invalid_input" });
 
-    const checkin = await prisma.roadbookCheckin.create({
-      data: { roadbookId: id, km: parsed.data.km, lat: parsed.data.lat ?? null, lon: parsed.data.lon ?? null, source: parsed.data.source },
+    // Publication sur le canal Telegram en arrière-plan : la réponse n'attend pas
+    // OpenWeatherMap ni Telegram (voir src/lib/roadbookSituation.ts).
+    const { checkin } = await recordCheckin(id, {
+      km: parsed.data.km,
+      lat: parsed.data.lat ?? null,
+      lon: parsed.data.lon ?? null,
+      source: parsed.data.source,
     });
-
-    // Historique borné : un suivi GPS sur un 600 peut produire beaucoup de positions.
-    const old = await prisma.roadbookCheckin.findMany({
-      where: { roadbookId: id },
-      orderBy: { at: "desc" },
-      skip: MAX_CHECKINS_KEPT,
-      select: { id: true },
-    });
-    if (old.length) await prisma.roadbookCheckin.deleteMany({ where: { id: { in: old.map((o) => o.id) } } });
 
     return reply.code(201).send({ checkin: serializeCheckin(checkin) });
   });
@@ -302,13 +304,8 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     const r = await prisma.roadbook.findUnique({ where: { shareToken: token }, include: { user: { select: { prenom: true } } } });
     if (!r) return reply.code(404).send({ error: "not_found" });
     const checkins = await prisma.roadbookCheckin.findMany({ where: { roadbookId: r.id }, orderBy: { at: "desc" }, take: 200 });
-    const { shareToken: _token, id: _id, ...rest } = serialize(r, true);
+    const { shareToken: _token, id: _id, telegramAnnounce: _announce, ...rest } = serialize(r, true);
     reply.header("cache-control", "no-store");
     return reply.send({ roadbook: { ...rest, author: publicName(r.user) }, checkins: checkins.map(serializeCheckin) });
   });
-}
-
-// Exporté pour les tests : décodage des points stockés.
-export function decodePoints(json: string): RoutePoint[] {
-  return (JSON.parse(json) as CompactPoint[]).map(fromCompactPoint);
 }

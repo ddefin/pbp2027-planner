@@ -1903,3 +1903,40 @@ button.link {
   background: color-mix(in srgb, #b91c1c 12%, transparent);
   color: #b91c1c;
 }
+.rb-livetrack {
+  display: block;
+  text-align: center;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #fff !important;
+  text-decoration: none;
+}
+.rb-livetrack:hover {
+  text-decoration: none;
+  opacity: 0.92;
+}
+.rb-livetrack-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rb-check {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.rb-check input {
+  margin-top: 3px;
+}
+.rb-telegram-help {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+}

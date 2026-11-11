@@ -411,6 +411,13 @@ model Roadbook {
   // Lien de partage public en lecture seule (suivi par les proches) : null = non
   // partagé. Jeton aléatoire de 128 bits, révocable/régénérable par l'auteur.
   shareToken              String?           @unique
+  // Lien de suivi du compteur GPS (Garmin LiveTrack) : affiché aux proches et dans
+  // le canal Telegram, jamais interrogé par le serveur (pas d'API ouverte).
+  liveTrackUrl            String?
+  // Publier un résumé de situation sur le canal Telegram du groupe à chaque pointage
+  // (opt-out possible : ce sont les positions de la personne).
+  telegramAnnounce        Boolean           @default(true)
+  lastAnnouncedAt         DateTime?
   checkins                RoadbookCheckin[]
   createdAt               DateTime          @default(now())
   updatedAt               DateTime          @updatedAt

@@ -7,6 +7,8 @@ WORKDIR /app/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+# Calculs du roadbook partagés avec le serveur (importés par web/src/lib/roadbook.ts).
+COPY src/shared /app/src/shared
 RUN npm run build
 
 FROM node:22-alpine AS backend-build

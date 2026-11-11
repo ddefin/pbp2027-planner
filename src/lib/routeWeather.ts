@@ -48,7 +48,7 @@ export function windAlongRoute(windFromDeg: number, windKmh: number, routeBearin
   return { relation, alongKmh };
 }
 
-function alertsFor(slot: PointForecastSlot, alongKmh: number | null): WeatherAlert[] {
+export function alertsFor(slot: PointForecastSlot, alongKmh: number | null): WeatherAlert[] {
   const alerts: WeatherAlert[] = [];
   if (slot.windSpeedKmh >= config.windAlertThresholdKmh || (slot.windGustsKmh ?? 0) >= GUSTS_ALERT_KMH) alerts.push("vent_fort");
   if (alongKmh !== null && -alongKmh >= HEADWIND_ALERT_KMH) alerts.push("vent_de_face");

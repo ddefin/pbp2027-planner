@@ -11,6 +11,8 @@ export interface RoadbookPoi {
 
 export interface RoadbookSettings {
   title: string;
+  liveTrackUrl?: string | null;
+  telegramAnnounce?: boolean;
   classKm: number;
   limitMinutes: number;
   startAt: string | null;
@@ -43,7 +45,7 @@ export interface Checkin {
   at: string;
 }
 
-export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken"> {
+export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken" | "telegramAnnounce"> {
   author: string;
 }
 

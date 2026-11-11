@@ -8,7 +8,7 @@ import {
   plannedMinuteAt,
   snapToRoute,
   type PacingSettings,
-} from "../web/src/lib/roadbook";
+} from "../src/shared/roadbookCalc";
 
 const brm200: PacingSettings = { movingSpeedKmh: 25, climbPenaltyMinPer100m: 0, classKm: 200, limitMinutes: 810 };
 
@@ -43,6 +43,18 @@ describe("Roadbook de passage", () => {
     expect(rows.map((r) => r.arriveMin)).toEqual([0, 120, 315, 525]); // 2h, +15 +3h, +30 +3h
     expect(rows[3].stopMinutes).toBe(0);
     expect(rows[3].marginMin).toBe(810 - 525);
+  });
+
+  it("ferme toujours l'arrivée au délai officiel, même sur un GPX un peu plus court que le nominal", () => {
+    const rows = buildSchedule(
+      [
+        { name: "Départ", km: 0, stopMinutes: 0 },
+        { name: "Arrivée", km: 199.8, stopMinutes: 0 },
+      ],
+      [],
+      brm200,
+    );
+    expect(rows[1].closeMin).toBe(810);
   });
 
   it("ajoute la pénalité de montée par tranche de 100 m de D+", () => {
@@ -130,6 +142,17 @@ describe("Utilitaires", () => {
     });
     expect(snapToRoute(loop, { lat: 48, lon: 2 }, 97).km).toBe(100);
     expect(snapToRoute(loop, { lat: 48, lon: 2 }, null).km).toBe(0); // sans historique : le départ
+  });
+
+  it("projette sur le segment, pas sur le sommet le plus proche (longue ligne droite simplifiée)", () => {
+    // Deux sommets seulement, à 20 km d'écart : une position au milieu doit donner km 10.
+    const line = [
+      { lat: 48, lon: 2, distKm: 0 },
+      { lat: 48, lon: 2 + 20 / 74.49, distKm: 20 },
+    ];
+    const r = snapToRoute(line, { lat: 48.001, lon: 2 + 10 / 74.49 }, null);
+    expect(r.km).toBeCloseTo(10, 1);
+    expect(r.offsetKm).toBeLessThan(0.2);
   });
 
   it("reconnaît les waypoints qui ressemblent à des contrôles", () => {

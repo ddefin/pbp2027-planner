@@ -98,6 +98,9 @@ export default defineConfig({
     }),
   ],
   server: {
+    // Autorise le serveur de dev à lire src/shared (calculs du roadbook partagés avec
+    // le backend), situé hors du dossier web/.
+    fs: { allow: [".."] },
     proxy: {
       "/api": {
         target: "http://localhost:3001",

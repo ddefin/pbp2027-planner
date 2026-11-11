@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { getSessionUser } from "../lib/session.js";
 import { parseGpxRoute, type GpxWaypoint } from "../lib/gpx.js";
-import { fromCompactPoint, nearestPointIndex, toCompactPoint, type CompactPoint, type RoutePoint } from "../lib/geo.js";
+import { fromCompactPoint, projectOntoRoute, toCompactPoint, type CompactPoint, type RoutePoint } from "../lib/geo.js";
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 import { PBP_2027_CONTROLS, PBP_2027_TOTAL_KM, PBP_2027_WAVES, buildIndicativeRoute, projectControls, type ProjectedControl } from "../lib/pbpControls.js";
 import { computeRouteWeather } from "../lib/routeWeather.js";
@@ -158,8 +158,8 @@ export async function pbpRoutesRoutes(app: FastifyInstance) {
     if (!loaded) return reply.code(404).send({ error: "not_found" });
 
     const waypoints = loaded.waypoints.map((w) => {
-      const { index, distanceM } = nearestPointIndex(loaded.points, w);
-      return { ...w, km: Math.round(loaded.points[index].distKm * 10) / 10, offsetKm: Math.round(distanceM / 100) / 10 };
+      const { km, distanceM } = projectOntoRoute(loaded.points, w);
+      return { ...w, km: Math.round(km * 10) / 10, offsetKm: Math.round(distanceM / 100) / 10 };
     });
 
     return reply.send({

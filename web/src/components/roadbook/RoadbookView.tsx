@@ -157,6 +157,12 @@ export function RoadbookView({
           </button>
         </div>
 
+        {data.liveTrackUrl && (
+          <a className="rb-livetrack no-print" href={data.liveTrackUrl} target="_blank" rel="noreferrer">
+            📡 Position en direct sur Garmin LiveTrack ↗
+          </a>
+        )}
+
         {status ? (
           <StatusPanel status={status} startAt={data.startAt} asOf={position?.at} />
         ) : (

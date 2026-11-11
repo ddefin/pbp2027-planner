@@ -180,3 +180,31 @@ export async function fetchCityWeather(city: string): Promise<CityWeather | null
   cache.set(key, { expiresAt: Date.now() + CACHE_TTL_MS, data });
   return data;
 }
+
+// Commune la plus proche d'un point (géocodage inverse OpenWeatherMap, même clé, inclus
+// dans l'offre gratuite) : plus précis que le "city.name" des prévisions, qui renvoie
+// parfois la grande ville voisine. Cache par cellule de ~1 km, le nom ne change pas.
+const placeCache = new Map<string, string | null>();
+const PLACE_CACHE_MAX = 2000;
+
+export async function reverseGeocode(lat: number, lon: number): Promise<string | null> {
+  if (!config.openWeatherApiKey) return null;
+  const key = `${Math.round(lat * 100) / 100},${Math.round(lon * 100) / 100}`;
+  if (placeCache.has(key)) return placeCache.get(key) ?? null;
+  let name: string | null = null;
+  try {
+    const raw = (await fetchJson(
+      `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${config.openWeatherApiKey}`,
+    )) as unknown as { name?: string; local_names?: Record<string, string> }[];
+    const first = Array.isArray(raw) ? raw[0] : undefined;
+    name = first?.local_names?.fr ?? first?.name ?? null;
+  } catch {
+    return null; // pas mis en cache : on retentera au prochain pointage
+  }
+  if (placeCache.size >= PLACE_CACHE_MAX) {
+    const oldest = placeCache.keys().next().value;
+    if (oldest !== undefined) placeCache.delete(oldest);
+  }
+  placeCache.set(key, name);
+  return name;
+}
