@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { getSharedRoadbook, getSharedSituation, type Checkin, type SharedRoadbook } from "../api/roadbooks";
+import { getSharedLive, getSharedRoadbook, getSharedSituation, type Checkin, type LiveView, type SharedRoadbook } from "../api/roadbooks";
 import { WhatsAppShare } from "../components/roadbook/WhatsAppShare";
+import { LiveCard } from "../components/roadbook/LiveCard";
 import { RoadbookView } from "../components/roadbook/RoadbookView";
 
 const REFRESH_MS = 60_000;
@@ -20,6 +21,7 @@ export function SharedRoadbookPage() {
   const [data, setData] = useState<{ roadbook: SharedRoadbook; checkins: Checkin[] } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [situation, setSituation] = useState<{ whatsapp: string; at: string } | null>(null);
+  const [live, setLive] = useState<LiveView | null>(null);
   const lastAt = data?.checkins[0]?.at ?? null;
 
   // Le résumé (météo, ville...) n'est recalculé que lorsqu'un NOUVEAU pointage arrive,
@@ -27,6 +29,15 @@ export function SharedRoadbookPage() {
   useEffect(() => {
     if (!token || !lastAt) return;
     getSharedSituation(token).then(setSituation).catch(() => setSituation(null));
+  }, [token, lastAt]);
+
+  // Vue en direct (arrivée prévue, barrière, météo devant) : le serveur la garde 10 min.
+  useEffect(() => {
+    if (!token || !lastAt) return;
+    const load = () => getSharedLive(token).then(setLive).catch(() => undefined);
+    load();
+    const t = setInterval(load, 5 * 60_000);
+    return () => clearInterval(t);
   }, [token, lastAt]);
 
   useEffect(() => {
@@ -67,6 +78,7 @@ export function SharedRoadbookPage() {
           {last ? `Dernière position ${ago(last.at)}` : "Pas encore de position"}
         </span>
       </div>
+      {live && <LiveCard live={live} />}
       <RoadbookView
         data={data.roadbook}
         author={data.roadbook.author}

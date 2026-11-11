@@ -7,6 +7,7 @@ import { ElevationProfile } from "../ElevationProfile";
 import { RouteMap } from "../pbp/RouteMap";
 import { StatusPanel } from "./StatusPanel";
 import { ScheduleTable } from "./ScheduleTable";
+import { NutritionCard } from "./PrepCards";
 import type { LivePosition } from "./LiveTracker";
 import { pointAtKm } from "../../lib/routeMath";
 import {
@@ -64,6 +65,7 @@ export interface RoadbookSlots {
   pointage?: ReactNode;
   quickShare?: (goTo: (tab: TabId) => void) => ReactNode;
   roadbookActions?: ReactNode;
+  preparation?: ReactNode;
   settingsFooter?: ReactNode;
   sharing?: ReactNode;
 }
@@ -348,6 +350,10 @@ export function RoadbookView({
             La carte de route de l'organisateur fait foi.
           </p>
 
+          <div className="no-print" style={{ marginTop: 14 }}>
+            <NutritionCard schedule={schedule} pois={pois} />
+          </div>
+
           {editable && pois.length > 0 && (
             <div className="no-print" style={{ marginTop: 14 }}>
               <div className="hint" style={{ fontWeight: 700, margin: "0 0 6px" }}>
@@ -508,6 +514,7 @@ export function RoadbookView({
               </div>
             </Disclosure>
 
+            {slots?.preparation}
             {slots?.settingsFooter}
           </section>,
         )}

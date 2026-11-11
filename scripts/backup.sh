@@ -32,4 +32,8 @@ gzip "${BACKUP_DIR}/pbp2027-${STAMP}.db"
 # Purge des sauvegardes plus vieilles que $KEEP_DAYS jours.
 find "$BACKUP_DIR" -name 'pbp2027-*.db.gz' -mtime "+${KEEP_DAYS}" -delete
 
+# Témoin lu par l'application (src/lib/backupWatch.ts) : sans lui, elle prévient les
+# administrateurs quand plus aucune sauvegarde n'est faite.
+docker exec "$CONTAINER" sh -c 'date +%s > /app/data/.last-backup' || echo "Avertissement : témoin de sauvegarde non écrit"
+
 echo "Sauvegarde créée : ${BACKUP_DIR}/pbp2027-${STAMP}.db.gz"

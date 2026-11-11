@@ -16,6 +16,7 @@ import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTrack
 import { Disclosure } from "../components/Disclosure";
 import { LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
 import { enqueue, flushQueue, isNetworkError, newClientId, queuedFor } from "../lib/checkinQueue";
+import { ChecklistCard, GpsExportCard } from "../components/roadbook/PrepCards";
 import { QuickShare, ShareLinkCard, WhatsAppCard } from "../components/roadbook/ShareCards";
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -204,6 +205,12 @@ export function RoadbookPage() {
               onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))}
             />
             <LiveTrackCard roadbookId={data.id} liveTrackUrl={data.liveTrackUrl ?? null} onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))} />
+          </>
+        ),
+        preparation: (
+          <>
+            <ChecklistCard stored={data.checklist} onChange={(checklist) => handleChange({ checklist })} />
+            <GpsExportCard roadbookId={data.id} />
           </>
         ),
         settingsFooter: (

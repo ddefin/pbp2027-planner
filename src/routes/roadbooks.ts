@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { parseGpxRoute, type GpxWaypoint } from "../lib/gpx.js";
-import { projectFirstPassage, projectOntoRoute, toCompactPoint, type CompactPoint, type RoutePoint } from "../lib/geo.js";
+import { projectFirstPassage, fromCompactPoint, projectOntoRoute, toCompactPoint, type CompactPoint, type RoutePoint } from "../lib/geo.js";
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 import { OFFICIAL_LIMIT_MINUTES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
@@ -12,6 +12,8 @@ import { looksLikeControl } from "../shared/roadbookCalc.js";
 import { latestSituationMessage, recordCheckin, toWhatsAppText } from "../lib/roadbookSituation.js";
 import { explainTelegramError, sendTelegram } from "../lib/telegram.js";
 import { config } from "../config.js";
+import { buildGpx, buildTcx } from "../lib/gpsExport.js";
+import { liveView } from "../lib/roadbookLive.js";
 
 const MAX_GPX_BYTES = 25 * 1024 * 1024;
 const DEFAULT_STOP_MINUTES = 15;
@@ -52,6 +54,7 @@ const patchSchema = z.object({
   movingSpeedKmh: z.number().min(8).max(45).optional(),
   climbPenaltyMinPer100m: z.number().min(0).max(30).optional(),
   controls: z.array(controlSchema).min(2).max(60).optional(),
+  checklist: z.array(z.object({ id: z.string().min(1).max(40), label: z.string().trim().min(1).max(120), done: z.boolean() })).max(60).optional(),
 });
 
 const checkinSchema = z.object({
@@ -146,6 +149,7 @@ function serialize(r: RoadbookRow, withPoints: boolean) {
     climbPenaltyMinPer100m: r.climbPenaltyMinPer100m,
     controls: JSON.parse(r.controls) as ControlEntry[],
     pois: JSON.parse(r.pois) as PoiEntry[],
+    checklist: JSON.parse(r.checklist) as { id: string; label: string; done: boolean }[],
     distanceKm: r.distanceKm,
     elevationGainM: r.elevationGainM,
     elevationLossM: r.elevationLossM,
@@ -237,7 +241,7 @@ export async function roadbooksRoutes(app: FastifyInstance) {
 
     const parsed = patchSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
-    const { controls, startAt, ...rest } = parsed.data;
+    const { controls, startAt, checklist, ...rest } = parsed.data;
 
     if (controls && controls.some((c) => c.km > r.distanceKm + 1)) return reply.code(400).send({ error: "control_beyond_route" });
 
@@ -247,6 +251,7 @@ export async function roadbooksRoutes(app: FastifyInstance) {
         ...rest,
         ...(startAt !== undefined ? { startAt: startAt === null ? null : new Date(startAt) } : {}),
         ...(controls ? { controls: JSON.stringify([...controls].sort((a, b) => a.km - b.km)) } : {}),
+        ...(checklist ? { checklist: JSON.stringify(checklist) } : {}),
       },
     });
     return reply.send({ roadbook: serialize(updated, false) });
@@ -272,6 +277,30 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     reply.header("content-type", "application/gpx+xml");
     reply.header("content-disposition", `attachment; filename="${r.fileName.replace(/"/g, "")}"`);
     return reply.send(await readUploadedFile(r.filePath));
+  });
+
+  // Export pour compteur GPS : GPX (tracé + contrôles + points d'eau) ou TCX « Course »
+  // (Garmin Connect, points de parcours avec alerte à l'approche).
+  app.get("/roadbooks/:id/export", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    const { id } = request.params as { id: string };
+    const format = z.enum(["gpx", "tcx"]).safeParse((request.query as { format?: string }).format);
+    if (!format.success) return reply.code(400).send({ error: "invalid_input" });
+    const r = await ownedRoadbook(id, user.id);
+    if (!r) return reply.code(404).send({ error: "not_found" });
+    const input = {
+      title: r.title,
+      startAt: r.startAt,
+      settings: { movingSpeedKmh: r.movingSpeedKmh, climbPenaltyMinPer100m: r.climbPenaltyMinPer100m, classKm: r.classKm, limitMinutes: r.limitMinutes },
+      controls: JSON.parse(r.controls) as ControlEntry[],
+      pois: JSON.parse(r.pois) as PoiEntry[],
+      points: (JSON.parse(r.points) as CompactPoint[]).map(fromCompactPoint),
+    };
+    const base = r.title.replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "") || "roadbook";
+    reply.header("content-type", format.data === "gpx" ? "application/gpx+xml" : "application/vnd.garmin.tcx+xml");
+    reply.header("content-disposition", `attachment; filename="${base}.${format.data}"`);
+    return reply.send(format.data === "gpx" ? buildGpx(input) : buildTcx(input));
   });
 
   // Activer = (re)générer un jeton : régénérer révoque l'ancien lien, utile si on l'a
@@ -388,13 +417,25 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     return reply.send({ whatsapp: toWhatsAppText(situation.html), at: situation.at.toISOString() });
   });
 
+  // Vue en direct (heure d'arrivée, barrière, météo devant) pour la page de suivi.
+  app.get("/roadbooks/shared/:token/live", async (request, reply) => {
+    const { token } = request.params as { token: string };
+    if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return reply.code(404).send({ error: "not_found" });
+    const r = await prisma.roadbook.findUnique({ where: { shareToken: token }, select: { id: true } });
+    if (!r) return reply.code(404).send({ error: "not_found" });
+    const live = await liveView(r.id);
+    if (!live) return reply.code(404).send({ error: "no_checkin" });
+    reply.header("cache-control", "no-store");
+    return reply.send(live);
+  });
+
   app.get("/roadbooks/shared/:token", async (request, reply) => {
     const { token } = request.params as { token: string };
     if (!/^[A-Za-z0-9_-]{16,64}$/.test(token)) return reply.code(404).send({ error: "not_found" });
     const r = await prisma.roadbook.findUnique({ where: { shareToken: token }, include: { user: { select: { prenom: true } } } });
     if (!r) return reply.code(404).send({ error: "not_found" });
     const checkins = await prisma.roadbookCheckin.findMany({ where: { roadbookId: r.id }, orderBy: { at: "desc" }, take: 200 });
-    const { shareToken: _token, id: _id, telegramAnnounce: _announce, announceStatus: _status, ...rest } = serialize(r, true);
+    const { shareToken: _token, id: _id, telegramAnnounce: _announce, announceStatus: _status, checklist: _checklist, ...rest } = serialize(r, true);
     reply.header("cache-control", "no-store");
     return reply.send({ roadbook: { ...rest, author: publicName(r.user) }, checkins: checkins.map(serializeCheckin) });
   });

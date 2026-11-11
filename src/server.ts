@@ -24,6 +24,7 @@ import { roadbooksRoutes } from "./routes/roadbooks.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
 import { scrapeNews } from "./lib/newsScraper.js";
 import { checkRoadbookAlerts } from "./lib/roadbookAlerts.js";
+import { checkBackup, lastBackupAt } from "./lib/backupWatch.js";
 import { checkOfficialRoute } from "./lib/pbpRouteWatch.js";
 import { startTelegramPolling } from "./lib/telegramBot.js";
 
@@ -82,7 +83,7 @@ export function buildServer() {
     } catch {
       return reply.code(503).send({ status: "degraded", db: "unreachable" });
     }
-    return { status: "ok", db: "ok", version: process.env.APP_VERSION ?? "dev" };
+    return { status: "ok", db: "ok", version: process.env.APP_VERSION ?? "dev", lastBackupAt: (await lastBackupAt())?.toISOString() ?? null };
   });
 
   // Sert le frontend déjà construit (web/dist) quand il existe, pour le déploiement en
@@ -136,8 +137,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   setTimeout(() => {
     const alerts = () => checkRoadbookAlerts().catch((err) => app.log.error(err, "checkRoadbookAlerts a échoué"));
     const route = () => checkOfficialRoute().catch((err) => app.log.error(err, "checkOfficialRoute a échoué"));
+    const backup = () => checkBackup().catch((err) => app.log.error(err, "checkBackup a échoué"));
     void alerts();
     void route();
+    void backup();
+    setInterval(backup, 24 * 3_600_000);
     setInterval(alerts, 10 * 60_000);
     setInterval(route, 60 * 60_000);
   }, 90_000);

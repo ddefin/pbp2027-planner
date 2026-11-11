@@ -308,3 +308,106 @@ export function snapToRoute(
 export function looksLikeControl(name: string): boolean {
   return /(contr[oô]le|\bcp\s?\d*\b|check|pointage|tampon|control|d[ée]part|arriv[ée]e|start|finish|secret)/i.test(name);
 }
+
+// ─── Plan nutrition et ravitaillement ───
+
+export interface NutritionSettings {
+  waterMlPerHour: number; // 500 ml/h par défaut (plus par forte chaleur)
+  carbsGPerHour: number; // 60 g/h par défaut (effort long)
+  bottleMl: number; // capacité embarquée (2 bidons de 750 ml par défaut)
+}
+
+export const DEFAULT_NUTRITION: NutritionSettings = { waterMlPerHour: 500, carbsGPerHour: 60, bottleMl: 1500 };
+
+export interface ResupplyPoint {
+  name: string;
+  km: number;
+  kind: "controle" | "eau" | "ravito";
+}
+
+export interface NutritionSegment {
+  from: string;
+  to: string;
+  fromKm: number;
+  toKm: number;
+  km: number;
+  rideMin: number; // temps de roulage (hors pause au contrôle de départ)
+  waterMl: number;
+  carbsG: number;
+  kcal: number;
+  // Points de réapprovisionnement ENTRE les deux contrôles (hors contrôles).
+  stops: ResupplyPoint[];
+  // Plus longue distance sans rien (ni contrôle ni point d'eau/ravito) dans le tronçon.
+  longestGapKm: number;
+  // La réserve embarquée ne couvre pas ce tronçon sans réapprovisionnement.
+  needsRefill: boolean;
+}
+
+export interface NutritionPlan {
+  segments: NutritionSegment[];
+  totalWaterL: number;
+  totalCarbsG: number;
+  totalKcal: number;
+}
+
+const WATER_RE = /(fontaine|\beau\b|water|cimeti[eè]re|point d'eau|robinet)/i;
+const FOOD_RE = /(boulang|p[aâ]tiss|supermarch|sup[eé]rette|[eé]picerie|ravito|caf[eé]|bar\b|restaurant|bistro|snack|boucher|carrefour|intermarch|leclerc|lidl|aldi|casino|auchan|u express|vival|spar\b|petit casino|station)/i;
+
+export function classifyPoi(name: string): "eau" | "ravito" | null {
+  if (WATER_RE.test(name)) return "eau";
+  if (FOOD_RE.test(name)) return "ravito";
+  return null;
+}
+
+// Besoins par tronçon (entre deux contrôles consécutifs) d'après le temps de ROULAGE
+// du planning, et vérification de l'autonomie : la réserve embarquée suffit-elle
+// jusqu'au prochain point de réapprovisionnement ?
+export function nutritionPlan(
+  schedule: ScheduleRow[],
+  pois: { name: string; km: number }[],
+  settings: NutritionSettings = DEFAULT_NUTRITION,
+): NutritionPlan {
+  const segments: NutritionSegment[] = [];
+  for (let i = 0; i < schedule.length - 1; i++) {
+    const a = schedule[i];
+    const b = schedule[i + 1];
+    const km = Math.max(0, b.km - a.km);
+    const rideMin = Math.max(0, b.arriveMin - a.departMin);
+    const hours = rideMin / 60;
+    const waterMl = Math.round(hours * settings.waterMlPerHour);
+    const carbsG = Math.round(hours * settings.carbsGPerHour);
+    const stops: ResupplyPoint[] = pois
+      .filter((p) => p.km > a.km + 0.2 && p.km < b.km - 0.2)
+      .flatMap((p): ResupplyPoint[] => {
+        const kind = classifyPoi(p.name);
+        return kind ? [{ name: p.name, km: p.km, kind }] : [];
+      })
+      .sort((x, y) => x.km - y.km);
+    const marks = [a.km, ...stops.map((s) => s.km), b.km];
+    let longestGapKm = 0;
+    for (let j = 1; j < marks.length; j++) longestGapKm = Math.max(longestGapKm, marks[j] - marks[j - 1]);
+    // Eau nécessaire sur le plus long tronçon sans point : proportionnelle à sa part du temps de roulage.
+    const gapWaterMl = km > 0 ? waterMl * (longestGapKm / km) : 0;
+    segments.push({
+      from: a.name,
+      to: b.name,
+      fromKm: a.km,
+      toKm: b.km,
+      km: Math.round(km * 10) / 10,
+      rideMin: Math.round(rideMin),
+      waterMl,
+      carbsG,
+      kcal: carbsG * 4,
+      stops,
+      longestGapKm: Math.round(longestGapKm * 10) / 10,
+      needsRefill: gapWaterMl > settings.bottleMl,
+    });
+  }
+  const totalCarbsG = segments.reduce((s, x) => s + x.carbsG, 0);
+  return {
+    segments,
+    totalWaterL: Math.round(segments.reduce((s, x) => s + x.waterMl, 0) / 100) / 10,
+    totalCarbsG,
+    totalKcal: totalCarbsG * 4,
+  };
+}

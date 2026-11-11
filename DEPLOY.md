@@ -252,3 +252,11 @@ sudo docker compose up -d --build
 - **`Bind mount failed: '.../data' does not exist`** : le dossier `data` n'a pas été
   créé côté hôte avant le premier `docker compose up` — `mkdir -p data` dans le
   dossier du repo (étape 4), puis relance.
+
+### Alerte « sauvegarde manquante »
+
+`scripts/backup.sh` écrit un témoin (`/app/data/.last-backup`) à chaque sauvegarde réussie.
+L'application le relit chaque jour : sans sauvegarde depuis `BACKUP_MAX_AGE_DAYS` jours (3 par
+défaut) — ou jamais —, les administrateurs reçoivent une notification dans l'app et sur le
+canal Telegram des actualités (rappel tous les 3 jours). La date de la dernière sauvegarde
+est aussi visible dans `/health` (`lastBackupAt`).

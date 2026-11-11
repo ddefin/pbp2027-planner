@@ -19,6 +19,7 @@ export interface RoadbookSettings {
   movingSpeedKmh: number;
   climbPenaltyMinPer100m: number;
   controls: RoadbookControl[];
+  checklist?: { id: string; label: string; done: boolean }[];
 }
 
 export interface AnnounceStatus {
@@ -53,7 +54,7 @@ export interface Checkin {
   at: string;
 }
 
-export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken" | "telegramAnnounce" | "announceStatus"> {
+export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken" | "telegramAnnounce" | "announceStatus" | "checklist"> {
   author: string;
 }
 
@@ -136,4 +137,39 @@ export function getRoadbookSituation(id: string) {
 
 export function getSharedSituation(token: string) {
   return request<{ whatsapp: string; at: string }>(`/roadbooks/shared/${encodeURIComponent(token)}/situation`);
+}
+
+export interface LiveWeather {
+  label: string;
+  km: number;
+  at: string;
+  tempC: number;
+  feelsLikeC: number;
+  description: string;
+  icon: string;
+  windSpeedKmh: number;
+  relation: "dos" | "face" | "travers" | null;
+  rainProbability: number;
+  alerts: string[];
+}
+
+export interface LiveView {
+  checkinAt: string;
+  km: number;
+  kmLeft: number;
+  totalKm: number;
+  place: string | null;
+  finished: boolean;
+  plannedFinishAt: string | null;
+  paceFinishAt: string | null;
+  limitAt: string | null;
+  planDeltaMin: number | null;
+  barrierMarginMin: number | null;
+  barrierLevel: "ok" | "tight" | "late" | null;
+  nextControl: { name: string; km: number; eta: string | null; closeAt: string | null } | null;
+  weather: LiveWeather[];
+}
+
+export function getSharedLive(token: string) {
+  return request<LiveView>(`/roadbooks/shared/${encodeURIComponent(token)}/live`);
 }

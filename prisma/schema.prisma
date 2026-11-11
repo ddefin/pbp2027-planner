@@ -422,6 +422,8 @@ model Roadbook {
   // sinon le motif renvoyé par Telegram (affiché au randonneur dans son roadbook).
   lastAnnounceError       String?
   lastAnnounceAttemptAt   DateTime?
+  // Check-list de préparation : [{id, label, done}] (la liste type est fournie par l'app).
+  checklist               String            @default("[]")
   checkins                RoadbookCheckin[]
   alerts                  RoadbookAlert[]
   createdAt               DateTime          @default(now())

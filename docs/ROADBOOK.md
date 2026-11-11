@@ -238,3 +238,13 @@ Les alertes déjà envoyées sont mémorisées (`RoadbookAlert`) ; un envoi refu
 ## Surveillance du parcours officiel
 
 Toutes les heures (`src/lib/pbpRouteWatch.ts`), la page https://www.paris-brest-paris.org/parcours/ est lue. Tant que « Retrouvez bientôt tous les liens vers les fichiers GPX » y figure, le tracé n'est pas publié. Quand la mention disparaît ou que des liens GPX/cartes apparaissent : notification dans l'app à tous les admins + message sur le canal actualités, et bandeau sur la page Parcours PBP. La première lecture ne notifie jamais.
+
+## Préparation et suivi des proches
+
+Aucun suivi GPS continu (batterie) : tout part des pointages volontaires.
+
+- **Check-list de départ** (Réglages) : liste type d'un brevet, cases à cocher, éléments ajoutables/supprimables, enregistrée dans le roadbook (`Roadbook.checklist`), jamais exposée sur le lien public.
+- **Nutrition et ravitaillement** (onglet Roadbook) : par tronçon entre contrôles, eau et glucides d'après le temps de roulage (réglables : 500 ml/h, 60 g/h, réserve 1,5 L), points d'eau/ravito du GPX reconnus à leur nom, alerte si un tronçon dépasse la réserve sans point repéré.
+- **Compteur GPS** (Réglages) : `GET /api/roadbooks/:id/export?format=gpx|tcx` — tracé + contrôles (heures d'ouverture/fermeture/prévue) + points d'eau/ravito. TCX « Course » pour Garmin Connect (noms ≤ 10 caractères).
+- **Vue en direct pour les proches** : `GET /api/roadbooks/shared/:token/live` (sans session) — km, ville, arrivée prévue et au rythme actuel, marge de barrière, prochain contrôle, météo devant ; recalculée au plus toutes les 10 min par roadbook, page rafraîchie toutes les 5 min.
+- **Sauvegarde** : voir DEPLOY.md (alerte si plus de sauvegarde depuis `BACKUP_MAX_AGE_DAYS` jours).
