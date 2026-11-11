@@ -135,17 +135,22 @@ describe("Calcul de la situation", () => {
       { ...base, place: "Dourdan", weather: [{ label: "Maintenant", km: 100, at, slot, relation: "face", alongKmh: -25, alerts: ["vent_de_face", "pluie"] }] },
       { author: "Didier", title: "BRM <200>", classKm: 200, limitMinutes: 810, liveTrackUrl: "https://livetrack.garmin.com/session/abc/token/xyz", shareUrl: "https://pbp.example/r/tok" },
     );
-    expect(msg).toContain("km 100</b> / 200");
-    expect(msg).toContain("reste <b>100 km</b>");
-    expect(msg).toContain("près de <b>Dourdan</b>");
-    expect(msg).toContain("pauses comprises");
-    expect(msg).toContain("hors pauses");
-    expect(msg).toContain("Arrivée estimée");
-    expect(msg).toContain("montées comprises");
-    expect(msg).toContain("Délais BRM 200");
+    expect(msg).toContain("Parcourus : <b>100 km</b> / 200 km");
+    expect(msg).toContain("▰▰▰▰▰▱▱▱▱▱ 50 %");
+    expect(msg).toContain("Restants : <b>100 km</b>");
+    expect(msg).toContain("Près de <b>Dourdan</b>");
+    expect(msg).toContain("<b>⏱ DÉLAIS · BRM 200 en 13h30</b>");
+    expect(msg).toContain("Barrière horaire");
     expect(msg).toContain("ferme à");
-    expect(msg).toContain("vent 25–40 km/h de face");
-    expect(msg).toContain("⚠️ vent de face, pluie");
+    expect(msg).toContain("Moyenne pauses comprises");
+    expect(msg).toContain("Moyenne hors pauses");
+    expect(msg).toContain("<b>🏁 ARRIVÉE ESTIMÉE</b>");
+    expect(msg).toContain("montées et pauses comprises");
+    expect(msg).toContain("<b>🔜 PROCHAIN CONTRÔLE</b>");
+    expect(msg).toContain("💨 25–40 km/h de face");
+    expect(msg).toContain("⚠️ <b>Vigilance</b> : vent de face, pluie");
+    // Blocs séparés par une ligne vide, pour la lisibilité dans le canal.
+    expect(msg.split("\n\n").length).toBeGreaterThanOrEqual(7);
     expect(msg).toContain('href="https://livetrack.garmin.com/session/abc/token/xyz"');
     expect(msg).toContain("BRM &lt;200&gt;");
     expect(msg).not.toContain("BRM <200>");
@@ -202,10 +207,10 @@ describe("Pointage depuis Telegram", () => {
     await msg({ location: { latitude: 48.001, longitude: lonAt(62) } });
     const channel = sent.find((m) => m.chatId === CHANNEL);
     const priv = sent.find((m) => m.chatId === CHAT);
-    expect(Number(/<b>km ([\d,]+)<\/b>/.exec(channel!.text)![1].replace(",", "."))).toBeCloseTo(62, 0);
+    expect(Number(/Parcourus : <b>([\d,]+) km<\/b>/.exec(channel!.text)![1].replace(",", "."))).toBeCloseTo(62, 0);
     expect(channel?.text).toContain("Bourg-la-Forêt");
     expect(channel?.text).toContain("de face"); // vent d'ouest, route vers l'ouest
-    expect(channel?.text).toContain("Arrivée estimée");
+    expect(channel?.text).toContain("ARRIVÉE ESTIMÉE");
     expect(priv?.text).toContain("publié sur le canal");
     const last = await prisma.roadbookCheckin.findFirst({ where: { roadbookId }, orderBy: { at: "desc" } });
     expect(last?.source).toBe("gps");
@@ -215,7 +220,7 @@ describe("Pointage depuis Telegram", () => {
   it("n'inonde pas le canal en cas de double pointage rapproché, mais répond toujours", async () => {
     await msg({ text: "/km 64" });
     expect(sent.some((m) => m.chatId === CHANNEL)).toBe(false);
-    expect(sent.find((m) => m.chatId === CHAT)?.text).toContain("km 64");
+    expect(sent.find((m) => m.chatId === CHAT)?.text).toContain("Parcourus : <b>64 km</b>");
   });
 
   it("liste et pointe les contrôles avec /cp", async () => {
@@ -225,7 +230,7 @@ describe("Pointage depuis Telegram", () => {
     await prisma.roadbook.update({ where: { id: roadbookId }, data: { lastAnnouncedAt: null } });
     await msg({ text: "/cp 1" });
     const cpMsg = sent.find((m) => m.chatId === CHANNEL)!.text;
-    expect(Number(/<b>km ([\d,]+)<\/b>/.exec(cpMsg)![1].replace(",", "."))).toBeCloseTo(50, 0);
+    expect(Number(/Parcourus : <b>([\d,]+) km<\/b>/.exec(cpMsg)![1].replace(",", "."))).toBeCloseTo(50, 0);
   });
 
   it("refuse une position trop loin du tracé", async () => {

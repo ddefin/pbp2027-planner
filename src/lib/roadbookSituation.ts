@@ -153,76 +153,103 @@ function weatherEmoji(icon: string): string {
   return ({ "01": "☀️", "02": "🌤️", "03": "☁️", "04": "☁️", "09": "🌧️", "10": "🌦️", "11": "⛈️", "13": "❄️", "50": "🌫️" } as Record<string, string>)[c] ?? "🌡️";
 }
 
-function weatherLine(w: WeatherPoint, ref: Date): string {
-  const s = w.slot;
-  const head = w.label === "Maintenant" ? "Maintenant" : `${escapeHtml(w.label)} (≈${dayTime(w.at, ref)})`;
-  const wind = `vent ${s.windSpeedKmh}${s.windGustsKmh ? `–${s.windGustsKmh}` : ""} km/h${w.relation ? ` ${RELATION_TXT[w.relation]}` : ""}`;
-  const rain = `💧${Math.round(s.precipitationProbability * 100)} %${s.rainMm > 0 ? ` (${s.rainMm} mm)` : ""}`;
-  const alerts = w.alerts.length ? ` ⚠️ ${w.alerts.map((a) => ALERT_TXT[a]).join(", ")}` : "";
-  return `${weatherEmoji(s.icon)} ${head} : ${s.tempC}° (ressenti ${s.feelsLikeC}°), ${escapeHtml(s.description)}, ${wind}, ${rain}${alerts}`;
+// Barre d'avancement en 10 cases : lisible d'un coup d'œil dans le canal, quel que soit
+// l'appareil (pas d'alignement en colonnes, qui casse avec les polices proportionnelles).
+function progressBar(km: number, total: number): string {
+  const ratio = total > 0 ? Math.max(0, Math.min(1, km / total)) : 0;
+  const filled = Math.round(ratio * 10);
+  return `${"▰".repeat(filled)}${"▱".repeat(10 - filled)} ${Math.round(ratio * 100)} %`;
 }
 
-// Message HTML Telegram. Chaque ligne absente quand l'info manque (pas d'heure de
-// départ, pas de météo configurée...) plutôt que d'afficher des "?" partout.
+function weatherBlock(w: WeatherPoint, ref: Date): string {
+  const s = w.slot;
+  const head = w.label === "Maintenant" ? "Maintenant" : `${escapeHtml(w.label)} · vers ${dayTime(w.at, ref)}`;
+  const wind = `💨 ${s.windSpeedKmh}${s.windGustsKmh ? `–${s.windGustsKmh}` : ""} km/h${w.relation ? ` ${RELATION_TXT[w.relation]}` : ""}`;
+  const rain = `💧 ${Math.round(s.precipitationProbability * 100)} %${s.rainMm > 0 ? ` (${kmFmt(s.rainMm)} mm)` : ""}`;
+  return `<b>${head}</b> — ${weatherEmoji(s.icon)} ${s.tempC}° (ressenti ${s.feelsLikeC}°), ${escapeHtml(s.description)}\n      ${wind} · ${rain}`;
+}
+
+// Message HTML Telegram, en blocs titrés : l'essentiel (où, combien, dans les temps ?)
+// en tête, le détail ensuite. Chaque bloc ou ligne disparaît quand l'info manque (pas
+// d'heure de départ, pas de météo configurée...) plutôt que d'afficher des "?".
 export function formatSituationMessage(s: Situation, meta: { author: string; title: string; classKm: number; limitMinutes: number; liveTrackUrl: string | null; shareUrl: string | null }): string {
-  const L: string[] = [];
-  L.push(`🚴 <b>${escapeHtml(meta.author)}</b> — ${escapeHtml(meta.title)}`);
-  const where = s.place ? ` · près de <b>${escapeHtml(s.place)}</b>` : "";
-  L.push(`📍 <b>km ${kmFmt(s.km)}</b> / ${kmFmt(s.totalKm)} · reste <b>${kmFmt(s.kmLeft)} km</b>${where}`);
-
-  if (s.kmLeft === 0) {
-    const inTime = s.limitAt ? s.at <= s.limitAt : null;
-    L.push(`🏁 <b>Arrivé${s.elapsedMin !== null ? ` en ${formatMinutes(s.elapsedMin)}` : ""}</b>${inTime === null ? "" : inTime ? " — dans les délais ✅" : " — hors délai ❌"}`);
-  } else if (s.elapsedMin === null) {
-    L.push("⏱ Heure de départ non renseignée dans le roadbook : pas de calcul d'avance/retard.");
-  } else {
-    L.push(`⏱ En route depuis ${formatMinutes(s.elapsedMin)} · pointage à ${time(s.at)}`);
-  }
-
+  const blocks: string[][] = [];
   const st = s.status;
-  if (st && s.kmLeft > 0) {
+  const finished = s.kmLeft === 0;
+
+  // En-tête : qui, quel brevet, où, quand.
+  const head = [`🚴 <b>${escapeHtml(meta.author)}</b> · ${escapeHtml(meta.title)}`];
+  head.push(`📍 ${s.place ? `Près de <b>${escapeHtml(s.place)}</b> — ` : ""}pointage à ${time(s.at)}`);
+  blocks.push(head);
+
+  // Progression.
+  const prog = ["<b>📏 PROGRESSION</b>", progressBar(s.km, s.totalKm), `Parcourus : <b>${kmFmt(s.km)} km</b> / ${kmFmt(s.totalKm)} km`];
+  if (!finished) prog.push(`Restants : <b>${kmFmt(s.kmLeft)} km</b>${s.remainingGainM ? ` · D+ restant ${s.remainingGainM} m` : ""}`);
+  if (s.elapsedMin !== null) prog.push(`En route depuis : ${formatMinutes(s.elapsedMin)}`);
+  blocks.push(prog);
+
+  if (finished) {
+    const inTime = s.limitAt ? s.at <= s.limitAt : null;
+    blocks.push([
+      `🏁 <b>ARRIVÉ${s.elapsedMin !== null ? ` EN ${formatMinutes(s.elapsedMin)}` : ""}</b>`,
+      inTime === null ? "" : inTime ? `✅ Dans les délais du BRM ${meta.classKm} (${formatMinutes(meta.limitMinutes)})` : `❌ Hors délai du BRM ${meta.classKm} (${formatMinutes(meta.limitMinutes)})`,
+    ].filter(Boolean));
+  } else if (s.elapsedMin === null) {
+    blocks.push(["⏱ Heure de départ non renseignée dans le roadbook : pas de calcul d'avance/retard."]);
+  } else if (st) {
+    // Délais : la barrière officielle d'abord (c'est l'élimination), puis le plan perso.
+    const delays = [`<b>⏱ DÉLAIS · BRM ${meta.classKm} en ${formatMinutes(meta.limitMinutes)}</b>`];
     if (st.nextControl) {
       const closeAt = s.startAt ? addMin(s.startAt, st.nextControl.closeMin) : null;
       const word = st.closedAlready ? "HORS DÉLAI" : st.barrierLevel === "ok" ? "dans les temps" : st.barrierLevel === "tight" ? "tangent" : "en retard";
-      L.push(
-        `${LEVEL_DOT[st.closedAlready ? "late" : st.barrierLevel]} Délais BRM ${meta.classKm} (${formatMinutes(meta.limitMinutes)}) : <b>${word}</b> — ${st.barrierMarginMin !== null ? `${signed(st.barrierMarginMin)} ` : ""}sur ${escapeHtml(st.nextControl.name)} (km ${Math.round(st.nextControl.km)}${closeAt ? `, ferme à ${dayTime(closeAt, s.at)}` : ""})`,
+      delays.push(
+        `${LEVEL_DOT[st.closedAlready ? "late" : st.barrierLevel]} Barrière horaire : <b>${st.barrierMarginMin !== null ? signed(st.barrierMarginMin) : "—"}</b> · ${word}`,
       );
+      delays.push(`      ${escapeHtml(st.nextControl.name)} (km ${Math.round(st.nextControl.km)})${closeAt ? ` ferme à ${dayTime(closeAt, s.at)}` : ""}`);
     }
-    L.push(`${LEVEL_DOT[st.planLevel]} Objectif perso : <b>${signed(st.planDeltaMin)}</b> ${st.planDeltaMin >= 0 ? "d'avance" : "de retard"} sur son roadbook`);
+    delays.push(`${LEVEL_DOT[st.planLevel]} Objectif perso : <b>${signed(st.planDeltaMin)}</b> ${st.planDeltaMin >= 0 ? "d'avance" : "de retard"}`);
+    blocks.push(delays);
   }
 
-  if (s.avgAllKmh) {
-    L.push(`🚀 Moyenne <b>${kmFmt(s.avgAllKmh)} km/h</b> pauses comprises${s.avgMovingKmh ? ` · ≈ ${kmFmt(s.avgMovingKmh)} km/h hors pauses` : ""}`);
+  // Allure.
+  if (s.avgAllKmh || (st?.requiredSpeedFinishKmh && !finished)) {
+    const pace = ["<b>🚀 ALLURE</b>"];
+    if (s.avgAllKmh) pace.push(`Moyenne pauses comprises : <b>${kmFmt(s.avgAllKmh)} km/h</b>`);
+    if (s.avgMovingKmh) pace.push(`Moyenne hors pauses : ≈ ${kmFmt(s.avgMovingKmh)} km/h`);
+    if (st?.requiredSpeedFinishKmh && !finished) pace.push(`Minimum pour finir dans les délais : ${kmFmt(st.requiredSpeedFinishKmh)} km/h`);
+    blocks.push(pace);
   }
 
-  if (s.kmLeft > 0 && s.plannedFinishAt) {
+  // Arrivée estimée.
+  if (!finished && s.plannedFinishAt) {
     const margin = s.limitAt ? Math.round((s.limitAt.getTime() - s.plannedFinishAt.getTime()) / 60_000) : null;
-    const pace = s.paceFinishAt ? ` · ${dayTime(s.paceFinishAt, s.at)} au rythme actuel` : "";
-    const lim = s.limitAt ? ` — délai ${dayTime(s.limitAt, s.at)}${margin !== null ? ` (marge ${signed(margin)})` : ""}` : "";
-    L.push(`🏁 Arrivée estimée <b>${dayTime(s.plannedFinishAt, s.at)}</b> (allure prévue, montées comprises)${pace}${lim}`);
+    const arr = ["<b>🏁 ARRIVÉE ESTIMÉE</b>", `<b>${dayTime(s.plannedFinishAt, s.at)}</b> à l'allure prévue (montées et pauses comprises)`];
+    if (s.paceFinishAt) arr.push(`${dayTime(s.paceFinishAt, s.at)} au rythme actuel`);
+    if (s.limitAt) arr.push(`Délai officiel : ${dayTime(s.limitAt, s.at)}${margin !== null ? ` · marge ${signed(margin)}` : ""}`);
+    blocks.push(arr);
   }
 
-  if (s.kmLeft > 0) {
-    const bits: string[] = [];
-    if (s.remainingGainM) bits.push(`reste D+ ${s.remainingGainM} m`);
-    if (st?.requiredSpeedFinishKmh) bits.push(`moyenne mini pour finir ${kmFmt(st.requiredSpeedFinishKmh)} km/h`);
-    if (s.nextControl && s.nextControlEta) bits.push(`prochain contrôle ${escapeHtml(s.nextControl.name)} dans ${kmFmt(s.nextControl.km - s.km)} km (≈${dayTime(s.nextControlEta, s.at)})`);
-    if (bits.length) L.push(`⛰️ ${bits.join(" · ")}`);
+  // Prochain contrôle.
+  if (!finished && s.nextControl && s.nextControlEta) {
+    blocks.push([
+      "<b>🔜 PROCHAIN CONTRÔLE</b>",
+      `${escapeHtml(s.nextControl.name)} — dans ${kmFmt(s.nextControl.km - s.km)} km, vers ${dayTime(s.nextControlEta, s.at)}`,
+    ]);
   }
 
+  // Météo, puis vigilance regroupée (une seule ligne, sans doublons).
   if (s.weather.length) {
-    L.push("");
-    for (const w of s.weather) L.push(weatherLine(w, s.at));
+    blocks.push(["<b>🌦️ MÉTÉO SUR LE PARCOURS</b>", ...s.weather.map((w) => weatherBlock(w, s.at))]);
+    const alerts = [...new Set(s.weather.flatMap((w) => w.alerts))];
+    if (alerts.length) blocks.push([`⚠️ <b>Vigilance</b> : ${alerts.map((a) => ALERT_TXT[a]).join(", ")}`]);
   }
 
   const links: string[] = [];
-  if (meta.liveTrackUrl) links.push(`<a href="${escapeHtml(meta.liveTrackUrl)}">Garmin LiveTrack</a>`);
-  if (meta.shareUrl) links.push(`<a href="${escapeHtml(meta.shareUrl)}">Roadbook et suivi</a>`);
-  if (links.length) {
-    L.push("");
-    L.push(`🔗 ${links.join(" · ")}`);
-  }
-  return L.join("\n");
+  if (meta.liveTrackUrl) links.push(`<a href="${escapeHtml(meta.liveTrackUrl)}">📡 Garmin LiveTrack</a>`);
+  if (meta.shareUrl) links.push(`<a href="${escapeHtml(meta.shareUrl)}">🗺️ Roadbook et suivi</a>`);
+  if (links.length) blocks.push([links.join("  ·  ")]);
+
+  return blocks.map((b) => b.join("\n")).join("\n\n");
 }
 
 export function decodeRoadbookPoints(json: string): RoutePoint[] {
