@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { NewsItem, NewsSource } from "../api/news";
+import { Disclosure } from "../components/Disclosure";
 import { useNews } from "../hooks/useNews";
 
 const SOURCE_LABEL: Record<NewsSource, string> = {
@@ -58,6 +59,9 @@ export function NewsPage() {
   const [source, setSource] = useState<NewsSource | "">("");
   const [search, setSearch] = useState("");
 
+  const isWide = typeof window !== "undefined" && window.matchMedia("(min-width: 701px)").matches;
+  const filterSummary = [source ? SOURCE_LABEL[source] : "Toutes sources", search.trim() ? `« ${search.trim()} »` : null].filter(Boolean).join(" · ");
+
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
     return (items ?? []).filter((i) => {
@@ -85,6 +89,7 @@ export function NewsPage() {
 
         {error && <div className="error-banner">{error}</div>}
 
+        <Disclosure title="Filtres" summary={filterSummary} defaultOpen={isWide} storageKey="actualites.filtres">
         <div className="cal-filters">
           <div className="cal-chips">
             <button type="button" className={`cal-chip${source === "" ? " active" : ""}`} onClick={() => setSource("")}>
@@ -105,6 +110,7 @@ export function NewsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        </Disclosure>
 
         {loading && (
           <div className="news-grid">

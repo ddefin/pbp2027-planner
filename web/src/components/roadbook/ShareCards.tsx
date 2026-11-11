@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { setRoadbookSharing, type AnnounceStatus } from "../../api/roadbooks";
+import { Disclosure } from "../Disclosure";
 import { WhatsAppShare } from "./WhatsAppShare";
 
 function shareLinkUrl(token: string | null): string | null {
@@ -43,8 +44,13 @@ export function ShareLinkCard({
   const url = shareLinkUrl(shareToken);
 
   return (
-    <div className="rb-card">
-      <h3 className="rb-card-title">🔗 Lien de suivi pour mes proches</h3>
+    <Disclosure
+      title="🔗 Lien de suivi pour mes proches"
+      summary={url ? "✓ Actif — partageable avec tes proches" : "Pas encore créé"}
+      tone={url ? "ok" : "warn"}
+      defaultOpen={!url}
+      storageKey="rb.partage.lien"
+    >
       {url ? (
         <>
           <input className="rb-input" style={{ width: "100%" }} readOnly value={url} onFocus={(e) => e.target.select()} aria-label="Lien de suivi" />
@@ -97,20 +103,25 @@ export function ShareLinkCard({
           </div>
         </>
       )}
-    </div>
+    </Disclosure>
   );
 }
 
 export function WhatsAppCard({ text, at }: { text: string | null; at?: string | null }) {
+  const when = at ? new Date(at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
   return (
-    <div className="rb-card">
-      <h3 className="rb-card-title">📲 WhatsApp</h3>
+    <Disclosure
+      title="📲 WhatsApp"
+      summary={text ? `✓ Résumé prêt${when ? ` (pointage de ${when})` : ""}` : "Disponible dès ton premier pointage"}
+      tone={text ? "ok" : "muted"}
+      storageKey="rb.partage.whatsapp"
+    >
       <p className="hint" style={{ margin: 0 }}>
         WhatsApp ne permet pas de publier automatiquement dans un groupe : le bouton ouvre WhatsApp avec le résumé de ta
         situation déjà rédigé, tu choisis le groupe et tu envoies.
       </p>
       {text ? <WhatsAppShare text={text} at={at} /> : <p className="hint" style={{ margin: 0 }}>Disponible dès ton premier pointage.</p>}
-    </div>
+    </Disclosure>
   );
 }
 

@@ -3,6 +3,7 @@ import { ApiError } from "../../api/auth";
 import { getTelegramStatus, type TelegramStatus } from "../../api/profile";
 import { testTrackingChannel, updateRoadbook, type AnnounceStatus } from "../../api/roadbooks";
 import { useAuth } from "../../context/AuthContext";
+import { Disclosure } from "../Disclosure";
 
 const GARMIN_HOSTS = ["livetrack.garmin.com", "share.garmin.com", "connect.garmin.com", "gar.mn"];
 
@@ -48,8 +49,12 @@ export function LiveTrackCard({
   }
 
   return (
-    <div className="rb-card">
-      <h3 className="rb-card-title">📡 Garmin LiveTrack</h3>
+    <Disclosure
+      title="📡 Garmin LiveTrack"
+      summary={liveTrackUrl ? "✓ Lien enregistré — visible par tes proches" : "Non renseigné (optionnel)"}
+      tone={liveTrackUrl ? "ok" : "muted"}
+      storageKey="rb.partage.livetrack"
+    >
       <p className="hint" style={{ margin: 0 }}>
         C'est ton compteur Garmin qui envoie sa position (via Garmin Connect) : rien à faire sur cette page. Démarre LiveTrack au
         départ, copie le lien de l'email ou de l'app Garmin Connect, colle-le ici. Le lien change à chaque activité.
@@ -73,7 +78,7 @@ export function LiveTrackCard({
         </button>
       </form>
       {state && <div className={`live-feedback live-feedback-${state.kind}`}>{state.text}</div>}
-    </div>
+    </Disclosure>
   );
 }
 
@@ -128,9 +133,23 @@ export function TelegramCard({
     }
   }
 
+  const failed = telegramAnnounce && Boolean(announceStatus?.lastError);
+  const summary = !telegramAnnounce
+    ? "Publication désactivée"
+    : failed
+      ? `⚠ Dernière publication échouée (${hhmm(announceStatus!.lastAttemptAt!)})`
+      : announceStatus?.lastAttemptAt
+        ? `✓ Dernière publication réussie (${hhmm(announceStatus.lastAttemptAt)})`
+        : "Actif — rien publié pour l'instant";
+
   return (
-    <div className="rb-card">
-      <h3 className="rb-card-title">✈️ Canal Telegram du groupe</h3>
+    <Disclosure
+      title="✈️ Canal Telegram du groupe"
+      summary={summary}
+      tone={!telegramAnnounce ? "muted" : failed ? "error" : announceStatus?.lastAttemptAt ? "ok" : "muted"}
+      defaultOpen={failed}
+      storageKey="rb.partage.telegram"
+    >
 
       <label className="rb-check">
         <input type="checkbox" checked={telegramAnnounce} onChange={(e) => void toggle(e.target.checked)} />
@@ -207,6 +226,6 @@ export function TelegramCard({
           )}
         </div>
       )}
-    </div>
+    </Disclosure>
   );
 }

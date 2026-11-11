@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { CatalogEvent } from "../api/brmCatalog";
+import { Disclosure } from "../components/Disclosure";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
 import { ACP_CALENDAR_URL, CATALOG_STATUS_LABEL, CATALOG_STATUS_OPTIONS, VALID_DISTANCES } from "../lib/brmMeta";
 
@@ -32,6 +33,19 @@ export function CalendrierPage() {
   const [search, setSearch] = useState("");
   const [distances, setDistances] = useState<Set<number>>(new Set());
   const [region, setRegion] = useState("");
+
+  // Filtres repliés sur téléphone (ils occupaient un écran entier avant la liste) ; le
+  // résumé rappelle ce qui est actif.
+  const isWide = typeof window !== "undefined" && window.matchMedia("(min-width: 701px)").matches;
+  const activeFilters = (distances.size > 0 ? 1 : 0) + (region ? 1 : 0) + (search.trim() ? 1 : 0);
+  const filterSummary = [
+    activeFilters > 0 ? `${activeFilters} filtre${activeFilters > 1 ? "s" : ""} actif${activeFilters > 1 ? "s" : ""}` : "Aucun filtre",
+    distances.size > 0 ? `${[...distances].sort((a, b) => a - b).join(", ")} km` : null,
+    region || null,
+    search.trim() ? `« ${search.trim()} »` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const regions = useMemo(() => {
     const set = new Set((events ?? []).map((e) => e.region).filter(Boolean));
@@ -79,6 +93,7 @@ export function CalendrierPage() {
 
         {error && <div className="error-banner">{error}</div>}
 
+        <Disclosure title="Filtres" summary={filterSummary} defaultOpen={isWide} storageKey="calendrier.filtres">
         <div className="cal-filters">
           <div className="cal-chips">
             <button type="button" className={`cal-chip${distances.size === 0 ? " active" : ""}`} onClick={() => setDistances(new Set())}>
@@ -111,6 +126,7 @@ export function CalendrierPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        </Disclosure>
 
         {loading && <p className="hint">Chargement du calendrier…</p>}
         {!loading && !error && filtered.length === 0 && <p className="hint">Aucun BRM ne correspond à ces critères.</p>}

@@ -36,6 +36,14 @@ pas renseignée, **Roadbook** pour préparer, **Suivi** à moins de 3 h du dépa
 brevet. Les proches qui ouvrent le lien de suivi n'ont que **Suivi** et **Roadbook**, en
 lecture seule.
 
+Dans Réglages et Partage, chaque groupe de choix est une **section dépliable** dont le
+résumé d'état reste visible fermée (« ✓ Lien actif », « ⚠ Dernière publication échouée »…).
+Une section **s'ouvre d'elle-même quand quelque chose demande attention** (départ à
+renseigner, lien pas encore créé, publication Telegram en échec) mais ne se referme jamais
+toute seule ; le choix de la personne est mémorisé sur son appareil. Même principe pour les
+filtres du calendrier et des actualités, repliés par défaut sur téléphone
+(`web/src/components/Disclosure.tsx`).
+
 Sur téléphone, le tableau des contrôles devient une fiche par contrôle (pas de défilement
 latéral). À l'impression, seuls le profil et le roadbook sont imprimés, quel que soit
 l'onglet actif.

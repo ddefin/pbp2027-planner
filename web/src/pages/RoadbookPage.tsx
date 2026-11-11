@@ -13,6 +13,7 @@ import {
 } from "../api/roadbooks";
 import { RoadbookView, type RoadbookData } from "../components/roadbook/RoadbookView";
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
+import { Disclosure } from "../components/Disclosure";
 import { LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
 import { QuickShare, ShareLinkCard, WhatsAppCard } from "../components/roadbook/ShareCards";
 
@@ -162,8 +163,7 @@ export function RoadbookPage() {
           </>
         ),
         settingsFooter: (
-          <div className="rb-card">
-            <h3 className="rb-card-title">📁 Fichier et suppression</h3>
+          <Disclosure title="📁 Fichier et suppression" summary="GPX d'origine · supprimer le roadbook" storageKey="rb.reglages.fichier">
             <div className="rb-card-actions">
               <a className="ghost-link" href={roadbookGpxUrl(data.id)} download>
                 Télécharger le GPX d'origine
@@ -180,7 +180,7 @@ export function RoadbookPage() {
                 Supprimer ce roadbook
               </button>
             </div>
-          </div>
+          </Disclosure>
         ),
       }}
     />

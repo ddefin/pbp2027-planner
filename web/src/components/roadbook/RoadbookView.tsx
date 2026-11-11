@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { TrackPoint } from "../../api/brmCatalog";
 import type { PbpControl, RouteWaypoint } from "../../api/pbpRoutes";
 import type { RoadbookPoi, RoadbookSettings } from "../../api/roadbooks";
+import { Disclosure } from "../Disclosure";
 import { ElevationProfile } from "../ElevationProfile";
 import { RouteMap } from "../pbp/RouteMap";
 import { StatusPanel } from "./StatusPanel";
@@ -380,8 +381,17 @@ export function RoadbookView({
           "reglages",
           false,
           <section className="panel no-print">
-            <div className="rb-card">
-              <h3 className="rb-card-title">🏷️ Brevet et départ</h3>
+            <Disclosure
+              title="🏷️ Brevet et départ"
+              summary={
+                data.startAt
+                  ? `BRM ${data.classKm} · départ ${new Date(data.startAt).toLocaleString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                  : "⚠ Heure de départ à renseigner"
+              }
+              tone={data.startAt ? "muted" : "warn"}
+              defaultOpen={!data.startAt}
+              storageKey="rb.reglages.brevet"
+            >
               <div className="field" style={{ marginBottom: 0 }}>
                 <label htmlFor="rb-title">Nom du roadbook (affiché aux proches et sur le canal Telegram)</label>
                 <input
@@ -453,10 +463,13 @@ export function RoadbookView({
                   />
                 </div>
               </div>
-            </div>
+            </Disclosure>
 
-            <div className="rb-card">
-              <h3 className="rb-card-title">🚴 Mon allure</h3>
+            <Disclosure
+              title="🚴 Mon allure"
+              summary={`${data.movingSpeedKmh.toFixed(1)} km/h roulés${data.climbPenaltyMinPer100m ? ` · +${data.climbPenaltyMinPer100m} min / 100 m D+` : ""}`}
+              storageKey="rb.reglages.allure"
+            >
               <div className="sim-grid">
                 <div className="field" style={{ marginBottom: 0 }}>
                   <label htmlFor="rb-speed">Vitesse roulée (hors arrêts) : {data.movingSpeedKmh.toFixed(1)} km/h</label>
@@ -494,7 +507,7 @@ export function RoadbookView({
                   Régler les pauses une par une → Roadbook
                 </button>
               </div>
-            </div>
+            </Disclosure>
 
             {slots?.settingsFooter}
           </section>,
