@@ -13,6 +13,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 import { NotificationBell } from "./components/NotificationBell";
+import { NotFoundPage } from "./pages/NotFoundPage";
 
 // Page la plus lourde de l'app (carte, profil, simulation, météo) : chargée seulement
 // quand on l'ouvre, pour que le reste de l'app démarre aussi vite qu'avant sur mobile.
@@ -189,6 +190,7 @@ export default function App() {
             </ProtectedLayout>
           }
         />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </AuthProvider>
   );

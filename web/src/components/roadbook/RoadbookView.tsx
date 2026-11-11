@@ -35,6 +35,24 @@ function toLocalInput(iso: string | null): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Message affiché tant qu'il n'y a pas de statut live : formulé pour le propriétaire
+// (quoi faire) ou pour un proche sur le lien de suivi (où en est-on) — un proche
+// n'a que faire de "Renseigne l'heure de départ".
+function waitingMessage(editable: boolean, startAt: string | null, author?: string): string {
+  const who = author ?? "Le randonneur";
+  if (editable) {
+    return startAt
+      ? "Le statut avance/retard s'affichera ici dès la première position (GPS ou pointage)."
+      : "Renseigne l'heure de départ (section « Mon allure ») pour obtenir les heures de passage et le suivi avance/retard.";
+  }
+  if (!startAt) return `${who} n'a pas encore indiqué son heure de départ : les horaires de passage s'afficheront ici dès que ce sera fait. Le parcours et le roadbook sont déjà consultables ci-dessous.`;
+  const start = new Date(startAt);
+  const when = start.toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+  return start.getTime() > Date.now()
+    ? `Départ prévu ${when}. La position et l'avance/retard s'afficheront ici pendant le brevet (page actualisée chaque minute).`
+    : `Parti ${when}. Pas encore de position partagée : elle apparaîtra ici dès le premier pointage (page actualisée chaque minute).`;
+}
+
 export function RoadbookView({
   data,
   position,
@@ -142,11 +160,7 @@ export function RoadbookView({
         {status ? (
           <StatusPanel status={status} startAt={data.startAt} asOf={position?.at} />
         ) : (
-          <p className="hint no-print">
-            {data.startAt
-              ? "Le statut avance/retard s'affichera ici dès la première position (GPS ou pointage)."
-              : "Renseigne l'heure de départ pour obtenir les heures de passage et le suivi avance/retard."}
-          </p>
+          <div className={editable ? "hint no-print" : "rb-viewer-note no-print"}>{waitingMessage(editable, data.startAt, author)}</div>
         )}
 
         {live && <div className="no-print">{live}</div>}

@@ -154,6 +154,11 @@ export function RoadbookPage() {
                     Désactiver
                   </button>
                 </div>
+                {!data.startAt && (
+                  <div className="pbp-banner" style={{ margin: 0 }}>
+                    Pas d'heure de départ renseignée : tes proches verront le parcours mais aucun horaire de passage ni suivi.
+                  </div>
+                )}
                 <p className="hint" style={{ margin: 0 }}>
                   Toute personne qui a ce lien voit ton roadbook et tes positions déclarées, sans compte. « Nouveau lien » rend
                   l'ancien inutilisable.
