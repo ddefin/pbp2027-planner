@@ -204,6 +204,18 @@ export function RoadbookView({
       {editable && onChange && (
         <section className="panel no-print">
           <h2>Mon allure</h2>
+          <div className="field">
+            <label htmlFor="rb-title">Nom du roadbook (affiché aux proches et sur le canal Telegram)</label>
+            <input
+              id="rb-title"
+              value={data.title}
+              maxLength={100}
+              onChange={(e) => onChange({ title: e.target.value })}
+              onBlur={(e) => {
+                if (!e.target.value.trim()) onChange({ title: "Mon BRM" });
+              }}
+            />
+          </div>
           <div className="sim-grid">
             <div className="field" style={{ marginBottom: 0 }}>
               <label htmlFor="rb-class">Brevet</label>

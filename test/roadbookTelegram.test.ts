@@ -89,6 +89,11 @@ beforeEach(() => {
         sent.push({ chatId: String(body.chat_id), text: body.text });
         return new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 });
       }
+      if (u.includes("/data/2.5/weather"))
+        return new Response(
+          JSON.stringify({ dt: Math.floor(Date.now() / 1000), main: { temp: 11, feels_like: 8 }, wind: { speed: 8, deg: 270, gust: 13 }, weather: [{ description: "couvert", icon: "04d" }] }),
+          { status: 200 },
+        );
       if (u.includes("/geo/1.0/reverse")) return new Response(JSON.stringify([{ name: "Bourg", local_names: { fr: "Bourg-la-Forêt" } }]), { status: 200 });
       if (u.includes("openweathermap")) return new Response(JSON.stringify(owmForecast()), { status: 200 });
       return new Response("not found", { status: 404 });
@@ -157,6 +162,54 @@ describe("Calcul de la situation", () => {
   });
 });
 
+describe("Robustesse du résumé", () => {
+  it("choisit le bon créneau de prévision, y compris avant la première échéance de 3 h", async () => {
+    const { pickForecastSlot } = await import("../src/lib/openWeather.js");
+    const base = Date.parse("2027-03-06T18:00:00Z");
+    const slots = [0, 3, 6].map((h) => ({ at: new Date(base + h * 3600_000).toISOString() }));
+    expect(pickForecastSlot(slots, new Date(base - 2.5 * 3600_000))).toBe(slots[0]); // 15h30 → créneau de 18h
+    expect(pickForecastSlot(slots, new Date(base - 4 * 3600_000))).toBeNull(); // trop avant
+    expect(pickForecastSlot(slots, new Date(base + 4 * 3600_000))).toBe(slots[1]);
+    expect(pickForecastSlot(slots, new Date(base + 9 * 3600_000))).toBeNull(); // au-delà de l'horizon
+  });
+
+  it("pointage avant l'heure de départ : ni « non renseignée » ni marge absurde, et pas de doublon arrivée/prochain contrôle", () => {
+    const points = Array.from({ length: 205 }, (_, i) => ({ lat: 48, lon: lonAt(i), ele: 100, distKm: i }));
+    const rb = {
+      classKm: 200,
+      limitMinutes: 810,
+      movingSpeedKmh: 25,
+      climbPenaltyMinPer100m: 0,
+      startAt: new Date("2027-03-07T06:00:00Z"),
+      controls: [
+        { name: "Départ", km: 0, stopMinutes: 0 },
+        { name: "Arrivée", km: 204, stopMinutes: 0 },
+      ],
+      points,
+    };
+    const at = new Date("2026-11-11T15:33:00Z");
+    const msg = situationLib.formatSituationMessage(
+      { ...situationLib.computeSituation(rb, 200.4, at), place: "Serris", weather: [] },
+      { author: "David", title: "BRM 200", classKm: 200, limitMinutes: 810, liveTrackUrl: null, shareUrl: null },
+    );
+    expect(msg).toContain("Départ prévu le dimanche 7 mars 2027");
+    expect(msg).not.toContain("non renseignée");
+    expect(msg).not.toContain("marge");
+    expect(msg).not.toContain("PROCHAIN CONTRÔLE");
+  });
+
+  it("découpe un message trop long entre deux blocs, sans rien perdre", async () => {
+    const { splitTelegramMessage } = await import("../src/lib/telegram.js");
+    const blocks = Array.from({ length: 30 }, (_, i) => `<b>BLOC ${i}</b>\n${"x".repeat(300)}`);
+    const text = blocks.join("\n\n");
+    const parts = splitTelegramMessage(text);
+    expect(parts.length).toBeGreaterThanOrEqual(3);
+    expect(parts.every((p) => p.length <= 4000)).toBe(true);
+    expect(parts.join("\n\n")).toBe(text);
+    expect(parts.every((p) => (p.match(/<b>/g) ?? []).length === (p.match(/<\/b>/g) ?? []).length)).toBe(true);
+  });
+});
+
 describe("Pointage depuis Telegram", () => {
   let server: ReturnType<typeof buildServer>;
   let cookie: string;
@@ -210,6 +263,8 @@ describe("Pointage depuis Telegram", () => {
     expect(Number(/Parcourus : <b>([\d,]+) km<\/b>/.exec(channel!.text)![1].replace(",", "."))).toBeCloseTo(62, 0);
     expect(channel?.text).toContain("Bourg-la-Forêt");
     expect(channel?.text).toContain("de face"); // vent d'ouest, route vers l'ouest
+    // "Maintenant" vient de l'observation actuelle (couvert, 11°), pas d'une prévision.
+    expect(channel?.text).toMatch(/<b>Maintenant<\/b> — ☁️ 11° \(ressenti 8°\), couvert/);
     expect(channel?.text).toContain("ARRIVÉE ESTIMÉE");
     expect(priv?.text).toContain("publié sur le canal");
     const last = await prisma.roadbookCheckin.findFirst({ where: { roadbookId }, orderBy: { at: "desc" } });

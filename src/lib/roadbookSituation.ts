@@ -1,9 +1,9 @@
 import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { fromCompactPoint, pointAtKm, routeBearingAt, type CompactPoint, type RoutePoint } from "./geo.js";
-import { fetchForecastAt, reverseGeocode, type PointForecastSlot } from "./openWeather.js";
+import { fetchCurrentAt, fetchForecastAt, pickForecastSlot, reverseGeocode, type PointForecastSlot } from "./openWeather.js";
 import { alertsFor, windAlongRoute, type WeatherAlert, type WindRelation } from "./routeWeather.js";
-import { escapeHtml, sendTelegram } from "./telegram.js";
+import { escapeHtml, sendTelegramLong } from "./telegram.js";
 import {
   buildSchedule,
   computeLiveStatus,
@@ -107,16 +107,13 @@ export function computeSituation(rb: RoadbookForSituation, km: number, at: Date)
   };
 }
 
-async function weatherAt(points: RoutePoint[], label: string, km: number, at: Date): Promise<WeatherPoint | null> {
+async function weatherAt(points: RoutePoint[], label: string, km: number, at: Date, current = false): Promise<WeatherPoint | null> {
   const p = pointAtKm(points, km);
-  const fc = await fetchForecastAt(p.lat, p.lon);
-  if (!fc || fc.slots.length === 0) return null;
-  let best = fc.slots[0];
-  for (const s of fc.slots) if (Math.abs(new Date(s.at).getTime() - at.getTime()) < Math.abs(new Date(best.at).getTime() - at.getTime())) best = s;
-  // Au-delà de l'horizon de prévision (créneaux de 3 h), on n'invente rien.
-  if (Math.abs(new Date(best.at).getTime() - at.getTime()) > 1.5 * 3600_000) return null;
-  const wind = best.windFromDeg !== null ? windAlongRoute(best.windFromDeg, best.windSpeedKmh, routeBearingAt(points, km)) : null;
-  return { label, km, at, slot: best, relation: wind?.relation ?? null, alongKmh: wind?.alongKmh ?? null, alerts: alertsFor(best, wind?.alongKmh ?? null) };
+  // "Maintenant" : observation réelle ; ensuite : prévision au créneau de l'heure estimée.
+  const slot = current ? await fetchCurrentAt(p.lat, p.lon) : pickForecastSlot((await fetchForecastAt(p.lat, p.lon))?.slots ?? [], at);
+  if (!slot) return null;
+  const wind = slot.windFromDeg !== null ? windAlongRoute(slot.windFromDeg, slot.windSpeedKmh, routeBearingAt(points, km)) : null;
+  return { label, km, at, slot, relation: wind?.relation ?? null, alongKmh: wind?.alongKmh ?? null, alerts: alertsFor(slot, wind?.alongKmh ?? null) };
 }
 
 // Ville + météo maintenant, au prochain contrôle et à l'arrivée (aux heures estimées).
@@ -132,7 +129,7 @@ export async function gatherSituation(rb: RoadbookForSituation, km: number, at: 
 
   const [place, ...weather] = await Promise.all([
     reverseGeocode(here.lat, here.lon),
-    ...targets.map((t) => weatherAt(rb.points, t.label, t.km, t.at)),
+    ...targets.map((t, i) => weatherAt(rb.points, t.label, t.km, t.at, i === 0)),
   ]);
   return { ...base, place, weather: weather.filter((w): w is WeatherPoint => w !== null) };
 }
@@ -194,8 +191,12 @@ export function formatSituationMessage(s: Situation, meta: { author: string; tit
       `🏁 <b>ARRIVÉ${s.elapsedMin !== null ? ` EN ${formatMinutes(s.elapsedMin)}` : ""}</b>`,
       inTime === null ? "" : inTime ? `✅ Dans les délais du BRM ${meta.classKm} (${formatMinutes(meta.limitMinutes)})` : `❌ Hors délai du BRM ${meta.classKm} (${formatMinutes(meta.limitMinutes)})`,
     ].filter(Boolean));
-  } else if (s.elapsedMin === null) {
+  } else if (!s.startAt) {
     blocks.push(["⏱ Heure de départ non renseignée dans le roadbook : pas de calcul d'avance/retard."]);
+  } else if (s.elapsedMin === null) {
+    // Pointage AVANT l'heure de départ du roadbook (essai, ou date du brevet mal saisie).
+    const when = s.startAt.toLocaleString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+    blocks.push([`⏱ Départ prévu le ${when} : pointage avant le départ, pas de calcul d'avance/retard.`]);
   } else if (st) {
     // Délais : la barrière officielle d'abord (c'est l'élimination), puis le plan perso.
     const delays = [`<b>⏱ DÉLAIS · BRM ${meta.classKm} en ${formatMinutes(meta.limitMinutes)}</b>`];
@@ -225,12 +226,12 @@ export function formatSituationMessage(s: Situation, meta: { author: string; tit
     const margin = s.limitAt ? Math.round((s.limitAt.getTime() - s.plannedFinishAt.getTime()) / 60_000) : null;
     const arr = ["<b>🏁 ARRIVÉE ESTIMÉE</b>", `<b>${dayTime(s.plannedFinishAt, s.at)}</b> à l'allure prévue (montées et pauses comprises)`];
     if (s.paceFinishAt) arr.push(`${dayTime(s.paceFinishAt, s.at)} au rythme actuel`);
-    if (s.limitAt) arr.push(`Délai officiel : ${dayTime(s.limitAt, s.at)}${margin !== null ? ` · marge ${signed(margin)}` : ""}`);
+    if (s.limitAt && s.elapsedMin !== null) arr.push(`Délai officiel : ${dayTime(s.limitAt, s.at)}${margin !== null ? ` · marge ${signed(margin)}` : ""}`);
     blocks.push(arr);
   }
 
   // Prochain contrôle.
-  if (!finished && s.nextControl && s.nextControlEta) {
+  if (!finished && s.nextControl && s.nextControlEta && s.nextControl.km < s.totalKm - 0.5) {
     blocks.push([
       "<b>🔜 PROCHAIN CONTRÔLE</b>",
       `${escapeHtml(s.nextControl.name)} — dans ${kmFmt(s.nextControl.km - s.km)} km, vers ${dayTime(s.nextControlEta, s.at)}`,
@@ -305,7 +306,7 @@ export async function recordCheckin(
 
     const chatId = config.telegramTrackingChatId;
     const result = chatId
-      ? await sendTelegram(chatId, message, { linkPreview: false })
+      ? await sendTelegramLong(chatId, message, { linkPreview: false })
       : { ok: false as const, error: "Canal non configuré sur le serveur (TELEGRAM_TRACKING_CHAT_ID absente de .env.production)" };
     await prisma.roadbook.update({
       where: { id: roadbookId },

@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { prisma } from "../db.js";
 import { config } from "../config.js";
-import { getTelegramUpdates, sendTelegramMessage, type TelegramUpdate } from "./telegram.js";
+import { getTelegramUpdates, sendTelegramLong, sendTelegramMessage, type TelegramUpdate } from "./telegram.js";
 import { handleTrackingMessage, TRACKING_HELP } from "./telegramPointing.js";
 
 const LINK_CODE_TTL_MS = 15 * 60 * 1000;
@@ -97,7 +97,7 @@ export async function handleTelegramUpdate(update: TelegramUpdate): Promise<void
   }
 
   const reply = await handleTrackingMessage(chatId, { text, location: msg.location });
-  if (reply) await sendTelegramMessage(chatId, reply, { linkPreview: false });
+  if (reply) await sendTelegramLong(chatId, reply, { linkPreview: false });
 }
 
 let pollingActive = false;

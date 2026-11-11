@@ -47,6 +47,45 @@ export async function sendTelegram(chatId: string, text: string, options: { link
   return result;
 }
 
+// Telegram refuse les messages de plus de 4096 caractères : au-delà, découpe ENTRE deux
+// blocs (lignes vides), jamais au milieu d'une balise HTML, et envoie dans l'ordre.
+const TELEGRAM_MAX_CHARS = 4000;
+
+export function splitTelegramMessage(text: string, max = TELEGRAM_MAX_CHARS): string[] {
+  if (text.length <= max) return [text];
+  const parts: string[] = [];
+  let current = "";
+  for (const block of text.split("\n\n")) {
+    const candidate = current ? `${current}\n\n${block}` : block;
+    if (candidate.length <= max) {
+      current = candidate;
+    } else {
+      if (current) parts.push(current);
+      // Bloc seul trop long (improbable) : coupé par lignes.
+      if (block.length > max) {
+        let chunk = "";
+        for (const line of block.split("\n")) {
+          if ((chunk ? chunk.length + 1 : 0) + line.length > max) {
+            parts.push(chunk);
+            chunk = line;
+          } else chunk = chunk ? `${chunk}\n${line}` : line;
+        }
+        current = chunk;
+      } else current = block;
+    }
+  }
+  if (current) parts.push(current);
+  return parts;
+}
+
+export async function sendTelegramLong(chatId: string, text: string, options: { linkPreview?: boolean } = {}): Promise<TelegramSendResult> {
+  for (const part of splitTelegramMessage(text)) {
+    const r = await sendTelegram(chatId, part, options);
+    if (!r.ok) return r;
+  }
+  return { ok: true };
+}
+
 export async function sendTelegramMessage(chatId: string, text: string, options: { linkPreview?: boolean } = {}): Promise<boolean> {
   return (await sendTelegram(chatId, text, options)).ok;
 }

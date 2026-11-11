@@ -208,3 +208,64 @@ export async function reverseGeocode(lat: number, lon: number): Promise<string |
   placeCache.set(key, name);
   return name;
 }
+
+// Créneau de prévision (pas de 3 h) correspondant à une heure donnée. La liste
+// d'OpenWeatherMap COMMENCE à la prochaine échéance de 3 h : une heure proche de
+// maintenant peut précéder le premier créneau de près de 3 h — on prend alors ce
+// premier créneau, au lieu de conclure à tort qu'aucune prévision n'existe. Au-delà de
+// la dernière échéance (+1h30), null : on n'invente rien.
+export function pickForecastSlot<T extends { at: string }>(slots: T[], at: Date): T | null {
+  if (slots.length === 0) return null;
+  const t = at.getTime();
+  const first = new Date(slots[0].at).getTime();
+  if (t < first) return first - t <= 3 * 3600_000 ? slots[0] : null;
+  let best = slots[0];
+  for (const s of slots) if (Math.abs(new Date(s.at).getTime() - t) < Math.abs(new Date(best.at).getTime() - t)) best = s;
+  return Math.abs(new Date(best.at).getTime() - t) <= 1.5 * 3600_000 ? best : null;
+}
+
+// Conditions ACTUELLES en un point (observation, pas prévision) : c'est ce qu'il faut
+// pour "maintenant" dans un résumé de pointage. La probabilité de pluie n'existe pas
+// dans l'observation : reprise du premier créneau de prévision (les prochaines heures).
+const currentCache = new Map<string, { expiresAt: number; data: PointForecastSlot }>();
+const CURRENT_CACHE_TTL_MS = 10 * 60 * 1000;
+
+export async function fetchCurrentAt(lat: number, lon: number): Promise<PointForecastSlot | null> {
+  if (!config.openWeatherApiKey) return null;
+  const rLat = Math.round(lat * 20) / 20;
+  const rLon = Math.round(lon * 20) / 20;
+  const key = `${rLat},${rLon}`;
+  const cached = currentCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = await fetchJson(`${CURRENT_URL}?lat=${rLat}&lon=${rLon}&appid=${config.openWeatherApiKey}&units=metric&lang=fr`);
+  } catch {
+    return null;
+  }
+  const main = raw.main as Record<string, number> | undefined;
+  if (!main) return null;
+  const wind = (raw.wind as Record<string, number>) ?? {};
+  const weather = (raw.weather as { description: string; icon: string }[] | undefined)?.[0];
+  const rain = raw.rain as Record<string, number> | undefined;
+  const next = (await fetchForecastAt(lat, lon))?.slots[0];
+  const data: PointForecastSlot = {
+    at: new Date(((raw.dt as number) ?? Date.now() / 1000) * 1000).toISOString(),
+    tempC: Math.round(main.temp),
+    feelsLikeC: Math.round(main.feels_like),
+    description: weather?.description ?? "",
+    icon: weather?.icon ?? "",
+    windSpeedKmh: msToKmh(wind.speed ?? 0),
+    windGustsKmh: typeof wind.gust === "number" ? msToKmh(wind.gust) : null,
+    windFromDeg: typeof wind.deg === "number" ? wind.deg : null,
+    precipitationProbability: next?.precipitationProbability ?? 0,
+    rainMm: Math.round((rain?.["1h"] ?? 0) * 10) / 10,
+  };
+  if (currentCache.size >= POINT_CACHE_MAX) {
+    const oldest = currentCache.keys().next().value;
+    if (oldest !== undefined) currentCache.delete(oldest);
+  }
+  currentCache.set(key, { expiresAt: Date.now() + CURRENT_CACHE_TTL_MS, data });
+  return data;
+}

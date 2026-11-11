@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 import { pointAtKm, routeBearingAt, type RoutePoint } from "./geo.js";
-import { fetchForecastAt, type PointForecastSlot } from "./openWeather.js";
+import { fetchForecastAt, pickForecastSlot, type PointForecastSlot } from "./openWeather.js";
 
 export type WindRelation = "dos" | "face" | "travers";
 export type WeatherAlert = "vent_fort" | "vent_de_face" | "pluie" | "froid" | "chaleur";
@@ -35,7 +35,6 @@ const HOT_FEELS_LIKE_C = 30;
 
 const MAX_SAMPLES = 40;
 const CONTROL_DEDUP_KM = 15;
-const SLOT_HALF_WIDTH_MS = 1.5 * 60 * 60 * 1000; // créneaux de 3h de l'API gratuite
 const FETCH_CONCURRENCY = 5;
 
 // windFromDeg : d'où vient le vent. Composante le long de la route positive = vent
@@ -123,16 +122,8 @@ export async function computeRouteWeather(params: {
     const last = fc.slots[fc.slots.length - 1].at;
     if (!horizonEnd || last > horizonEnd) horizonEnd = last;
 
-    let best: PointForecastSlot | null = null;
-    let bestDiff = Infinity;
-    for (const s of fc.slots) {
-      const diff = Math.abs(new Date(s.at).getTime() - etaMs);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        best = s;
-      }
-    }
-    if (!best || bestDiff > SLOT_HALF_WIDTH_MS) return { ...base, forecast: null, outOfRange: true, alerts: [] };
+    const best = pickForecastSlot(fc.slots, new Date(etaMs));
+    if (!best) return { ...base, forecast: null, outOfRange: true, alerts: [] };
 
     const wind = best.windFromDeg !== null ? windAlongRoute(best.windFromDeg, best.windSpeedKmh, bearing) : null;
     return {

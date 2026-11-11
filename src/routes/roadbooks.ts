@@ -64,6 +64,21 @@ const checkinSchema = z.object({
 type ControlEntry = z.infer<typeof controlSchema>;
 type PoiEntry = { name: string; km: number; lat: number; lon: number };
 
+// Titre lisible à partir du nom de fichier GPX : sans extension, sans les identifiants
+// numériques ajoutés par les sites d'export (OpenRunner : "…_v3-25295972-1794154787-181"),
+// séparateurs remplacés par des espaces, sigles usuels en majuscules.
+export function titleFromFileName(fileName: string): string {
+  const base = fileName.replace(/\.gpx$/i, "").replace(/([-_ ]\d{5,})+(-\d+)*$/, "");
+  // Nom "slug" sans espace (brm-300-chartres) : tirets = séparateurs. Avec des espaces,
+  // on garde les tirets, qui font alors partie des noms (Nogent-le-Roi).
+  const cleaned = (/\s/.test(base) ? base.replace(/_+/g, " ") : base.replace(/[-_]+/g, " "))
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b(acp|brm|pbp|ffct|ffvelo)\b/gi, (m) => m.toUpperCase());
+  const title = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  return title.slice(0, 100) || "Mon BRM";
+}
+
 // Distance nominale probable d'après la distance réelle du GPX : un brevet est souvent
 // un peu plus long que sa distance nominale (un "200" de 205 à 220 km reste un 200,
 // avec le délai de 13h30). Au-delà de +10 %, on ne devine pas : format sur-mesure.
@@ -183,7 +198,7 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     const roadbook = await prisma.roadbook.create({
       data: {
         userId: user.id,
-        title: file.filename.replace(/\.gpx$/i, "").slice(0, 100) || "Mon BRM",
+        title: titleFromFileName(file.filename),
         classKm,
         limitMinutes,
         controls: JSON.stringify(controls),
