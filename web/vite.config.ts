@@ -33,11 +33,24 @@ export default defineConfig({
           {
             // Fonds de carte CyclOSM/Esri/OpenTopoMap (voir TrackMap.tsx) : une fois
             // une zone affichée, ses tuiles restent utilisables hors-ligne.
-            urlPattern: /^https:\/\/.*(tile-cyclosm\.openstreetmap\.fr|arcgisonline\.com|tile\.opentopomap\.org)\/.*/,
+            urlPattern: /^https:\/\/.*(tile-cyclosm\.openstreetmap\.fr|arcgisonline\.com|tile\.opentopomap\.org|data\.geopf\.fr)\/.*/,
             handler: "CacheFirst",
             options: {
               cacheName: "map-tiles",
               expiration: { maxEntries: 2000, maxAgeSeconds: 30 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Parcours PBP déjà consulté (tracé, contrôles, météo calculée) : relu
+            // hors-ligne en bord de route si le réseau tombe — la carte reste utile
+            // sans 4G au milieu de la Bretagne intérieure.
+            urlPattern: /\/api\/pbp\/(meta|routes)(\/[^/]+(\/weather)?)?(\?.*)?$/,
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "pbp-route-data",
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 60, maxAgeSeconds: 14 * 24 * 60 * 60 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

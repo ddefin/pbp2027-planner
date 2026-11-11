@@ -37,6 +37,7 @@ model User {
   telegramLink           TelegramLink?
   telegramLinkCodes      TelegramLinkCode[]
   notifications          Notification[]
+  pbpRoutes              PbpRoute[]
 }
 
 model Session {
@@ -351,4 +352,34 @@ model Notification {
   readAt    DateTime?
 
   @@index([userId, createdAt])
+}
+
+// Tracé du parcours PBP (page "Parcours PBP") : le parcours 2027 définitif n'est pas
+// encore publié, donc plusieurs tracés coexistent — "provisoire" (proposé par un
+// admin), "communautaire" (n'importe quel randonneur) et, le jour venu, "officiel".
+// Le tracé affiché par défaut est le plus récent de plus haut rang (officiel >
+// provisoire > communautaire) : importer le GPX officiel suffit à basculer tout le
+// monde dessus, sans rien supprimer (les autres restent comparables). points est un
+// tableau JSON compact [[lat, lon, ele|null, distKm], ...] déjà simplifié (Douglas-
+// Peucker 3D, voir src/lib/geo.ts) ; le GPX d'origine reste sur disque (filePath)
+// pour pouvoir le retélécharger ou le retraiter si l'algorithme évolue.
+model PbpRoute {
+  id               String   @id @default(cuid())
+  label            String
+  kind             String // "officiel" | "provisoire" | "communautaire"
+  description      String?
+  fileName         String
+  filePath         String
+  points           String
+  waypoints        String // [{name, lat, lon}] issus des <wpt> du GPX
+  distanceKm       Float
+  elevationGainM   Int?
+  elevationLossM   Int?
+  rawPointCount    Int
+  uploadedByUserId String
+  uploadedBy       User     @relation(fields: [uploadedByUserId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([kind, createdAt])
 }

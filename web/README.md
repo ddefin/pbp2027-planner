@@ -44,6 +44,7 @@ Ouvrir `http://localhost:5173`.
 - `/login` — email + mot de passe.
 - `/mot-de-passe-oublie`, `/reinitialiser-mot-de-passe` — mot de passe oublié par email.
 - `/` — tableau de bord (compte à rebours, suivi BRM, BRM choisis par le groupe).
+- `/parcours-pbp` — carte du parcours PBP 2027, profil, contrôles, simulation de passage, météo le long du tracé.
 - `/calendrier` — calendrier des BRM officiels (ACP), choix de statut par utilisateur.
 - `/actualites` — actualités agrégées depuis les sites ACP et PBP (filtres, recherche).
 - `/messagerie` — messagerie temps réel (salon général + messages privés).

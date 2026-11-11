@@ -1125,3 +1125,430 @@ button.link {
   color: var(--fg-muted);
   margin-top: 2px;
 }
+
+/* ===== Page Parcours PBP ===== */
+.pbp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pbp-banner {
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.kind-badge {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  vertical-align: 1px;
+}
+.kind-officiel {
+  background: var(--ok);
+  color: #fff;
+}
+.kind-provisoire {
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  color: var(--warn);
+}
+.kind-communautaire {
+  background: color-mix(in srgb, #2563eb 16%, transparent);
+  color: #2563eb;
+}
+.kind-indicatif {
+  background: color-mix(in srgb, var(--fg-muted) 18%, transparent);
+  color: var(--fg-muted);
+}
+
+/* Carte : hauteur relative à l'écran sur mobile (la carte est l'outil principal sur
+   le terrain), plafonnée sur grand écran. */
+.route-map-wrap {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.route-map {
+  height: min(58vh, 560px);
+  min-height: 300px;
+}
+.route-map-wrap.is-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  border-radius: 0;
+  border: none;
+  background: var(--bg);
+}
+.route-map-wrap.is-fullscreen .route-map {
+  height: 100%;
+  min-height: 0;
+}
+.route-map-fs {
+  position: absolute;
+  left: 10px;
+  bottom: 22px;
+  z-index: 1000;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  background: #fff;
+  color: #111;
+  font-size: 18px;
+  cursor: pointer;
+}
+.rm-km {
+  background: #fff;
+  color: #111;
+  border: 1px solid #ff3b30;
+  border-radius: 999px;
+  font: 700 10px "JetBrains Mono", monospace;
+  padding: 1px 5px;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+.rm-arrow {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 9px solid #ff3b30;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff);
+}
+.rm-zoom-low .rm-wind,
+.rm-zoom-low .rm-km {
+  display: none;
+}
+.rm-ctrl {
+  transform: translate(-50%, -50%);
+  background: #0f2a4f;
+  color: #fff;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  font: 700 10px "JetBrains Mono", monospace;
+  padding: 2px 6px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+.rm-ctrl-accueil {
+  background: #64748b;
+}
+.rm-wind {
+  transform: translate(-50%, -150%);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: #fff;
+  color: var(--wc);
+  border: 2px solid var(--wc);
+  border-radius: 999px;
+  font: 700 10px "JetBrains Mono", monospace;
+  padding: 1px 5px 1px 3px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rm-wind span {
+  display: inline-block;
+  /* ➤ pointe vers la droite (90°) : on le ramène vers le nord avant la rotation. */
+  rotate: -90deg;
+}
+
+.pbp-here {
+  margin-top: 10px;
+  font-size: 13px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.pbp-here-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
+.sim-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.sim-grid input[type="range"],
+.km-cursor input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.km-cursor {
+  margin-top: 6px;
+}
+.km-cursor input[type="range"] {
+  height: 32px; /* cible tactile confortable */
+}
+.km-cursor-info {
+  font-size: 12.5px;
+  color: var(--fg-muted);
+}
+
+/* Frise météo */
+.wx-alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.wx-alert {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.wx-alert-vent_fort,
+.wx-alert-vent_de_face {
+  border-color: #dc2626;
+}
+.wx-alert-pluie {
+  border-color: #2563eb;
+}
+.wx-alert-froid {
+  border-color: #0891b2;
+}
+.wx-alert-chaleur {
+  border-color: #ea580c;
+}
+.wx-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+}
+.wx-card {
+  flex: 0 0 132px;
+  scroll-snap-align: center;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  border-radius: 10px;
+  padding: 8px 9px;
+  font: inherit;
+  cursor: pointer;
+}
+.wx-card.has-alert {
+  border-color: color-mix(in srgb, #dc2626 55%, var(--line));
+}
+.wx-card.active {
+  outline: 2px solid #2563eb;
+  outline-offset: -1px;
+}
+.wx-km {
+  font: 700 11px "JetBrains Mono", monospace;
+  color: var(--fg-muted);
+}
+.wx-place {
+  font-weight: 700;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wx-place.is-control {
+  color: var(--accent);
+}
+.wx-eta {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.wx-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+.wx-emoji {
+  font-size: 20px;
+}
+.wx-temp {
+  font: 700 20px var(--font-display);
+}
+.wx-sub {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.wx-wind {
+  margin-top: 4px;
+  font: 700 12px "JetBrains Mono", monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.wx-arrow {
+  display: inline-block;
+  rotate: -90deg;
+}
+.wx-wind-face {
+  color: #dc2626;
+}
+.wx-wind-dos {
+  color: #16a34a;
+}
+.wx-wind-travers {
+  color: #d97706;
+}
+.wx-rain {
+  position: relative;
+  margin-top: 6px;
+  height: 16px;
+  border-radius: 4px;
+  background: color-mix(in srgb, #2563eb 10%, transparent);
+  overflow: hidden;
+}
+.wx-rain-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, #2563eb 35%, transparent);
+}
+.wx-rain-txt {
+  position: relative;
+  font-size: 10.5px;
+  padding-left: 4px;
+  line-height: 16px;
+}
+
+/* Tableau des contrôles */
+.ctrl-table-wrap {
+  overflow-x: auto;
+}
+.ctrl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ctrl-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+  padding: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.ctrl-table td {
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.ctrl-table tbody tr {
+  cursor: pointer;
+}
+.ctrl-table tbody tr:hover {
+  background: var(--bg);
+}
+.ctrl-table .num {
+  text-align: right;
+}
+.ctrl-table tr.is-missing {
+  opacity: 0.55;
+}
+.ctrl-name {
+  font-weight: 700;
+}
+.ctrl-services {
+  font-size: 12px;
+}
+.ctrl-note {
+  color: var(--fg-muted);
+  font-size: 11.5px;
+}
+
+/* Gestion des tracés */
+.route-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.route-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+.route-item.is-primary {
+  border-color: var(--accent);
+}
+.route-pick {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+  min-width: 0;
+  flex: 1 1 260px;
+  font-size: 13.5px;
+}
+.route-stats {
+  display: block;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.route-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+.route-compare {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  cursor: pointer;
+}
+.ghost-link {
+  font-size: 12.5px;
+  text-decoration: underline;
+}
+.route-upload {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.route-actions select,
+.route-upload select {
+  background: var(--panel);
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font: inherit;
+}
+
+@media (max-width: 700px) {
+  .pbp-page .panel {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  .route-map {
+    height: 52vh;
+  }
+  .ctrl-table {
+    font-size: 12px;
+  }
+}

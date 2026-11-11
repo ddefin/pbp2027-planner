@@ -56,6 +56,77 @@ async function fetchJson(url: string): Promise<Record<string, unknown>> {
   }
 }
 
+export interface PointForecastSlot {
+  at: string;
+  tempC: number;
+  feelsLikeC: number;
+  description: string;
+  icon: string; // code icône OpenWeatherMap (ex. "10d")
+  windSpeedKmh: number;
+  windGustsKmh: number | null;
+  windFromDeg: number | null; // direction D'OÙ vient le vent (convention météo)
+  precipitationProbability: number; // 0-1
+  rainMm: number; // cumul sur le créneau de 3h
+}
+
+export interface PointForecast {
+  place: string; // localité la plus proche selon OpenWeatherMap (sert de "ville étape")
+  slots: PointForecastSlot[];
+}
+
+// Grille de ~5 km pour le cache : deux échantillons du parcours très proches (ou deux
+// utilisateurs qui simulent des départs différents) partagent le même appel API.
+const POINT_CACHE_TTL_MS = 30 * 60 * 1000;
+const POINT_CACHE_MAX = 500;
+const pointCache = new Map<string, { expiresAt: number; data: PointForecast }>();
+
+export async function fetchForecastAt(lat: number, lon: number): Promise<PointForecast | null> {
+  if (!config.openWeatherApiKey) return null;
+
+  const rLat = Math.round(lat * 20) / 20;
+  const rLon = Math.round(lon * 20) / 20;
+  const key = `${rLat},${rLon}`;
+  const cached = pointCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.data;
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = await fetchJson(`${FORECAST_URL}?lat=${rLat}&lon=${rLon}&appid=${config.openWeatherApiKey}&units=metric&lang=fr`);
+  } catch {
+    return null;
+  }
+
+  const list = (raw.list as Record<string, unknown>[] | undefined) ?? [];
+  const slots: PointForecastSlot[] = list.map((slot) => {
+    const main = slot.main as Record<string, number>;
+    const wind = (slot.wind as Record<string, number>) ?? {};
+    const weather = (slot.weather as { description: string; icon: string }[] | undefined)?.[0];
+    const rain = slot.rain as Record<string, number> | undefined;
+    return {
+      at: new Date((slot.dt as number) * 1000).toISOString(),
+      tempC: Math.round(main.temp),
+      feelsLikeC: Math.round(main.feels_like),
+      description: weather?.description ?? "",
+      icon: weather?.icon ?? "",
+      windSpeedKmh: msToKmh(wind.speed ?? 0),
+      windGustsKmh: typeof wind.gust === "number" ? msToKmh(wind.gust) : null,
+      windFromDeg: typeof wind.deg === "number" ? wind.deg : null,
+      precipitationProbability: typeof slot.pop === "number" ? slot.pop : 0,
+      rainMm: Math.round((rain?.["3h"] ?? 0) * 10) / 10,
+    };
+  });
+
+  const city = raw.city as { name?: string } | undefined;
+  const data: PointForecast = { place: city?.name || "", slots };
+
+  if (pointCache.size >= POINT_CACHE_MAX) {
+    const oldest = pointCache.keys().next().value;
+    if (oldest !== undefined) pointCache.delete(oldest);
+  }
+  pointCache.set(key, { expiresAt: Date.now() + POINT_CACHE_TTL_MS, data });
+  return data;
+}
+
 export async function fetchCityWeather(city: string): Promise<CityWeather | null> {
   if (!config.openWeatherApiKey) return null;
 

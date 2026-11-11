@@ -1,4 +1,5 @@
 import { XMLParser } from "fast-xml-parser";
+import { simplifyRoute, type RoutePoint } from "./geo.js";
 
 export interface GpxStats {
   distanceKm: number;
@@ -140,6 +141,70 @@ export function parseGpxProfile(xml: string, maxPoints = 600): TrackProfilePoint
   const last = points[points.length - 1];
   decimated[decimated.length - 1] = { lat: last.lat, lon: last.lon, ele: last.ele, distKm: Math.round(totalKm * 100) / 100 };
   return decimated;
+}
+
+export interface GpxWaypoint {
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+export interface ParsedRoute {
+  points: RoutePoint[]; // simplifiés (Douglas-Peucker 3D), distKm issue du tracé complet
+  waypoints: GpxWaypoint[];
+  stats: GpxStats;
+  rawPointCount: number;
+}
+
+function collectWaypoints(parsed: unknown): GpxWaypoint[] {
+  const gpx = (parsed as Record<string, unknown>)?.gpx as Record<string, unknown> | undefined;
+  if (!gpx?.wpt) return [];
+  const result: GpxWaypoint[] = [];
+  for (const raw of ([] as unknown[]).concat(gpx.wpt)) {
+    const w = raw as Record<string, unknown>;
+    const lat = Number(w["@_lat"]);
+    const lon = Number(w["@_lon"]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const name = String(w.name ?? w.desc ?? "Point").trim().slice(0, 100) || "Point";
+    result.push({ name, lat, lon });
+  }
+  return result;
+}
+
+// Tracé de parcours complet (page Parcours PBP) : contrairement à parseGpxProfile
+// (échantillonnage régulier en distance, pensé pour un profil de BRM), on garde la
+// GÉOMÉTRIE fidèle via Douglas-Peucker 3D — les virages et les bosses restent là où
+// ils sont, les lignes droites sont allégées. distKm et le D+/D- sont calculés AVANT
+// simplification, sur le tracé complet : simplifier d'abord raccourcirait la
+// distance (chaque virage coupé) et sous-estimerait le dénivelé.
+export function parseGpxRoute(xml: string, maxPoints = 4000): ParsedRoute | null {
+  const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: "@_" });
+  let parsed: unknown;
+  try {
+    parsed = parser.parse(xml);
+  } catch {
+    return null;
+  }
+
+  const raw = collectPoints(parsed);
+  if (raw.length < 2) return null;
+  const filled = fillMissingElevation(raw);
+  const stats = parseGpxStats(xml);
+  if (!stats) return null;
+
+  const full: RoutePoint[] = [];
+  let cum = 0;
+  for (let i = 0; i < filled.length; i++) {
+    if (i > 0) cum += haversineMeters(filled[i - 1], filled[i]) / 1000;
+    full.push({ lat: filled[i].lat, lon: filled[i].lon, ele: filled[i].ele, distKm: cum });
+  }
+
+  return {
+    points: simplifyRoute(full, maxPoints),
+    waypoints: collectWaypoints(parsed),
+    stats,
+    rawPointCount: raw.length,
+  };
 }
 
 export function parseGpxStats(xml: string): GpxStats | null {

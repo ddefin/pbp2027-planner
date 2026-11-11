@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
@@ -14,6 +14,10 @@ import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 import { NotificationBell } from "./components/NotificationBell";
 
+// Page la plus lourde de l'app (carte, profil, simulation, météo) : chargée seulement
+// quand on l'ouvre, pour que le reste de l'app démarre aussi vite qu'avant sur mobile.
+const PbpRoutePage = lazy(() => import("./pages/PbpRoutePage").then((m) => ({ default: m.PbpRoutePage })));
+
 function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
   const { status, user, logout } = useAuth();
   const navigate = useNavigate();
@@ -26,6 +30,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
 
   const links = [
     { to: "/", label: "Tableau de bord" },
+    { to: "/parcours-pbp", label: "Parcours PBP" },
     { to: "/calendrier", label: "Calendrier BRM" },
     { to: "/actualites", label: "Actualités" },
     { to: "/messagerie", label: "Messagerie" },
@@ -96,6 +101,16 @@ export default function App() {
           element={
             <ProtectedLayout>
               <CalendrierPage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/parcours-pbp"
+          element={
+            <ProtectedLayout>
+              <Suspense fallback={<p className="hint" style={{ padding: 24 }}>Chargement de la carte…</p>}>
+                <PbpRoutePage />
+              </Suspense>
             </ProtectedLayout>
           }
         />

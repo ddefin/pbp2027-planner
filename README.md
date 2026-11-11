@@ -91,6 +91,15 @@ Nécessite `OPENWEATHER_API_KEY` (clé gratuite sur [openweathermap.org](https:/
 
 **Cette clé est une variable d'environnement du serveur qui fait tourner le backend, pas un secret GitHub Actions** : un secret GitHub n'est injecté que dans les workflows CI, jamais automatiquement dans le process qui tourne en prod. Pose `OPENWEATHER_API_KEY` directement dans l'environnement d'exécution (fichier `.env` non committé en dev, variable d'environnement de l'hébergeur en prod). Un secret GitHub Actions n'aurait de sens ici que si un pipeline de déploiement existait et écrivait explicitement cette valeur sur le serveur au moment du déploiement — ce n'est pas encore le cas (voir "Pour la suite").
 
+### Parcours PBP (carte, profil, météo le long du tracé)
+
+Tracés multiples (officiel / provisoire / communautaire, + un tracé indicatif entre
+villes de contrôle tant qu'aucun GPX n'est publié), simplification Douglas-Peucker 3D
+côté serveur, projection des 16 contrôles 2027, simulation de passage par vague de
+départ, météo à l'heure de passage estimée avec vent de face/dos. Routes `/api/pbp/*`.
+**Voir [docs/PARCOURS-PBP.md](./docs/PARCOURS-PBP.md)**, notamment pour basculer sur
+le GPX officiel le jour de sa publication (un simple import, sans redéploiement).
+
 ### Actualités (agrégées depuis ACP et PBP)
 
 | Méthode | Route | Description |

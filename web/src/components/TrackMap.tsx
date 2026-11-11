@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { ControlPoint, TrackPoint } from "../api/brmCatalog";
 import { bearing } from "../lib/gpxAnalysis";
+import { addBaseLayers } from "../lib/mapLayers";
 
 const CONTROL_POINT_SYMBOL: Record<ControlPoint["kind"], string> = {
   depart: "🏁",
@@ -66,10 +67,7 @@ function arrowIcon(bearingDeg: number): L.DivIcon {
 // dessiné à la main. Instance impérative dans un useEffect (Leaflet gère son propre
 // DOM), pas un rendu déclaratif React classique.
 //
-// Plusieurs fonds au choix : tile.openstreetmap.org bloquait nos requêtes, CARTO
-// exige désormais une clé API sur ses fonds gratuits, OpenTopoMap puis CyclOSM seuls
-// se sont révélés peu lisibles selon les cas. Vélo (CyclOSM), Satellite (Esri, sans
-// clé) et Relief (OpenTopoMap), dans leurs couleurs réelles.
+// Fonds de carte : voir src/lib/mapLayers.ts (partagés avec la carte Parcours PBP).
 export function TrackMap({
   points,
   highlight,
@@ -103,22 +101,7 @@ export function TrackMap({
     const map = L.map(containerRef.current, { attributionControl: true });
     mapRef.current = map;
 
-    const velo = L.tileLayer("https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      subdomains: "abc",
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors | © <a href="https://www.cyclosm.org">CyclOSM</a>',
-    });
-    const satellite = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 19, attribution: "© Esri — World Imagery" },
-    );
-    const relief = L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {
-      maxZoom: 17,
-      subdomains: "abc",
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, SRTM | © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)',
-    });
-    velo.addTo(map);
-    L.control.layers({ "Vélo": velo, "Satellite": satellite, "Relief": relief }).addTo(map);
+    addBaseLayers(map);
 
     controlLayerRef.current = L.layerGroup().addTo(map);
     variantLayerRef.current = L.layerGroup().addTo(map);

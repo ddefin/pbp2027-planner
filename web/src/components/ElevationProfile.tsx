@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TrackPoint } from "../api/brmCatalog";
 import { cumulativeGain, findClimbs, withProfile } from "../lib/gpxAnalysis";
 
-const VB_W = 600;
+const DEFAULT_VB_W = 600;
 const VB_H = 170;
 const PAD_L = 34;
 const PAD_R = 8;
@@ -16,15 +16,42 @@ const PAD_B = 20;
 export function ElevationProfile({
   points,
   onHoverPoint,
+  cursorKm,
+  markers,
+  onSelectKm,
+  showClimbList = true,
 }: {
   points: TrackPoint[];
   // Position survolée reportée au composant parent, pour la montrer aussi sur la
   // carte (voir TrackMap `highlight`) — comme le fait OpenRunner entre son profil et
   // sa carte.
   onHoverPoint?: (point: TrackPoint | null) => void;
+  // Position "sélectionnée" pilotée de l'extérieur (curseur km de la page Parcours
+  // PBP), distincte du survol qui, lui, est éphémère.
+  cursorKm?: number | null;
+  markers?: { km: number; label: string }[];
+  onSelectKm?: (km: number) => void;
+  // Sur 1200 km la liste des montées dépasse la centaine de lignes : les bandes sur
+  // le profil suffisent, la liste détaillée encombrerait l'écran d'un téléphone.
+  showClimbList?: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  // viewBox calée sur la largeur réelle en pixels : avec une largeur fixe de 600, le
+  // SVG (hauteur fixe) restait cantonné au centre sur grand écran, et un ratio
+  // étiré aurait déformé le texte des axes.
+  const [VB_W, setVbW] = useState(DEFAULT_VB_W);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(([entry]) => {
+      const w = Math.round(entry.contentRect.width);
+      if (w > 0) setVbW(w);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [points.length]);
 
   const withEle = useMemo(() => withProfile(points), [points]);
   const gain = useMemo(() => cumulativeGain(withEle), [withEle]);
@@ -75,15 +102,21 @@ export function ElevationProfile({
   const hoverGain = hoverIdx !== null ? gain[hoverIdx] : null;
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 8 }} ref={wrapRef}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${VB_W} ${VB_H}`}
-        style={{ width: "100%", height: 150, display: "block", cursor: "crosshair" }}
+        style={{ width: "100%", height: VB_H, display: "block", cursor: "crosshair" }}
         onMouseMove={(e) => handleMove(e.clientX)}
+        onClick={() => hover && onSelectKm?.(hover.distKm)}
         onMouseLeave={() => setHoverIdx(null)}
+        onTouchStart={(e) => e.touches[0] && handleMove(e.touches[0].clientX)}
         onTouchMove={(e) => e.touches[0] && handleMove(e.touches[0].clientX)}
-        onTouchEnd={() => setHoverIdx(null)}
+        onTouchEnd={() => {
+          // Au doigt, "relâcher" vaut sélection : pas de survol durable sur mobile.
+          if (hover) onSelectKm?.(hover.distKm);
+          setHoverIdx(null);
+        }}
       >
         {/* grille horizontale discrète */}
         {[0, 0.5, 1].map((f) => (
@@ -122,6 +155,19 @@ export function ElevationProfile({
           {Math.round(minEle)}
         </text>
 
+        {(markers ?? []).map((m, i) => (
+          <g key={i}>
+            <line x1={x(m.km)} x2={x(m.km)} y1={PAD_T} y2={VB_H - PAD_B} stroke="var(--fg-muted)" strokeWidth={0.75} opacity={0.5} />
+            <text x={x(m.km)} y={VB_H - 6} textAnchor="middle" fontSize={8} fill="var(--fg-muted)" fontFamily="JetBrains Mono, monospace">
+              {m.label}
+            </text>
+          </g>
+        ))}
+
+        {typeof cursorKm === "number" && cursorKm >= 0 && cursorKm <= totalKm && (
+          <line x1={x(cursorKm)} x2={x(cursorKm)} y1={PAD_T} y2={VB_H - PAD_B} stroke="#2563eb" strokeWidth={2} />
+        )}
+
         {hover && (
           <>
             <line x1={x(hover.distKm)} x2={x(hover.distKm)} y1={PAD_T} y2={VB_H - PAD_B} stroke="var(--fg-muted)" strokeWidth={1} strokeDasharray="3,3" />
@@ -136,7 +182,7 @@ export function ElevationProfile({
           : `0 → ${totalKm.toFixed(1)} km · passe la souris sur le profil`}
       </div>
 
-      {climbs.length > 0 && (
+      {showClimbList && climbs.length > 0 && (
         <div style={{ marginTop: 10 }}>
           <div className="hint" style={{ margin: "0 0 4px", fontWeight: 700 }}>Montées significatives</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
