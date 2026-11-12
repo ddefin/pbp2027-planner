@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
@@ -29,6 +29,12 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Une nouvelle version attend (voir main.tsx) : on l'applique au changement de page,
+  // moment où un rechargement ne fait rien perdre.
+  useEffect(() => {
+    if (window.__pbpUpdateReady) window.location.reload();
+  }, [location.pathname]);
 
   if (status === "loading") return null;
   // On garde la page demandée (ex. retour de Strava sur /profil#strava) pour y revenir après la connexion.

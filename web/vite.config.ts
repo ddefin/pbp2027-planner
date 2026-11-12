@@ -20,6 +20,12 @@ export default defineConfig({
       // et le profil d'élévation d'un BRM déjà consultés restent utilisables avec un
       // réseau mobile capricieux en plein brevet, sans réinstaller l'app.
       workbox: {
+        // INDISPENSABLE avec injectRegister:false : le plugin n'active ces deux options
+        // tout seul que s'il injecte lui-même l'enregistrement. Sans elles, la nouvelle
+        // version restait « en attente » tant qu'un onglet (ou l'appli installée) restait
+        // ouvert : après un déploiement on gardait l'ancien site, même en rechargeant.
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
         // Par défaut, le service worker traite toute navigation (y compris une
         // <iframe src="...">, qui EST une navigation pour le navigateur, pas une
