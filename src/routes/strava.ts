@@ -88,7 +88,11 @@ export async function stravaRoutes(app: FastifyInstance) {
       }
       return back("error");
     }
-    void syncAccount(userId, { force: true }); // première synchro en arrière-plan
+    // Première synchronisation AVANT de rendre la main : au retour sur le site, le tableau
+    // de bord est déjà rempli (pas d'écran vide ni de rechargement manuel). Plafonnée à 10 s :
+    // au-delà, elle continue en arrière-plan et l'écran la suit tout seul.
+    const sync = syncAccount(userId, { force: true });
+    await Promise.race([sync, new Promise((r) => setTimeout(r, 10_000))]);
     return back("ok");
   });
 

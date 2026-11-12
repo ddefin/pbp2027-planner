@@ -31,7 +31,8 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
   const [menuOpen, setMenuOpen] = useState(false);
 
   if (status === "loading") return null;
-  if (status === "anonymous") return <Navigate to="/login" replace />;
+  // On garde la page demandée (ex. retour de Strava sur /profil#strava) pour y revenir après la connexion.
+  if (status === "anonymous") return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />;
   if (adminOnly && !user?.isAdmin) return <Navigate to="/" replace />;
 
   const links = [

@@ -31,7 +31,9 @@ export function LoginPage() {
     try {
       await login(email, password);
       await refresh();
-      navigate("/", { replace: true });
+      // Retour à la page d'origine (chemin interne uniquement : pas de redirection vers un autre site).
+      const next = new URLSearchParams(window.location.search).get("next");
+      navigate(next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") ? next : "/", { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     } finally {

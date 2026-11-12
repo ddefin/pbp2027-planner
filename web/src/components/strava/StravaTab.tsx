@@ -53,7 +53,7 @@ export function StravaTab() {
     const p = new URLSearchParams(window.location.search).get("strava");
     if (p) {
       const msg: Record<string, string> = {
-        ok: "✓ Compte Strava connecté. Première synchronisation en cours…",
+        ok: "✓ Compte Strava connecté.",
         denied: "Connexion annulée : tu as refusé l'accès sur Strava.",
         scope: "Autorisations insuffisantes : coche bien « Voir les données de tes activités » sur l'écran Strava, puis réessaie.",
         limit: "Strava n'accepte pas de nouveau sportif pour le moment : l'application a atteint sa limite de comptes connectés. L'administrateur vient d'être prévenu, il doit demander à Strava d'augmenter cette limite. Réessaie dans quelques jours.",
@@ -64,10 +64,20 @@ export function StravaTab() {
       window.history.replaceState(null, "", `${window.location.pathname}#strava`);
     }
     void load();
-    // La première synchronisation tourne en arrière-plan : on relit un peu plus tard.
-    const t = p === "ok" ? setTimeout(() => void load(), 5000) : undefined;
-    return () => t && clearTimeout(t);
   }, [load]);
+
+  // Tant que la première synchronisation n'a pas abouti (compte tout juste connecté), on
+  // relit l'état toutes les 2 s (1 min maximum) : le tableau de bord apparaît tout seul.
+  const waitingFirstSync = Boolean(status?.connected && status.account && status.account.lastSyncAt === null);
+  useEffect(() => {
+    if (!waitingFirstSync) return;
+    let tries = 0;
+    const t = setInterval(() => {
+      if (++tries > 30) clearInterval(t);
+      else void load();
+    }, 2000);
+    return () => clearInterval(t);
+  }, [waitingFirstSync, load]);
 
   async function connect() {
     setBusy("connect");
@@ -149,7 +159,7 @@ export function StravaTab() {
               <strong>{acc.athleteName}</strong>
               <div className="sv-badges">
                 <span className={`sv-badge${acc.lastSyncError ? " is-bad" : ""}`}>
-                  <i className="sv-dot-live" aria-hidden="true" /> {acc.lastSyncError ? "Erreur de synchro" : `Synchronisé ${ago(acc.lastSyncAt)}`}
+                  <i className="sv-dot-live" aria-hidden="true" /> {acc.lastSyncError ? "Erreur de synchro" : acc.lastSyncAt ? `Synchronisé ${ago(acc.lastSyncAt)}` : "Synchronisation en cours…"}
                 </span>
                 {acc.ftp ? <span className="sv-badge">FTP {acc.ftp} W</span> : null}
                 {acc.maxHr ? <span className="sv-badge">FC max {acc.maxHr}</span> : null}
@@ -169,9 +179,15 @@ export function StravaTab() {
         </section>
       )}
 
-      {acc && !dash && !error && <p className="hint">Chargement du tableau de bord…</p>}
+      {waitingFirstSync && (
+        <section className="panel" role="status" aria-live="polite">
+          <p style={{ margin: 0 }}>⏳ <strong>Première synchronisation en cours…</strong> Tes sorties arrivent, le tableau de bord s'affichera tout seul dans quelques secondes.</p>
+        </section>
+      )}
 
-      {dash && dash.empty && (
+      {acc && !dash && !error && !waitingFirstSync && <p className="hint">Chargement du tableau de bord…</p>}
+
+      {dash && dash.empty && !waitingFirstSync && (
         <section className="panel">
           <p style={{ margin: 0 }}>Aucune sortie à vélo trouvée sur les 13 derniers mois. Fais une sortie ou clique sur « Synchroniser » : le tableau de bord se remplira tout seul.</p>
         </section>
