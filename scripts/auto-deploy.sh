@@ -77,6 +77,11 @@ if [ -t 1 ]; then echo "Construction et démarrage de $APP_VERSION (plusieurs mi
 # recrée pas toujours le conteneur quand seul ce fichier change (et un simple
 # `docker restart` ne relit PAS les variables). On mémorise donc une empreinte du fichier
 # et on force la recréation du conteneur dès qu'elle change.
+# Piège fréquent : réglages écrits dans « env.production » (sans le point), que Docker
+# ignore. On le signale dans le journal plutôt que de laisser l'app « sans configuration ».
+if [ -f env.production ]; then
+  log "ATTENTION : le fichier « env.production » (sans point) est ignoré. Les réglages doivent être dans « .env.production » : grep -E '^[A-Z_]+=' env.production >> .env.production  (puis supprime les doublons)"
+fi
 ENV_STATE=.deploy-env-state
 ENV_NOW=$(cksum .env.production 2>/dev/null | cut -d' ' -f1,2)
 RECREATE=""
