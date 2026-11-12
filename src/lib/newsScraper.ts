@@ -141,5 +141,31 @@ export async function scrapeNews(): Promise<{ added: number; checked: number }> 
     }
   }
 
+  await syncNewsNotifications().catch((err) => console.error("[news] notifications impossibles :", err));
   return { added, checked };
+}
+
+const NEWS_NOTIFY_DAYS = 7;
+
+// Cloche de l'app : une notification par compte pour chaque actualité PUBLIÉE depuis
+// moins de 7 jours. Idempotent (un compte ne reçoit jamais deux fois la même), ce qui
+// rattrape aussi une actualité déjà en base avant cette fonctionnalité et les comptes
+// créés après. Le plafond de 7 jours évite d'inonder la cloche au premier passage sur
+// une base vide (le scraping remonte alors tout l'historique des sites sources).
+export async function syncNewsNotifications(now = new Date()): Promise<number> {
+  const since = new Date(now.getTime() - NEWS_NOTIFY_DAYS * 86_400_000);
+  const items = await prisma.newsItem.findMany({ where: { publishedAt: { gte: since } }, orderBy: { publishedAt: "asc" } });
+  if (items.length === 0) return 0;
+  const users = await prisma.user.findMany({ select: { id: true } });
+  let created = 0;
+  for (const item of items) {
+    const message = `📰 ${SOURCE_META[item.source as NewsSource]?.label ?? "Actualité"} : ${item.title}`;
+    const already = await prisma.notification.findMany({ where: { kind: "news", message }, select: { userId: true } });
+    const have = new Set(already.map((n) => n.userId));
+    const missing = users.filter((u) => !have.has(u.id));
+    if (missing.length === 0) continue;
+    await prisma.notification.createMany({ data: missing.map((u) => ({ userId: u.id, kind: "news", message, link: "/actualites" })) });
+    created += missing.length;
+  }
+  return created;
 }

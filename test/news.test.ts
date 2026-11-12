@@ -14,6 +14,7 @@ const pbpHtml = readFileSync(path.resolve(__dirname, "fixtures/pbp-actualites.ht
 let buildServer: typeof import("../src/server.js").buildServer;
 let prisma: typeof import("../src/db.js").prisma;
 let scrapeNews: typeof import("../src/lib/newsScraper.js").scrapeNews;
+let syncNewsNotifications: typeof import("../src/lib/newsScraper.js").syncNewsNotifications;
 let generateOpaqueToken: typeof import("../src/lib/tokens.js").generateOpaqueToken;
 let hashToken: typeof import("../src/lib/tokens.js").hashToken;
 let SESSION_COOKIE: typeof import("../src/lib/session.js").SESSION_COOKIE;
@@ -36,7 +37,7 @@ beforeAll(async () => {
 
   ({ buildServer } = await import("../src/server.js"));
   ({ prisma } = await import("../src/db.js"));
-  ({ scrapeNews } = await import("../src/lib/newsScraper.js"));
+  ({ scrapeNews, syncNewsNotifications } = await import("../src/lib/newsScraper.js"));
   ({ generateOpaqueToken, hashToken } = await import("../src/lib/tokens.js"));
   ({ SESSION_COOKIE } = await import("../src/lib/session.js"));
 });
@@ -115,6 +116,26 @@ describe("Scraping des actualités", () => {
 
     const telegramCalls = fetchMock.mock.calls.filter(([url]: any[]) => String(url).includes("sendMessage"));
     expect(telegramCalls).toHaveLength(0); // rien de nouveau à rediffuser
+  });
+
+  it("crée une notification de cloche par compte pour les actualités récentes, sans doublon", async () => {
+    const user = await prisma.user.create({ data: { email: `news-bell-${Date.now()}@example.com`, passwordHash: "x", prenom: "Cloche" } });
+    await scrapeNews();
+    // Le scraping crée lui-même les notifications (« maintenant » = date réelle du test).
+    const now = new Date();
+    const mine = await prisma.notification.findMany({ where: { userId: user.id, kind: "news" } });
+    const recent = await prisma.newsItem.count({ where: { publishedAt: { gte: new Date(now.getTime() - 7 * 86_400_000) } } });
+    expect(mine.length).toBe(recent); // seulement les articles de moins de 7 jours
+    expect(mine.every((n) => n.link === "/actualites")).toBe(true);
+    if (recent > 0) expect(mine[0].message).toMatch(/^📰 /);
+    expect(await syncNewsNotifications(now)).toBe(0); // idempotent
+    // Un compte créé plus tard reçoit les actualités récentes au passage suivant.
+    const late = await prisma.user.create({ data: { email: `news-late-${Date.now()}@example.com`, passwordHash: "x", prenom: "Tard" } });
+    expect(await syncNewsNotifications(now)).toBe(recent);
+    await prisma.notification.deleteMany({ where: { userId: late.id } });
+    await prisma.user.delete({ where: { id: late.id } });
+    await prisma.notification.deleteMany({ where: { userId: user.id } });
+    await prisma.user.delete({ where: { id: user.id } });
   });
 
   it("continue avec l'autre source si l'une des deux pages sources est injoignable", async () => {
