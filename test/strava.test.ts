@@ -124,6 +124,7 @@ let sentTelegram: string[] = [];
 let athleteStatus = 200;
 let tokenExpiresAt = Math.floor(Date.now() / 1000) + 6 * 3600;
 let remoteActivities: Record<string, unknown>[] = [];
+let tokenExchangeStatus = 200;
 
 const localIso = (daysAgo: number) => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()) - daysAgo * DAY + 8 * 3600_000).toISOString().replace(".000Z", "Z");
 const remote = (id: number, daysAgo: number, o: Record<string, unknown> = {}) => ({
@@ -160,6 +161,7 @@ beforeEach(() => {
   calls = [];
   sentTelegram = [];
   athleteStatus = 200;
+  tokenExchangeStatus = 200;
   tokenExpiresAt = Math.floor(Date.now() / 1000) + 6 * 3600;
   remoteActivities = [remote(1, 1), remote(2, 3), remote(3, 8), remote(4, 40), remote(9, 2, { sport_type: "Run" })];
   vi.stubGlobal(
@@ -172,6 +174,7 @@ beforeEach(() => {
         sentTelegram.push(JSON.parse(String(init?.body)).text);
         return json({ ok: true, result: {} });
       }
+      if (u.endsWith("/oauth/token") && tokenExchangeStatus !== 200) return json({ message: "Forbidden", errors: [{ resource: "Application", field: "athlete_limit", code: "exceeded" }] }, tokenExchangeStatus);
       if (u.endsWith("/oauth/token")) {
         const body = new URLSearchParams(String(init?.body));
         return json({ access_token: body.get("grant_type") === "refresh_token" ? "access-refreshed" : "access-1", refresh_token: body.get("grant_type") === "refresh_token" ? "refresh-2" : "refresh-1", expires_at: tokenExpiresAt, athlete: { id: 777, firstname: "Didier", lastname: "D.", profile: "https://img.example/p.jpg" } });
@@ -230,6 +233,18 @@ describe("API Strava", () => {
     expect((await callback(`code=abc&state=forge`)).headers.location).toBe("/profil?strava=invalid#strava");
     expect((await callback(`code=abc&state=${encodeURIComponent(s)}&scope=read`)).headers.location).toBe("/profil?strava=scope#strava");
     expect(await prisma.stravaAccount.count()).toBe(0);
+  });
+
+  it("prévient l'utilisateur et les admins quand l'application Strava a atteint sa limite de sportifs", async () => {
+    const admin = await prisma.user.create({ data: { email: `adm-lim-${Date.now()}@example.com`, passwordHash: "x", prenom: "Admin", isAdmin: true } });
+    tokenExchangeStatus = 403;
+    const s = strava.makeState(userId);
+    const res = await callback(`code=abc&state=${encodeURIComponent(s)}&scope=read,activity:read_all,profile:read_all`);
+    expect(res.headers.location).toBe("/profil?strava=limit#strava");
+    expect(await prisma.stravaAccount.count({ where: { userId } })).toBe(0);
+    const n = await prisma.notification.findFirst({ where: { userId: admin.id, kind: "strava_limit" } });
+    expect(n?.message).toContain("limite de sportifs");
+    expect(n?.message).toContain("Didier");
   });
 
   it("connecte le compte, chiffre les jetons et synchronise les sorties à vélo", async () => {

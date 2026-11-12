@@ -72,12 +72,18 @@ async function tokenRequest(params: Record<string, string>): Promise<TokenRespon
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ client_id: config.stravaClientId!, client_secret: config.stravaClientSecret!, ...params }),
   });
-  if (!res.ok) throw new StravaError(`Strava a refusé l'échange de jeton (HTTP ${res.status})`, res.status);
+  if (!res.ok) {
+    // Application pas encore autorisée pour plus d'un sportif : Strava refuse l'échange
+    // pour les comptes au-delà de la capacité (403 / message « limit … exceeded »).
+    const text = await res.text().catch(() => "");
+    const limit = res.status === 403 || /limit|exceed|capacity/i.test(text);
+    throw new StravaError(`Strava a refusé l'échange de jeton (HTTP ${res.status})`, res.status, limit ? "athlete_limit" : undefined);
+  }
   return (await res.json()) as TokenResponse;
 }
 
 export class StravaError extends Error {
-  constructor(message: string, public status: number) {
+  constructor(message: string, public status: number, public code?: string) {
     super(message);
   }
 }

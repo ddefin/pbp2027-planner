@@ -77,7 +77,15 @@ export async function stravaRoutes(app: FastifyInstance) {
     try {
       const token = await exchangeCode(q.code);
       await saveConnection(userId, token, q.scope ?? "");
-    } catch {
+    } catch (err) {
+      if (err instanceof StravaError && err.code === "athlete_limit") {
+        // L'administrateur doit demander à Strava d'augmenter la capacité de l'application.
+        const [who, admins] = await Promise.all([prisma.user.findUnique({ where: { id: userId }, select: { prenom: true } }), prisma.user.findMany({ where: { isAdmin: true }, select: { id: true } })]);
+        for (const a of admins) {
+          await prisma.notification.create({ data: { userId: a.id, kind: "strava_limit", message: `🚴 ${who?.prenom ?? "Un randonneur"} n'a pas pu connecter Strava : limite de sportifs de l'application atteinte. Demande une augmentation de capacité sur strava.com/settings/api.`, link: "/profil#strava" } }).catch(() => undefined);
+        }
+        return back("limit");
+      }
       return back("error");
     }
     void syncAccount(userId, { force: true }); // première synchro en arrière-plan

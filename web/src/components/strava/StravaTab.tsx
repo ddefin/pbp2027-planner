@@ -56,6 +56,7 @@ export function StravaTab() {
         ok: "✓ Compte Strava connecté. Première synchronisation en cours…",
         denied: "Connexion annulée : tu as refusé l'accès sur Strava.",
         scope: "Autorisations insuffisantes : coche bien « Voir les données de tes activités » sur l'écran Strava, puis réessaie.",
+        limit: "Strava n'accepte pas de nouveau sportif pour le moment : l'application a atteint sa limite de comptes connectés. L'administrateur vient d'être prévenu, il doit demander à Strava d'augmenter cette limite. Réessaie dans quelques jours.",
         error: "Strava n'a pas pu valider la connexion. Réessaie dans un instant.",
         invalid: "Lien de connexion invalide ou expiré. Relance la connexion depuis cette page.",
       };
@@ -122,7 +123,10 @@ export function StravaTab() {
             <li>Aucune IA externe : l'analyse est calculée sur ce serveur</li>
           </ul>
           {status.configured ? (
-            <ConnectButton onClick={connect} busy={busy === "connect"} />
+            <>
+              <ConnectButton onClick={connect} busy={busy === "connect"} />
+              <p className="sv-sub">Si Strava affiche une erreur de limite ou refuse l'autorisation, préviens l'administrateur du site : l'application Strava doit être autorisée pour plusieurs sportifs.</p>
+            </>
           ) : (
             <div className="sv-warn">
               ⚠️ L'intégration Strava n'est pas configurée sur le serveur. Variable{(status.missing?.length ?? 0) > 1 ? "s" : ""} non vue{(status.missing?.length ?? 0) > 1 ? "s" : ""} par le serveur :{" "}
