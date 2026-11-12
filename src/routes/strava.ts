@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { getSessionUser } from "../lib/session.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
-import { StravaError, authorizeUrl, disconnect, exchangeCode, purgeLocal, readState, redirectUri, saveConnection, stravaConfigured, syncAccount, syncOneActivity, validAccessToken } from "../lib/strava.js";
+import { StravaError, authorizeUrl, disconnect, exchangeCode, purgeLocal, readState, redirectUri, initialSync, isSyncing, saveConnection, stravaConfigured, syncAccount, syncOneActivity, validAccessToken } from "../lib/strava.js";
 import { analyze } from "../lib/stravaCoach.js";
 import { fitness, intensityShare, lastDays, sinceYearStart, sumVolume, weeklySeries } from "../lib/stravaMetrics.js";
 import { loadActivities, parsePrefs, parisParts, sendActivityReport } from "../lib/coachReports.js";
@@ -39,6 +39,7 @@ export async function stravaRoutes(app: FastifyInstance) {
       redirectUri: redirectUri(),
       mcpUrl: MCP_URL,
       connected: Boolean(acc),
+      syncing: isSyncing(user.id),
       account: acc && {
         athleteName: acc.athleteName,
         profilePhoto: acc.profilePhoto,
@@ -88,11 +89,9 @@ export async function stravaRoutes(app: FastifyInstance) {
       }
       return back("error");
     }
-    // Première synchronisation AVANT de rendre la main : au retour sur le site, le tableau
-    // de bord est déjà rempli (pas d'écran vide ni de rechargement manuel). Plafonnée à 10 s :
-    // au-delà, elle continue en arrière-plan et l'écran la suit tout seul.
-    const sync = syncAccount(userId, { force: true });
-    await Promise.race([sync, new Promise((r) => setTimeout(r, 10_000))]);
+    // Retour IMMÉDIAT sur le site : la synchronisation tourne en arrière-plan (8 dernières
+    // semaines d'abord, puis l'historique) et l'écran se remplit tout seul.
+    void initialSync(userId).catch((err) => request.log.error(err, "synchronisation initiale Strava"));
     return back("ok");
   });
 

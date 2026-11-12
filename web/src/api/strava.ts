@@ -12,6 +12,7 @@ export interface StravaStatus {
   redirectUri: string | null;
   mcpUrl: string;
   connected: boolean;
+  syncing?: boolean;
   account: {
     athleteName: string;
     profilePhoto: string | null;

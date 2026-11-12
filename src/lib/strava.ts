@@ -187,7 +187,7 @@ function settingsOf(acc: { ftp: number | null; maxHr: number | null; hrZones: st
   return { ftp: acc.ftp, maxHr: acc.maxHr, hrZones: acc.hrZones ? (JSON.parse(acc.hrZones) as [number, number][]) : null };
 }
 
-async function upsertActivity(userId: string, a: StravaSummary, settings: AthleteSettings): Promise<void> {
+function activityUpsert(userId: string, a: StravaSummary, settings: AthleteSettings) {
   const inp = { movingSec: a.moving_time, avgHr: a.average_heartrate ?? null, avgWatts: a.average_watts ?? null, weightedWatts: a.weighted_average_watts ?? null };
   const data = {
     userId,
@@ -206,17 +206,26 @@ async function upsertActivity(userId: string, a: StravaSummary, settings: Athlet
     load: estimateLoad(inp, settings),
     zone: estimateZone(inp, settings),
   };
-  await prisma.stravaActivity.upsert({ where: { id: String(a.id) }, create: { id: String(a.id), ...data }, update: data });
+  return prisma.stravaActivity.upsert({ where: { id: String(a.id) }, create: { id: String(a.id), ...data }, update: data });
 }
 
-async function refreshAthlete(userId: string, token: string): Promise<AthleteSettings> {
+// Écriture groupée : UNE transaction par lot de 100 sorties. Une écriture par sortie
+// coûtait une synchronisation disque chacune (plusieurs secondes sur le disque d'un NAS
+// pour une année d'activités).
+async function saveActivities(userId: string, rides: StravaSummary[], settings: AthleteSettings): Promise<void> {
+  for (let i = 0; i < rides.length; i += 100) {
+    await prisma.$transaction(rides.slice(i, i + 100).map((a) => activityUpsert(userId, a, settings)));
+  }
+}
+
+async function refreshAthlete(userId: string, token: string, batchMaxHr = 0): Promise<AthleteSettings> {
   const [athlete, zones] = await Promise.all([
     api<{ ftp?: number | null; profile?: string; firstname?: string; lastname?: string }>(token, "/athlete").catch(() => null),
     api<{ heart_rate?: { zones?: { min: number; max: number }[] } }>(token, "/athlete/zones").catch(() => null),
   ]);
   const hz = zones?.heart_rate?.zones?.map((z) => [z.min, z.max] as [number, number]) ?? null;
   const observed = await prisma.stravaActivity.aggregate({ where: { userId }, _max: { maxHr: true } });
-  const maxHr = Math.round(Math.max(observed._max.maxHr ?? 0, hz?.[hz.length - 1]?.[0] ?? 0)) || null;
+  const maxHr = Math.round(Math.max(observed._max.maxHr ?? 0, batchMaxHr, hz?.[hz.length - 1]?.[0] ?? 0)) || null;
   await prisma.stravaAccount.update({
     where: { userId },
     data: {
@@ -230,32 +239,50 @@ async function refreshAthlete(userId: string, token: string): Promise<AthleteSet
   return { ftp: athlete?.ftp ?? null, maxHr, hrZones: hz };
 }
 
-// Synchronisation complète des `HISTORY_DAYS` derniers jours. Cooldown d'une minute
-// (bouton « Synchroniser » martelé) sauf `force`. Jamais d'exception : l'erreur est
-// mémorisée sur le compte pour être affichée.
-export async function syncAccount(userId: string, opts: { force?: boolean; now?: Date } = {}): Promise<{ ok: boolean; synced: number; error?: string; throttled?: boolean }> {
+// Comptes en cours de synchronisation (une seule instance du serveur) : l'interface s'en
+// sert pour savoir s'il faut encore attendre des données.
+const syncing = new Set<string>();
+export const isSyncing = (userId: string) => syncing.has(userId);
+
+// Synchronisation des `days` derniers jours (par défaut tout l'historique utile). Cooldown
+// d'une minute (bouton « Synchroniser » martelé) sauf `force`. Jamais d'exception :
+// l'erreur est mémorisée sur le compte pour être affichée.
+export async function syncAccount(userId: string, opts: { force?: boolean; now?: Date; days?: number } = {}): Promise<{ ok: boolean; synced: number; error?: string; throttled?: boolean }> {
   const now = opts.now ?? new Date();
   const acc = await prisma.stravaAccount.findUnique({ where: { userId } });
   if (!acc) return { ok: false, synced: 0, error: "Compte Strava non lié" };
   if (!opts.force && acc.lastSyncAt && now.getTime() - acc.lastSyncAt.getTime() < SYNC_COOLDOWN_MS) return { ok: true, synced: 0, throttled: true };
+  syncing.add(userId);
   try {
     const token = await validAccessToken(userId, now.getTime());
-    const after = Math.floor((now.getTime() - HISTORY_DAYS * 86_400_000) / 1000);
-    const all: StravaSummary[] = [];
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const batch = await api<StravaSummary[]>(token, `/athlete/activities?after=${after}&per_page=200&page=${page}`);
-      all.push(...batch);
-      if (batch.length < 200) break;
-    }
-    const settings = await refreshAthlete(userId, token);
+    const after = Math.floor((now.getTime() - (opts.days ?? HISTORY_DAYS) * 86_400_000) / 1000);
+    const page = (n: number) => api<StravaSummary[]>(token, `/athlete/activities?after=${after}&per_page=200&page=${n}`);
+    const all: StravaSummary[] = [...(await page(1))];
+    for (let n = 2; n <= MAX_PAGES && all.length === (n - 1) * 200; n++) all.push(...(await page(n)));
     const rides = all.filter(isRide);
-    for (const a of rides) await upsertActivity(userId, a, settings);
+    const settings = await refreshAthlete(userId, token, Math.max(0, ...rides.map((r) => r.max_heartrate ?? 0)));
+    await saveActivities(userId, rides, settings);
     await prisma.stravaAccount.update({ where: { userId }, data: { lastSyncAt: now, lastSyncError: null } });
     return { ok: true, synced: rides.length };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Erreur inconnue";
     await prisma.stravaAccount.update({ where: { userId }, data: { lastSyncAt: now, lastSyncError: message } }).catch(() => undefined);
     return { ok: false, synced: 0, error: message };
+  } finally {
+    syncing.delete(userId);
+  }
+}
+
+// À la connexion : d'abord les 8 dernières semaines (une seule requête, le tableau de bord
+// s'affiche en une à deux secondes), puis tout l'historique en arrière-plan.
+export async function initialSync(userId: string): Promise<void> {
+  syncing.add(userId);
+  try {
+    const quick = await syncAccount(userId, { force: true, days: 60 });
+    syncing.add(userId); // reste « en cours » entre les deux passes
+    if (quick.ok) await syncAccount(userId, { force: true });
+  } finally {
+    syncing.delete(userId);
   }
 }
 
@@ -271,7 +298,7 @@ export async function syncOneActivity(athleteId: string, activityId: string, asp
     const token = await validAccessToken(acc.userId);
     const a = await api<StravaSummary>(token, `/activities/${activityId}`);
     if (!isRide(a)) return null;
-    await upsertActivity(acc.userId, a, settingsOf(acc));
+    await activityUpsert(acc.userId, a, settingsOf(acc));
     return { userId: acc.userId, created: aspect === "create" };
   } catch (err) {
     console.error("[strava] activité non synchronisée :", err instanceof Error ? err.message : err);

@@ -66,18 +66,20 @@ export function StravaTab() {
     void load();
   }, [load]);
 
-  // Tant que la première synchronisation n'a pas abouti (compte tout juste connecté), on
-  // relit l'état toutes les 2 s (1 min maximum) : le tableau de bord apparaît tout seul.
+  // Compte tout juste connecté : on relit l'état toutes les 1,5 s tant que la première
+  // synchronisation n'a pas abouti, puis tant que l'historique s'importe (2 min maximum).
   const waitingFirstSync = Boolean(status?.connected && status.account && status.account.lastSyncAt === null);
+  const importing = Boolean(status?.connected && status.syncing);
+  const polling = waitingFirstSync || importing;
   useEffect(() => {
-    if (!waitingFirstSync) return;
+    if (!polling) return;
     let tries = 0;
     const t = setInterval(() => {
-      if (++tries > 30) clearInterval(t);
+      if (++tries > 80) clearInterval(t);
       else void load();
-    }, 2000);
+    }, 1500);
     return () => clearInterval(t);
-  }, [waitingFirstSync, load]);
+  }, [polling, load]);
 
   async function connect() {
     setBusy("connect");
@@ -161,6 +163,7 @@ export function StravaTab() {
                 <span className={`sv-badge${acc.lastSyncError ? " is-bad" : ""}`}>
                   <i className="sv-dot-live" aria-hidden="true" /> {acc.lastSyncError ? "Erreur de synchro" : acc.lastSyncAt ? `Synchronisé ${ago(acc.lastSyncAt)}` : "Synchronisation en cours…"}
                 </span>
+                {importing && !waitingFirstSync && <span className="sv-badge">⏳ Import de l'historique…</span>}
                 {acc.ftp ? <span className="sv-badge">FTP {acc.ftp} W</span> : null}
                 {acc.maxHr ? <span className="sv-badge">FC max {acc.maxHr}</span> : null}
               </div>
