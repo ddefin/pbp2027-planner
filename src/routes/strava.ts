@@ -28,7 +28,14 @@ export async function stravaRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
     const acc = await prisma.stravaAccount.findUnique({ where: { userId: user.id } });
     return reply.send({
-      configured: stravaConfigured(),
+      configured: stravaConfigured() && Boolean(redirectUri()),
+      // Ce que le SERVEUR voit réellement (jamais les valeurs) : aide à trouver une variable
+      // mal nommée ou pas relue par le conteneur.
+      missing: [
+        ...(config.stravaClientId ? [] : ["STRAVA_CLIENT_ID"]),
+        ...(config.stravaClientSecret ? [] : ["STRAVA_CLIENT_SECRET"]),
+        ...(redirectUri() ? [] : ["PUBLIC_URL (ou STRAVA_REDIRECT_URI)"]),
+      ],
       redirectUri: redirectUri(),
       mcpUrl: MCP_URL,
       connected: Boolean(acc),

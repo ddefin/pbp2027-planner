@@ -125,7 +125,13 @@ export function StravaTab() {
             <ConnectButton onClick={connect} busy={busy === "connect"} />
           ) : (
             <div className="sv-warn">
-              ⚠️ L'intégration Strava n'est pas configurée sur le serveur : il manque <code>STRAVA_CLIENT_ID</code> et <code>STRAVA_CLIENT_SECRET</code> (et <code>PUBLIC_URL</code>). Voir <code>.env.example</code>.
+              ⚠️ L'intégration Strava n'est pas configurée sur le serveur. Variable{(status.missing?.length ?? 0) > 1 ? "s" : ""} non vue{(status.missing?.length ?? 0) > 1 ? "s" : ""} par le serveur :{" "}
+              {(status.missing ?? []).map((m) => (
+                <code key={m} style={{ marginRight: 6 }}>{m}</code>
+              ))}
+              <div className="sv-sub" style={{ marginTop: 6 }}>
+                Vérifie l'orthographe exacte dans <code>.env.production</code> (pas de espace autour du « = »), puis relance le déploiement : le conteneur doit être <strong>recréé</strong> pour relire le fichier (un simple redémarrage ne suffit pas).
+              </div>
             </div>
           )}
         </section>

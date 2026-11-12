@@ -210,6 +210,7 @@ describe("API Strava", () => {
   it("exige une session et propose le bon lien d'autorisation", async () => {
     expect((await get("/api/strava/status", false)).statusCode).toBe(401);
     const status = (await get("/api/strava/status")).json();
+    expect(status.missing).toEqual([]);
     expect(status).toMatchObject({ configured: true, connected: false, redirectUri: "https://pbp.example/api/strava/callback" });
     const { url } = (await get("/api/strava/connect")).json();
     const u = new URL(url);

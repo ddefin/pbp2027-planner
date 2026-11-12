@@ -8,6 +8,7 @@ export type CoachMetric = "hr" | "power" | "elevation" | "speed";
 
 export interface StravaStatus {
   configured: boolean;
+  missing?: string[];
   redirectUri: string | null;
   mcpUrl: string;
   connected: boolean;

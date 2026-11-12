@@ -73,15 +73,26 @@ export APP_VERSION
 
 if [ "$BEFORE" != "$AFTER" ]; then log "nouveau code : $BEFORE → $AFTER"; fi
 if [ -t 1 ]; then echo "Construction et démarrage de $APP_VERSION (plusieurs minutes si le code a changé)…"; fi
+# Un changement de .env.production doit être pris en compte : `docker compose up` ne
+# recrée pas toujours le conteneur quand seul ce fichier change (et un simple
+# `docker restart` ne relit PAS les variables). On mémorise donc une empreinte du fichier
+# et on force la recréation du conteneur dès qu'elle change.
+ENV_STATE=.deploy-env-state
+ENV_NOW=$(cksum .env.production 2>/dev/null | cut -d' ' -f1,2)
+RECREATE=""
+if [ "$ENV_NOW" != "$(cat "$ENV_STATE" 2>/dev/null)" ]; then
+  RECREATE="--force-recreate"
+  log ".env.production modifié (ou première vérification) : conteneur recréé pour relire les variables"
+fi
 BUILD_OUT=$(mktemp)
 if [ -t 1 ]; then
   # En terminal : progression visible en direct, et gardée pour le journal.
   # Le code de retour de docker ne traverse pas un tube en sh POSIX (pas de
   # pipefail) : on l'écrit dans le flux puis on le relit.
-  { docker compose up -d --build 2>&1; echo "__EXIT__$?"; } | tee "$BUILD_OUT" | grep -v '^__EXIT__'
+  { docker compose up -d --build $RECREATE 2>&1; echo "__EXIT__$?"; } | tee "$BUILD_OUT" | grep -v '^__EXIT__'
   STATUS=$(sed -n 's/^__EXIT__//p' "$BUILD_OUT" | tail -n 1)
 else
-  docker compose up -d --build > "$BUILD_OUT" 2>&1; STATUS=$?
+  docker compose up -d --build $RECREATE > "$BUILD_OUT" 2>&1; STATUS=$?
 fi
 if [ "$STATUS" != "0" ]; then
   log "ÉCHEC build/démarrage ($AFTER), l'ancienne version continue de tourner :"
@@ -90,6 +101,7 @@ if [ "$STATUS" != "0" ]; then
   exit 1
 fi
 rm -f "$BUILD_OUT"
+echo "$ENV_NOW" > "$ENV_STATE"
 # Pas une ligne toutes les 5 min quand rien ne change : seulement s'il y a du nouveau
 # code, un lancement à la main, ou une réussite qui suit un échec.
 if [ "$BEFORE" != "$AFTER" ] || [ -t 1 ] || tail -n 45 "$LOG" 2>/dev/null | grep -q "ÉCHEC"; then

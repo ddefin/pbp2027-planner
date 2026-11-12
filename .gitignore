@@ -9,3 +9,4 @@ prisma/dev.db-journal
 runner/.env
 deploy.log
 .deploy.lock/
+.deploy-env-state
