@@ -39,6 +39,15 @@ export const config = {
   // D'où partent les liens de réinitialisation (ex. https://pbp2027.lameteoducyclo.fr) :
   // sans elle, dérivé de l'en-tête Host de la requête (voir src/routes/auth.ts).
   publicUrl: process.env.PUBLIC_URL || null,
+  // Intégration Strava (API v3, OAuth2). Sans STRAVA_CLIENT_ID/SECRET, l'onglet Strava du
+  // profil explique ce qu'il manque et le reste de l'app fonctionne normalement. Créer
+  // l'application sur https://www.strava.com/settings/api (domaine de rappel = celui du site).
+  stravaClientId: process.env.STRAVA_CLIENT_ID || null,
+  stravaClientSecret: process.env.STRAVA_CLIENT_SECRET || null,
+  // Par défaut : <PUBLIC_URL>/api/strava/callback.
+  stravaRedirectUri: process.env.STRAVA_REDIRECT_URI || null,
+  // Jeton de vérification de l'abonnement webhook Strava (au choix, secret).
+  stravaWebhookVerifyToken: process.env.STRAVA_WEBHOOK_VERIFY_TOKEN || null,
   // Toutes optionnelles : sans TELEGRAM_BOT_TOKEN, ni la diffusion des actualités, ni
   // les notifications personnalisées, ni la liaison de compte ne sont actives — le
   // reste de l'app fonctionne normalement (même logique que SMTP/OpenWeather plus haut).

@@ -4,6 +4,7 @@ import { useProfile } from "../hooks/useProfile";
 import { usePersonalEvents } from "../hooks/usePersonalEvents";
 import { useLicenseDocuments } from "../hooks/useLicenseDocuments";
 import { ApiError } from "../api/auth";
+import { StravaTab } from "../components/strava/StravaTab";
 import {
   changePassword,
   createTelegramLinkCode,
@@ -39,9 +40,30 @@ function CollapsibleSection({ title, summary, defaultOpen = false, children }: {
   );
 }
 
+type ProfileTab = "compte" | "strava";
+
 export function ProfilePage() {
+  const [tab, setTab] = useState<ProfileTab>(() => (window.location.hash === "#strava" || new URLSearchParams(window.location.search).has("strava") ? "strava" : "compte"));
+  const go = (t: ProfileTab) => {
+    setTab(t);
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${t === "strava" ? "#strava" : ""}`);
+  };
   return (
     <div className="wrap">
+      <nav className="rb-tabs" role="tablist" aria-label="Sections du profil">
+        <button type="button" role="tab" id="pf-tab-compte" aria-selected={tab === "compte"} aria-controls="pf-panel-compte" className="rb-tab" onClick={() => go("compte")}>
+          👤 Compte
+        </button>
+        <button type="button" role="tab" id="pf-tab-strava" aria-selected={tab === "strava"} aria-controls="pf-panel-strava" className="rb-tab" onClick={() => go("strava")}>
+          🚴 Strava
+        </button>
+      </nav>
+      {tab === "strava" && (
+        <div role="tabpanel" id="pf-panel-strava" aria-labelledby="pf-tab-strava">
+          <StravaTab />
+        </div>
+      )}
+      <div role="tabpanel" id="pf-panel-compte" aria-labelledby="pf-tab-compte" hidden={tab !== "compte"}>
       <CollapsibleSection title="Mon profil" summary="Prénom, adresse e-mail">
         <ProfileSection />
       </CollapsibleSection>
@@ -60,6 +82,7 @@ export function ProfilePage() {
       <CollapsibleSection title="Telegram" summary="Notifications et pointage par message">
         <TelegramSection />
       </CollapsibleSection>
+      </div>
       <DeployedVersion />
     </div>
   );
