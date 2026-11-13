@@ -2368,3 +2368,29 @@ button.link {
 .sv-copy { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
 .sv-copy code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font: 500 12.5px var(--font-mono); background: color-mix(in srgb, var(--fg) 5%, transparent); }
 .sv-test { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 8px; font-size: 13.5px; }
+
+/* Étapes de qualification (tableau de bord) */
+.quali-steps {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 8px;
+  padding: 0;
+}
+.quali-steps li {
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.quali-steps li.is-done {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+.quali-steps small {
+  font-weight: 500;
+}

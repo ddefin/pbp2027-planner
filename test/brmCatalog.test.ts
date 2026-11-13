@@ -154,6 +154,44 @@ describe("API catalogue BRM (ACP)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("compte pour la qualification les BRM du calendrier marqués « Homologué », un 1000 valant pour le 600", async () => {
+    const cookie = await registerWithSession(server, `quali-${Date.now()}@example.com`);
+    const { events } = (await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } })).json();
+    const brm1000 = events.find((e: { distance: number }) => e.distance === 1000);
+    const brm600 = events.find((e: { distance: number }) => e.distance === 600);
+    const q0 = (await server.inject({ method: "GET", url: "/api/brm/qualification", headers: { cookie } })).json();
+    expect(q0.steps.map((s: { step: number }) => s.step)).toEqual([200, 300, 400, 600]);
+    expect(q0.steps.every((s: { done: boolean }) => !s.done)).toBe(true);
+
+    // « Prévu » ne compte pas ; « Homologué » oui.
+    await server.inject({ method: "PUT", url: `/api/brm/catalog/${brm1000.id}/participation`, headers: { cookie }, payload: { status: "prevu" } });
+    expect((await server.inject({ method: "GET", url: "/api/brm/qualification", headers: { cookie } })).json().steps[3].done).toBe(false);
+    await server.inject({ method: "PUT", url: `/api/brm/catalog/${brm1000.id}/participation`, headers: { cookie }, payload: { status: "homologue" } });
+    // Un BRM perso (200 homologué) s'ajoute au calendrier.
+    await server.inject({ method: "POST", url: "/api/brm", headers: { cookie }, payload: { distance: 200, date: "2027-02-14T06:00:00.000Z", lieu: "Rambouillet", status: "homologue" } });
+    const q = (await server.inject({ method: "GET", url: "/api/brm/qualification", headers: { cookie } })).json();
+    expect(q.catalogAvailable).toBe(true);
+    expect(q.steps.filter((s: { done: boolean }) => s.done).map((s: { step: number }) => s.step)).toEqual([200, 600]);
+    expect(q.steps[3].by).toMatchObject({ distance: 1000, lieu: "Paris", source: "calendrier" });
+    expect(q.steps[0].by).toMatchObject({ distance: 200, source: "perso" });
+
+    // Le 600 du calendrier homologué en plus : toujours une seule étape 600.
+    await server.inject({ method: "PUT", url: `/api/brm/catalog/${brm600.id}/participation`, headers: { cookie }, payload: { status: "homologue" } });
+    expect((await server.inject({ method: "GET", url: "/api/brm/qualification", headers: { cookie } })).json().steps.filter((s: { done: boolean }) => s.done)).toHaveLength(2);    // Ne pas laisser de choix en base : d'autres tests comptent les participants d'un BRM.
+    await prisma.brmParticipation.deleteMany({ where: { user: { email: { startsWith: "quali-" } } } });
+  });
+
+  it("qualification : calendrier ACP injoignable, on compte les BRM perso et on le signale", async () => {
+    const cookie = await registerWithSession(server, `quali-ko-${Date.now()}@example.com`);
+    const { events } = (await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } })).json();
+    await server.inject({ method: "PUT", url: `/api/brm/catalog/${events[0].id}/participation`, headers: { cookie }, payload: { status: "homologue" } });
+    await server.inject({ method: "POST", url: "/api/brm", headers: { cookie }, payload: { distance: 300, date: "2027-03-14T06:00:00.000Z", lieu: "Gacé", status: "homologue" } });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+    const q = (await server.inject({ method: "GET", url: "/api/brm/qualification", headers: { cookie } })).json();
+    expect(q.catalogAvailable).toBe(false);
+    expect(q.steps.filter((s: { done: boolean }) => s.done).map((s: { step: number }) => s.step)).toEqual([300]);    await prisma.brmParticipation.deleteMany({ where: { user: { email: { startsWith: "quali-" } } } });
+  });
+
   it("ne garde que les BRM France de 200 à 1000 km, avec un id stable", async () => {
     const cookie = await registerAndLogin(server, `catalog-${Date.now()}@example.com`);
     const res = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } });

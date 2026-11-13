@@ -5,6 +5,7 @@ import { getSessionUser } from "../lib/session.js";
 import { fetchFranceBrmCatalog } from "../lib/acpCatalog.js";
 import { CATALOG_STATUSES, CALENDAR_DISTANCES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
+import { QUALIFYING_STEPS, qualifiedSteps, stepFor } from "../shared/qualification.js";
 import { triggerWebhooks } from "../lib/webhooks.js";
 import { fetchCityWeather } from "../lib/openWeather.js";
 import { config } from "../config.js";
@@ -38,6 +39,45 @@ const controlPointSchema = z.object({
 });
 
 export async function brmCatalogRoutes(app: FastifyInstance) {
+  // Qualification PBP du randonneur connecté : BRM perso ET BRM du calendrier marqués
+  // « Homologué ». Un 1000 vaut pour l'étape 600 (src/shared/qualification.ts). Si le
+  // calendrier ACP est injoignable, on compte ce qu'on sait (BRM perso) et on le signale.
+  app.get("/brm/qualification", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+
+    const [personal, participations] = await Promise.all([
+      prisma.brmEvent.findMany({ where: { userId: user.id, status: "homologue" }, select: { distance: true, date: true, lieu: true } }),
+      prisma.brmParticipation.findMany({ where: { userId: user.id, status: "homologue" }, select: { catalogEventId: true } }),
+    ]);
+
+    let catalogAvailable = true;
+    let fromCalendar: { distance: number; date: string; ville: string }[] = [];
+    if (participations.length) {
+      try {
+        const events = await fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: CALENDAR_DISTANCES });
+        const wanted = new Set(participations.map((p) => p.catalogEventId));
+        fromCalendar = events.filter((e) => wanted.has(e.id)).map((e) => ({ distance: e.distance, date: e.date, ville: e.ville }));
+      } catch {
+        catalogAvailable = false;
+      }
+    }
+
+    const all = [
+      ...personal.map((e) => ({ distance: e.distance, status: "homologue", date: e.date.toISOString().slice(0, 10), lieu: e.lieu, source: "perso" as const })),
+      ...fromCalendar.map((e) => ({ distance: e.distance, status: "homologue", date: e.date, lieu: e.ville, source: "calendrier" as const })),
+    ];
+    const steps = qualifiedSteps(all);
+    return reply.send({
+      total: QUALIFYING_STEPS.length,
+      steps: QUALIFYING_STEPS.map((step) => {
+        const by = all.filter((e) => stepFor(e.distance) === step).sort((a, b) => a.date.localeCompare(b.date))[0] ?? null;
+        return { step, done: steps.has(step), by: by && { distance: by.distance, date: by.date, lieu: by.lieu, source: by.source } };
+      }),
+      catalogAvailable,
+    });
+  });
+
   app.get("/brm/catalog", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });

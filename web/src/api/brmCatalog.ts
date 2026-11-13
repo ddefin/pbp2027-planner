@@ -147,3 +147,13 @@ export async function uploadTrackVariant(id: string, file: File, label: string):
 export function deleteTrackVariant(id: string, variantId: string) {
   return request<void>(`/brm/catalog/${id}/track-variants/${variantId}`, { method: "DELETE" });
 }
+
+export interface Qualification {
+  total: number;
+  steps: { step: number; done: boolean; by: { distance: number; date: string; lieu: string; source: "perso" | "calendrier" } | null }[];
+  catalogAvailable: boolean;
+}
+
+export function getQualification() {
+  return request<Qualification>("/brm/qualification");
+}

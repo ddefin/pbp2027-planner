@@ -1,12 +1,24 @@
+import { useEffect, useState } from "react";
 import type { BrmEvent } from "../api/brm";
+import { getQualification, type Qualification } from "../api/brmCatalog";
 import { PBP_DATE } from "../lib/brmMeta";
-import { QUALIFYING_STEPS, qualifiedSteps } from "../../../src/shared/qualification";
 import { Countdown } from "./Countdown";
 
+// Qualification calculée par le serveur : BRM perso + BRM du calendrier marqués
+// « Homologué » ; un 1000 vaut pour l'étape 600. `events` (BRM perso) sert seulement à
+// relancer le calcul quand un statut change sur le tableau de bord.
 export function DashboardHero({ events }: { events: BrmEvent[] | null }) {
-  // Série 200/300/400/600 ; un 1000 homologué vaut pour l'étape 600.
-  const done = qualifiedSteps(events ?? []).size;
-  const total = QUALIFYING_STEPS.length;
+  const [q, setQ] = useState<Qualification | null>(null);
+  const statusKey = (events ?? []).map((e) => `${e.id}:${e.status}`).join(",");
+
+  useEffect(() => {
+    getQualification()
+      .then(setQ)
+      .catch(() => setQ(null));
+  }, [statusKey]);
+
+  const total = q?.total ?? 4;
+  const done = q?.steps.filter((s) => s.done).length ?? 0;
   const pct = Math.round((done / total) * 100);
 
   return (
@@ -25,8 +37,19 @@ export function DashboardHero({ events }: { events: BrmEvent[] | null }) {
         <div className="quali-bar">
           <div style={{ width: `${pct}%` }} />
         </div>
+        {q && (
+          <ul className="quali-steps" aria-label="Étapes de qualification">
+            {q.steps.map((s) => (
+              <li key={s.step} className={s.done ? "is-done" : undefined} title={s.by ? `${s.by.distance} km — ${s.by.lieu}, ${s.by.date}` : "Pas encore homologué"}>
+                {s.done ? "✓" : "○"} {s.step}
+                {s.done && s.by && s.by.distance !== s.step ? <small> (via {s.by.distance})</small> : null}
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="meta" style={{ margin: 0 }}>
           {pct}% des distances requises homologuées
+          {q && !q.catalogAvailable ? " · calendrier ACP indisponible : seuls tes BRM perso sont comptés" : ""}
         </div>
       </div>
     </div>
