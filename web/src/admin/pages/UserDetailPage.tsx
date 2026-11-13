@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Ban, KeyRound, Laptop, RotateCcw, ShieldCheck, Trash2, UserX } from "lucide-react";
+import { ArrowLeft, Ban, KeyRound, Laptop, Mail, RotateCcw, ShieldCheck, Trash2, UserX } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
 import { EmptyState, Skeleton } from "../components/States";
 import { RoleBadge, StatusBadge } from "../components/StatusBadge";
 import { useUserActions } from "../components/UserActions";
 import { useBreadcrumbLeaf } from "../components/Breadcrumbs";
-import { errorText, getUser } from "../api";
+import { errorText, getUser, sendResetLink } from "../api";
+import { PresenceDot } from "../components/PresenceDot";
+import { Dialog } from "../components/Dialog";
+import { useToast } from "../components/Toaster";
 import { ACTION_LABEL, EVENT_LABEL, fmtAgo, fmtDate, fmtDateTime } from "../format";
 import { useAuth } from "../../context/AuthContext";
 import type { UserDetail } from "../types";
@@ -27,6 +30,9 @@ export function UserDetailPage() {
   const [data, setData] = useState<UserDetail | null>(null);
   const [error, setError] = useState<{ code: number; text: string } | null>(null);
   const [reload, setReload] = useState(0);
+  const toast = useToast();
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
   useBreadcrumbLeaf(data?.user.prenom ?? null);
 
   useEffect(() => {
@@ -40,6 +46,21 @@ export function UserDetailPage() {
   }, [id, reload]);
 
   const actions = useUserActions((kind) => (kind === "delete" ? navigate("/admin/utilisateurs", { replace: true }) : setReload((r) => r + 1)));
+
+  async function doSendReset() {
+    setResetBusy(true);
+    try {
+      const r = await sendResetLink(id);
+      if (r.sent) toast("success", "Lien de réinitialisation envoyé (valable 1 heure).");
+      else toast("error", `E-mail non envoyé : ${r.error ?? "cause inconnue"}`);
+      setResetOpen(false);
+      setReload((x) => x + 1);
+    } catch (e) {
+      toast("error", errorText(e));
+    } finally {
+      setResetBusy(false);
+    }
+  }
 
   if (error?.code === 404)
     return <EmptyState icon={UserX} title="Compte introuvable" text="Il a peut-être été supprimé." action={<Link to="/admin/utilisateurs" className="ad-btn">Retour à la liste</Link>} />;
@@ -84,6 +105,9 @@ export function UserDetailPage() {
                   <Ban size={15} aria-hidden="true" /> Suspendre
                 </button>
               )}
+              <button type="button" className="ad-btn" onClick={() => setResetOpen(true)} disabled={u.status === "suspended"} title={u.status === "suspended" ? "Compte suspendu : réactive-le d'abord" : undefined}>
+                <Mail size={15} aria-hidden="true" /> Lien de mot de passe
+              </button>
               <button type="button" className="ad-btn" onClick={() => actions.open(u.isAdmin ? "demote" : "promote", target)}>
                 <ShieldCheck size={15} aria-hidden="true" /> {u.isAdmin ? "Retirer admin" : "Nommer admin"}
               </button>
@@ -97,6 +121,7 @@ export function UserDetailPage() {
       <div className="ad-badges-row">
         <StatusBadge status={u.status} />
         <RoleBadge isAdmin={u.isAdmin} />
+        <PresenceDot presence={u.presence} lastSeenAt={u.lastSeenAt} />
       </div>
       {u.status === "suspended" && (
         <div className="ad-callout is-warn">
@@ -205,6 +230,29 @@ export function UserDetailPage() {
         )}
       </section>
       {actions.dialog}
+      <Dialog
+        open={resetOpen}
+        title={`Envoyer un lien de mot de passe à ${u.prenom}`}
+        onClose={() => !resetBusy && setResetOpen(false)}
+        onSubmit={() => void doSendReset()}
+        footer={
+          <>
+            <button type="button" className="ad-btn" onClick={() => setResetOpen(false)} disabled={resetBusy}>
+              Annuler
+            </button>
+            <button type="submit" className="ad-btn is-primary" disabled={resetBusy}>
+              {resetBusy ? "Envoi…" : "Envoyer le lien"}
+            </button>
+          </>
+        }
+      >
+        <p>
+          Un e-mail part à <strong>{u.email}</strong> avec un lien valable 1 heure. Tu ne vois pas le lien : seul {u.prenom} peut choisir son nouveau mot de passe.
+        </p>
+        <p className="ad-muted" style={{ whiteSpace: "normal" }}>
+          Le résultat s'affiche tout de suite (envoyé, ou la cause exacte de l'échec) et l'action est inscrite au journal.
+        </p>
+      </Dialog>
     </>
   );
 }

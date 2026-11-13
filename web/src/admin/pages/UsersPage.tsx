@@ -5,11 +5,12 @@ import { PageHeader } from "../components/PageHeader";
 import { DataTable, type Column } from "../components/DataTable";
 import { EmptyState } from "../components/States";
 import { RoleBadge, StatusBadge } from "../components/StatusBadge";
+import { PresenceDot } from "../components/PresenceDot";
 import { useUserActions } from "../components/UserActions";
 import { useToast } from "../components/Toaster";
 import { Dialog } from "../components/Dialog";
 import { bulkUsers, errorText, listUsers } from "../api";
-import { fmtAgo, fmtDate } from "../format";
+import { fmtDate } from "../format";
 import { useAuth } from "../../context/AuthContext";
 import type { Page, UserRow } from "../types";
 import { reasonSchema } from "../../../../src/shared/adminSchemas";
@@ -71,6 +72,7 @@ export function UsersPage() {
   const q = params.get("q") ?? "";
   const status = params.get("statut") ?? "all";
   const role = params.get("role") ?? "all";
+  const presence = params.get("presence") ?? "all";
   const sort = SORTS.includes(params.get("tri") ?? "") ? params.get("tri")! : "createdAt";
   const dir = params.get("ordre") === "asc" ? "asc" : "desc";
   const page = Math.max(1, Number(params.get("page")) || 1);
@@ -109,7 +111,7 @@ export function UsersPage() {
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    const p = new URLSearchParams({ q, status, role, sort, dir, page: String(page), pageSize: String(pageSize) });
+    const p = new URLSearchParams({ q, status, role, presence, sort, dir, page: String(page), pageSize: String(pageSize) });
     listUsers(p)
       .then((d) => alive && (setData(d), setError(null)))
       .catch((e) => alive && setError(errorText(e)))
@@ -117,7 +119,7 @@ export function UsersPage() {
     return () => {
       alive = false;
     };
-  }, [q, status, role, sort, dir, page, pageSize, reload]);
+  }, [q, status, role, presence, sort, dir, page, pageSize, reload]);
 
   const actions = useUserActions(() => {
     setSelected(new Set());
@@ -134,7 +136,9 @@ export function UsersPage() {
           <Link to={`/admin/utilisateurs/${u.id}`} className="ad-user-cell">
             <span className="ad-mini-avatar" aria-hidden="true">{u.prenom.slice(0, 1).toUpperCase()}</span>
             <span>
-              <strong>{u.prenom}</strong>
+              <strong>
+                {u.prenom} <PresenceDot presence={u.presence} lastSeenAt={u.lastSeenAt} compact />
+              </strong>
               <small>{u.email}</small>
             </span>
           </Link>
@@ -143,7 +147,7 @@ export function UsersPage() {
       { key: "role", header: "Rôle", render: (u) => <RoleBadge isAdmin={u.isAdmin} />, hideOnMobile: true },
       { key: "status", header: "Statut", render: (u) => <StatusBadge status={u.status} /> },
       { key: "createdAt", header: "Inscrit le", sortable: true, render: (u) => <span className="ad-num">{fmtDate(u.createdAt)}</span>, hideOnMobile: true },
-      { key: "lastSeenAt", header: "Dernière activité", sortable: true, render: (u) => <span className="ad-muted">{fmtAgo(u.lastSeenAt)}</span>, hideOnMobile: true },
+      { key: "lastSeenAt", header: "Présence", sortable: true, render: (u) => <PresenceDot presence={u.presence} lastSeenAt={u.lastSeenAt} />, hideOnMobile: true },
       { key: "actions", header: "", className: "ad-col-actions", render: (u) => <RowMenu row={u} me={u.email === me?.email} onAction={(k) => actions.open(k, u)} /> },
     ],
     [me, actions],
@@ -169,7 +173,7 @@ export function UsersPage() {
     }
   }
 
-  const filtered = q || status !== "all" || role !== "all";
+  const filtered = q || status !== "all" || role !== "all" || presence !== "all";
   return (
     <>
       <PageHeader title="Utilisateurs" description="Rechercher, filtrer et gérer les comptes des randonneurs." />
@@ -189,6 +193,12 @@ export function UsersPage() {
             <option value="all">Tous les rôles</option>
             <option value="admin">Administrateurs</option>
             <option value="member">Membres</option>
+          </select>
+          <select value={presence} onChange={(e) => update({ presence: e.target.value })} aria-label="Filtrer par présence">
+            <option value="all">Toute présence</option>
+            <option value="online">🟢 En ligne</option>
+            <option value="recent">🟠 Vus sous 72 h</option>
+            <option value="away">🔴 Absents (+72 h)</option>
           </select>
           {filtered && (
             <button

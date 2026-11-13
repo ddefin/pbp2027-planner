@@ -21,6 +21,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "user.demote": "a retiré le rôle administrateur de",
   "user.delete": "a supprimé (anonymisé)",
   "content.delete": "a supprimé le contenu",
+  "user.reset_link": "a envoyé un lien de mot de passe à",
+  "announcement.send": "a publié :",
 };
 
 export const EVENT_LABEL: Record<string, { label: string; tone: "ok" | "warn" | "error" | "info" }> = {

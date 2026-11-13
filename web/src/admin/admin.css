@@ -1402,3 +1402,151 @@
   align-items: center;
   gap: 8px;
 }
+
+/* ───── Présence, à surveiller, annonces ───── */
+.ad-presence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.ad-presence i {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--bad);
+  box-shadow: 0 0 0 2px var(--panel);
+}
+.ad-presence.is-online i {
+  background: var(--ok);
+}
+.ad-presence.is-online {
+  color: var(--ok);
+  font-weight: 600;
+}
+.ad-presence.is-recent i {
+  background: var(--warn);
+}
+.ad-top-cards {
+  margin-bottom: 16px;
+}
+.ad-count {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--ad-soft);
+  font-size: 13px;
+}
+.ad-allgood {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--ok);
+  font-weight: 600;
+  font-size: 14px;
+}
+.ad-attention {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.ad-attention li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+.ad-attention li > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--warn);
+}
+.ad-attention li.is-error > svg {
+  color: var(--bad);
+}
+.ad-attention a {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  color: var(--fg);
+  text-decoration: none;
+}
+.ad-attention a:hover strong {
+  text-decoration: underline;
+}
+.ad-attention small {
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.ad-online {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ad-online a {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.ad-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 10px 0 0;
+  white-space: normal;
+}
+.ad-legend .ad-presence {
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+.ad-announce-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+.ad-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.ad-check input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+.ad-preview {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--ad-softer);
+  font-size: 14px;
+}
+.ad-preview p {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+.ad-announce-text {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}

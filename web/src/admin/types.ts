@@ -1,4 +1,5 @@
 export type UserStatus = "active" | "suspended" | "locked";
+export type Presence = "online" | "recent" | "away";
 export type Period = "7d" | "30d" | "12m";
 
 export interface Kpi {
@@ -10,6 +11,7 @@ export interface Kpi {
 export interface Overview {
   period: Period;
   totals: { members: number; admins: number; suspended: number };
+  online: { count: number; users: { id: string; prenom: string }[] };
   kpis: {
     active: Kpi;
     newUsers: Kpi;
@@ -40,6 +42,7 @@ export interface UserRow {
   isAdmin: boolean;
   createdAt: string;
   lastSeenAt: string | null;
+  presence: Presence;
   status: UserStatus;
   suspendedReason: string | null;
 }
@@ -61,6 +64,8 @@ export interface UserDetail {
     isAdmin: boolean;
     createdAt: string;
     status: UserStatus;
+    lastSeenAt: string | null;
+    presence: Presence;
     suspendedAt: string | null;
     suspendedReason: string | null;
     lockedUntil: string | null;
@@ -71,4 +76,21 @@ export interface UserDetail {
   sessions: { device: string; lastSeenAt: string; createdAt: string }[];
   events: { kind: string; detail: string | null; at: string }[];
   audit: { id: string; action: string; actorEmail: string; metadata: Record<string, unknown> | null; at: string }[];
+}
+
+export interface AttentionItem {
+  kind: "mail_failed" | "locked" | "backup" | "strava" | "mail_config";
+  level: "error" | "warn";
+  title: string;
+  detail: string | null;
+  link: string;
+}
+
+export interface AnnouncementRow {
+  id: string;
+  actorEmail: string;
+  message: string;
+  recipients: number;
+  telegramSent: number;
+  at: string;
 }

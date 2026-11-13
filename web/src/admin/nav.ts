@@ -1,4 +1,4 @@
-import { FolderOpen, LayoutDashboard, ScrollText, Settings, Users, type LucideIcon } from "lucide-react";
+import { FolderOpen, LayoutDashboard, Megaphone, ScrollText, Settings, Users, type LucideIcon } from "lucide-react";
 
 export interface NavItem {
   to: string;
@@ -11,6 +11,7 @@ export const NAV: NavItem[] = [
   { to: "/admin", label: "Vue d'ensemble", icon: LayoutDashboard, keywords: "accueil tableau de bord kpi statistiques" },
   { to: "/admin/utilisateurs", label: "Utilisateurs", icon: Users, keywords: "comptes membres randonneurs suspendre supprimer" },
   { to: "/admin/contenus", label: "Contenus", icon: FolderOpen, keywords: "messages tracés gpx brm modération" },
+  { to: "/admin/annonces", label: "Annonces", icon: Megaphone, keywords: "message groupe notification telegram diffusion" },
   { to: "/admin/journaux", label: "Journaux d'audit", icon: ScrollText, keywords: "historique audit événements connexions" },
   { to: "/admin/parametres", label: "Paramètres", icon: Settings, keywords: "configuration mail telegram strava webhooks" },
 ];
@@ -21,4 +22,5 @@ export const SEGMENT_LABEL: Record<string, string> = {
   contenus: "Contenus",
   journaux: "Journaux d'audit",
   parametres: "Paramètres",
+  annonces: "Annonces",
 };

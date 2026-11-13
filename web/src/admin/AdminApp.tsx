@@ -9,6 +9,7 @@ const UsersPage = lazy(() => import("./pages/UsersPage").then((m) => ({ default:
 const UserDetailPage = lazy(() => import("./pages/UserDetailPage").then((m) => ({ default: m.UserDetailPage })));
 const ContentPage = lazy(() => import("./pages/ContentPage").then((m) => ({ default: m.ContentPage })));
 const AuditPage = lazy(() => import("./pages/AuditPage").then((m) => ({ default: m.AuditPage })));
+const AnnouncementsPage = lazy(() => import("./pages/AnnouncementsPage").then((m) => ({ default: m.AnnouncementsPage })));
 const SettingsPage = lazy(() => import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
 
 // Masquer l'espace aux non-admins n'est qu'un confort : c'est le serveur qui refuse chaque
@@ -50,6 +51,7 @@ export default function AdminApp() {
         <Route path="utilisateurs/:id" element={<Suspense fallback={null}><UserDetailPage /></Suspense>} />
         <Route path="contenus" element={<Suspense fallback={null}><ContentPage /></Suspense>} />
         <Route path="journaux" element={<Suspense fallback={null}><AuditPage /></Suspense>} />
+        <Route path="annonces" element={<Suspense fallback={null}><AnnouncementsPage /></Suspense>} />
         <Route path="parametres" element={<Suspense fallback={null}><SettingsPage /></Suspense>} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
       </Route>

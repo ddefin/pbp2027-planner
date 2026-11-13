@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, ScrollText, UserPlus, Users } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle2, CircleAlert, ScrollText, UserPlus, Users } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
 import { KpiCard } from "../components/KpiCard";
 import { ActivityChart } from "../components/ActivityChart";
 import { EmptyState, Skeleton } from "../components/States";
-import { errorText, getOverview } from "../api";
+import { errorText, getAttention, getOverview } from "../api";
 import { ACTION_LABEL, fmtAgo, fmtNum } from "../format";
-import type { Overview, Period } from "../types";
+import type { AttentionItem, Overview, Period } from "../types";
 
 const PERIODS: { id: Period; label: string }[] = [
   { id: "7d", label: "7 j" },
@@ -34,6 +34,23 @@ export function OverviewPage() {
     };
   }, [period]);
 
+  // « À surveiller » et « En ligne maintenant » : rafraîchis toutes les 30 s (page visible).
+  const [attention, setAttention] = useState<AttentionItem[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const tick = () => {
+      if (document.visibilityState !== "visible") return;
+      getAttention().then((a) => alive && setAttention(a)).catch(() => undefined);
+      getOverview(period).then((d) => alive && setData((prev) => (prev ? { ...prev, online: d.online } : d))).catch(() => undefined);
+    };
+    getAttention().then((a) => alive && setAttention(a)).catch(() => undefined);
+    const t = setInterval(tick, 30_000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [period]);
+
   const k = loading ? undefined : data?.kpis;
   return (
     <>
@@ -51,6 +68,60 @@ export function OverviewPage() {
         }
       />
       {error && <div className="ad-callout is-danger" role="alert">{error}</div>}
+
+      <div className="ad-grid-2 ad-top-cards">
+        <section className="ad-card" aria-labelledby="ad-att-title">
+          <div className="ad-card-head">
+            <h2 id="ad-att-title">À surveiller</h2>
+          </div>
+          {attention === null ? (
+            <Skeleton height={18} />
+          ) : attention.length === 0 ? (
+            <p className="ad-allgood">
+              <CheckCircle2 size={18} aria-hidden="true" /> Tout va bien : rien à signaler.
+            </p>
+          ) : (
+            <ul className="ad-attention">
+              {attention.map((a, i) => (
+                <li key={`${a.kind}-${i}`} className={`is-${a.level}`}>
+                  <CircleAlert size={16} aria-hidden="true" />
+                  <Link to={a.link}>
+                    <strong>{a.title}</strong>
+                    {a.detail && <small>{a.detail}</small>}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+        <section className="ad-card" aria-labelledby="ad-online-title">
+          <div className="ad-card-head">
+            <h2 id="ad-online-title">
+              <span className="ad-presence is-online"><i aria-hidden="true" /></span> En ligne maintenant
+              {data ? <span className="ad-count ad-num">{data.online.count}</span> : null}
+            </h2>
+            <Link to="/admin/utilisateurs?presence=online">Voir</Link>
+          </div>
+          {!data ? (
+            <Skeleton height={18} />
+          ) : data.online.count === 0 ? (
+            <p className="ad-muted" style={{ margin: 0 }}>Personne d'autre que toi pour l'instant.</p>
+          ) : (
+            <ul className="ad-online">
+              {data.online.users.map((u) => (
+                <li key={u.id}>
+                  <Link to={`/admin/utilisateurs/${u.id}`}>{u.prenom}</Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="ad-muted ad-legend">
+            <span className="ad-presence is-online"><i aria-hidden="true" /> en ligne</span>
+            <span className="ad-presence is-recent"><i aria-hidden="true" /> vu sous 72 h</span>
+            <span className="ad-presence is-away"><i aria-hidden="true" /> absent +72 h</span>
+          </p>
+        </section>
+      </div>
 
       <div className="ad-kpis">
         <KpiCard icon={Users} label="Membres actifs" kpi={k?.active} loading={loading} hint="vus sur la période" />

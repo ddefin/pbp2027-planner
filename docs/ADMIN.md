@@ -17,8 +17,15 @@ Ensuite, les rôles se gèrent depuis Administration → Utilisateurs.
 | Vue d'ensemble | 4 indicateurs (membres actifs, inscriptions, activité, incidents de compte) avec variation vs la période précédente ; activité par jour/mois (7 j, 30 j, 12 mois) ; dernières inscriptions et actions |
 | Utilisateurs | recherche (prénom, e-mail, club), filtres statut/rôle, tri, pagination côté serveur, sélection multiple ; fiche d'un compte (état, données, appareils, connexions et mots de passe, historique) |
 | Contenus | modération des messages du groupe, des tracés PBP et des traces GPX des BRM (les roadbooks sont privés et non modérables) |
+| Annonces | message à tous les membres actifs : cloche du site, et Telegram (comptes liés) si coché ; historique |
 | Journaux d'audit | actions d'administration (lecture seule) ; connexions et mots de passe, y compris pour une adresse sans compte |
 | Paramètres | état de la configuration (mail, sauvegardes, Telegram, Strava, météo, sécurité), sans aucun secret |
+
+**Présence** (liste et fiche des utilisateurs, carte « En ligne maintenant ») : vert = vu depuis moins de 5 min (un onglet ouvert interroge le serveur chaque minute), orange = vu dans les 72 h, rouge = au-delà ou jamais. Règle dans `src/shared/presence.ts`.
+
+**À surveiller** (vue d'ensemble) : mails de réinitialisation non envoyés (7 jours), comptes verrouillés, sauvegarde absente ou en retard, Strava en erreur, serveur mail non configuré.
+
+**Lien de mot de passe** (fiche d'un compte) : l'administrateur déclenche l'envoi et voit le résultat exact ; le lien ne part que dans la boîte du membre (3 envois par heure et par compte).
 
 Raccourcis : Ctrl/⌘+K (recherche de pages, comptes, tracés), sélecteur de thème clair/sombre/système dans la barre du haut.
 

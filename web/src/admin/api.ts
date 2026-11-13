@@ -1,4 +1,4 @@
-import type { Overview, Page, Period, UserDetail, UserRow } from "./types";
+import type { AnnouncementRow, AttentionItem, Overview, Page, Period, UserDetail, UserRow } from "./types";
 
 // Client de l'API /api/admin. Le navigateur envoie seul l'en-tête Origin, vérifié par le
 // serveur sur chaque modification (protection CSRF en plus du cookie SameSite=Strict).
@@ -34,6 +34,8 @@ export const ERROR_TEXT: Record<string, string> = {
   last_admin: "Il doit rester au moins un administrateur actif.",
   not_found: "Élément introuvable (déjà supprimé ?).",
   invalid_input: "Données invalides.",
+  account_suspended: "Ce compte est suspendu : réactive-le d'abord.",
+  mail_not_configured: "Aucun serveur mail n'est configuré sur le serveur.",
 };
 
 export function errorText(err: unknown): string {
@@ -82,3 +84,9 @@ export const deleteContent = (kind: ContentKind, id: string, reason: string) => 
 export const listAudit = (params: URLSearchParams) => adminRequest<Page<AuditListRow>>(`/audit?${params}`);
 export const listAuthEvents = (params: URLSearchParams) => adminRequest<Page<AuthEventRow>>(`/auth-events?${params}`);
 export const getSettings = () => adminRequest<Settings>("/settings");
+
+export const getAttention = () => adminRequest<{ items: AttentionItem[] }>("/attention").then((r) => r.items);
+export const sendResetLink = (id: string) => adminRequest<{ sent: boolean; error: string | null }>(`/users/${encodeURIComponent(id)}/send-reset`, { method: "POST", json: {} });
+export const getAnnouncementRecipients = () => adminRequest<{ members: number; telegram: number }>("/announcements/recipients");
+export const listAnnouncements = () => adminRequest<{ items: AnnouncementRow[] }>("/announcements").then((r) => r.items);
+export const sendAnnouncement = (message: string, telegram: boolean) => adminRequest<{ ok: true; recipients: number; telegramSent: number }>("/announcements", { method: "POST", json: { message, telegram } });
