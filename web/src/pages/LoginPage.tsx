@@ -31,9 +31,12 @@ export function LoginPage() {
     try {
       await login(email, password);
       await refresh();
-      // Retour à la page d'origine (chemin interne uniquement : pas de redirection vers un autre site).
-      const next = new URLSearchParams(window.location.search).get("next");
-      navigate(next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") ? next : "/", { replace: true });
+      // Connexion normale : accueil. Seul le retour depuis Strava (?strava=…) ramène sur la
+      // page demandée, pour rester sur l'onglet Strava. Chemin interne uniquement.
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next");
+      const fromStrava = next !== null && /^\/profil\b/.test(next) && next.includes("strava=");
+      navigate(fromStrava && next!.startsWith("/") && !next!.startsWith("//") ? next! : "/", { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
