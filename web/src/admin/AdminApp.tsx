@@ -18,7 +18,23 @@ export default function AdminApp() {
   const location = useLocation();
   if (status === "loading") return null;
   if (status === "anonymous") return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
-  if (!user?.isAdmin) return <Navigate to="/" replace />;
+  // Compte connecté mais pas administrateur : on le dit clairement au lieu de renvoyer
+  // en silence vers l'accueil.
+  if (!user?.isAdmin)
+    return (
+      <div className="auth-shell">
+        <div className="auth-card">
+          <h1>Accès réservé</h1>
+          <p>
+            L'espace d'administration est réservé aux administrateurs. Tu es connecté avec <strong>{user?.email}</strong>, qui n'a pas ce rôle.
+          </p>
+          <p className="hint">Un administrateur peut te donner le rôle depuis Administration → Utilisateurs. Pour le tout premier administrateur, voir docs/ADMIN.md.</p>
+          <a className="primary" href="/" style={{ display: "inline-block", textAlign: "center", padding: "10px 16px" }}>
+            Retour à l'accueil
+          </a>
+        </div>
+      </div>
+    );
   return (
     <Routes>
       <Route element={<AdminLayout />}>

@@ -32,12 +32,13 @@ export function LoginPage() {
     try {
       await login(email, password);
       await refresh();
-      // Connexion normale : accueil. Seul le retour depuis Strava (?strava=…) ramène sur la
-      // page demandée, pour rester sur l'onglet Strava. Chemin interne uniquement.
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get("next");
-      const fromStrava = next !== null && /^\/profil\b/.test(next) && next.includes("strava=");
-      navigate(fromStrava && next!.startsWith("/") && !next!.startsWith("//") ? next! : "/", { replace: true });
+      // Connexion normale : accueil. On ne revient sur la page demandée que dans deux cas
+      // voulus : l'espace d'administration (/admin…) et le retour depuis Strava (?strava=…).
+      // Chemin interne uniquement (jamais un autre site).
+      const next = new URLSearchParams(window.location.search).get("next");
+      const internal = next !== null && next.startsWith("/") && !next.startsWith("//");
+      const wanted = internal && (/^\/admin(\/|$|\?|#)/.test(next!) || (/^\/profil\b/.test(next!) && next!.includes("strava=")));
+      navigate(wanted ? next! : "/", { replace: true });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
