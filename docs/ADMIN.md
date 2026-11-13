@@ -1,10 +1,12 @@
 # Espace d'administration (/admin)
 
-Réservé aux comptes administrateurs (`User.isAdmin`). Pour nommer le premier administrateur sur le NAS :
+Réservé aux comptes administrateurs (`User.isAdmin`). Pour nommer le premier administrateur, sur le NAS, dans le dossier du dépôt :
 
 ```
-sudo docker exec pbp2027-planner node --input-type=module -e "import { PrismaClient } from '@prisma/client'; const p = new PrismaClient(); await p.user.update({ where: { email: 'ton@email.fr' }, data: { isAdmin: true } }); await p.\$disconnect();"
+sudo sh scripts/make-admin.sh ton@email.fr
 ```
+
+(`--retirer` en second argument retire le rôle.) Déconnecte-toi puis reconnecte-toi sur le site.
 
 Ensuite, les rôles se gèrent depuis Administration → Utilisateurs.
 
