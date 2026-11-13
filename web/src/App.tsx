@@ -11,6 +11,7 @@ import { CalendrierPage } from "./pages/CalendrierPage";
 import { NewsPage } from "./pages/NewsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
+import { AdminPage } from "./pages/AdminPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 import { NotificationBell } from "./components/NotificationBell";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -49,7 +50,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
     { to: "/actualites", label: "Actualités" },
     { to: "/messagerie", label: "Messagerie" },
     { to: "/profil", label: "Mon profil" },
-    ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }] : []),
+    ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }, { to: "/administration", label: "Administration" }] : []),
   ];
 
   return (
@@ -181,6 +182,14 @@ export default function App() {
           element={
             <ProtectedLayout>
               <ProfilePage />
+            </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/administration"
+          element={
+            <ProtectedLayout adminOnly>
+              <AdminPage />
             </ProtectedLayout>
           }
         />

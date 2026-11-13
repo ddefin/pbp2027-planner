@@ -554,3 +554,17 @@ model CoachPrefs {
   lastReportKey String?
   updatedAt     DateTime @updatedAt
 }
+
+// Journal des événements de compte (mot de passe oublié, verrouillage, réinitialisation),
+// lisible par les administrateurs dans la page Administration pour comprendre un blocage.
+// Conservé 60 jours. Pas de mot de passe ni de jeton dans ce journal.
+model AuthEvent {
+  id        String   @id @default(cuid())
+  email     String // adresse saisie (le compte peut ne pas exister)
+  kind      String // reset_requested | reset_no_account | mail_sent | mail_failed | reset_ok | reset_token_invalid | login_locked
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([createdAt])
+}

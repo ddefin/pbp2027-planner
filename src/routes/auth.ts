@@ -8,6 +8,7 @@ import { createSession, destroySession, destroyAllSessions, getSessionUser } fro
 import { checkRateLimit } from "../lib/rateLimit.js";
 import { generateOpaqueToken } from "../lib/tokens.js";
 import { sendPasswordResetEmail } from "../lib/mailer.js";
+import { logAuthEvent } from "../lib/authEvents.js";
 
 const LOCKOUT_THRESHOLD = 8;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
@@ -56,10 +57,17 @@ export async function authRoutes(app: FastifyInstance) {
       await prisma.passwordResetToken.create({
         data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
       });
+      await logAuthEvent(user.email, "reset_requested");
 
       const base = config.publicUrl || `${request.protocol}://${request.headers.host}`;
       const resetUrl = `${base}/reinitialiser-mot-de-passe?token=${token}`;
-      void sendPasswordResetEmail(user.email, resetUrl);
+      // L'envoi tourne en arrière-plan ; son résultat (et sa cause en cas d'échec) est gardé
+      // dans le journal pour la page Administration.
+      void sendPasswordResetEmail(user.email, resetUrl).then((r) =>
+        logAuthEvent(user.email, r.ok ? "mail_sent" : "mail_failed", r.error),
+      );
+    } else {
+      await logAuthEvent(parsed.data.email, "reset_no_account");
     }
 
     return reply.code(202).send({ status: "check_email_if_account_exists" });
@@ -76,6 +84,8 @@ export async function authRoutes(app: FastifyInstance) {
       where: { tokenHash: hashToken(parsed.data.token) },
     });
     if (!resetToken || resetToken.expiresAt < new Date()) {
+      const u = resetToken ? await prisma.user.findUnique({ where: { id: resetToken.userId }, select: { email: true } }) : null;
+      await logAuthEvent(u?.email ?? "inconnu", "reset_token_invalid", resetToken ? "expiré" : "introuvable");
       return reply.code(401).send({ error: "invalid_or_expired_token" });
     }
 
@@ -93,6 +103,8 @@ export async function authRoutes(app: FastifyInstance) {
     // Si le compte a été compromis, un mot de passe réinitialisé doit aussi
     // déconnecter toute session déjà ouverte ailleurs.
     await destroyAllSessions(resetToken.userId);
+    const done = await prisma.user.findUnique({ where: { id: resetToken.userId }, select: { email: true } });
+    await logAuthEvent(done?.email ?? "inconnu", "reset_ok");
 
     return reply.send({ status: "password_reset" });
   });
@@ -113,6 +125,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     if (user.lockedUntil && user.lockedUntil > new Date()) {
+      await logAuthEvent(user.email, "login_locked", `jusqu'à ${user.lockedUntil.toISOString()}`);
       return reply.code(423).send({ error: "account_locked", retryAt: user.lockedUntil });
     }
 

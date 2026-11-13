@@ -22,6 +22,8 @@ import { notificationsRoutes } from "./routes/notifications.js";
 import { pbpRoutesRoutes } from "./routes/pbpRoutes.js";
 import { roadbooksRoutes } from "./routes/roadbooks.js";
 import { stravaRoutes } from "./routes/strava.js";
+import { adminRoutes } from "./routes/admin.js";
+import { purgeAuthEvents } from "./lib/authEvents.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
 import { scrapeNews } from "./lib/newsScraper.js";
 import { checkRoadbookAlerts } from "./lib/roadbookAlerts.js";
@@ -74,6 +76,7 @@ export function buildServer() {
       api.register(pbpRoutesRoutes);
       api.register(roadbooksRoutes);
       api.register(stravaRoutes);
+      api.register(adminRoutes);
     },
     { prefix: "/api" },
   );
@@ -146,6 +149,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     void route();
     void backup();
     setInterval(backup, 24 * 3_600_000);
+    setInterval(() => void purgeAuthEvents().catch(() => undefined), 24 * 3_600_000);
     // Strava : abonnement webhook (une fois), synchro de secours toutes les 6 h (renouvelle
     // aussi les jetons), bilans hebdomadaires du Coach (dimanche soir).
     void ensureWebhookSubscription().then((r) => r === "error" && app.log.warn("abonnement webhook Strava impossible"));
