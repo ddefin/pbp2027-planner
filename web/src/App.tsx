@@ -21,6 +21,7 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 const PbpRoutePage = lazy(() => import("./pages/PbpRoutePage").then((m) => ({ default: m.PbpRoutePage })));
 const RoadbooksPage = lazy(() => import("./pages/RoadbooksPage").then((m) => ({ default: m.RoadbooksPage })));
 const RoadbookPage = lazy(() => import("./pages/RoadbookPage").then((m) => ({ default: m.RoadbookPage })));
+const AdminApp = lazy(() => import("./admin/AdminApp"));
 const SharedRoadbookPage = lazy(() => import("./pages/SharedRoadbookPage").then((m) => ({ default: m.SharedRoadbookPage })));
 
 const pageFallback = <p className="hint" style={{ padding: 24 }}>Chargement…</p>;
@@ -50,7 +51,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
     { to: "/actualites", label: "Actualités" },
     { to: "/messagerie", label: "Messagerie" },
     { to: "/profil", label: "Mon profil" },
-    ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }, { to: "/administration", label: "Administration" }] : []),
+    ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }, { to: "/admin", label: "Administration" }] : []),
   ];
 
   return (
@@ -183,6 +184,14 @@ export default function App() {
             <ProtectedLayout>
               <ProfilePage />
             </ProtectedLayout>
+          }
+        />
+        <Route
+          path="/admin/*"
+          element={
+            <Suspense fallback={pageFallback}>
+              <AdminApp />
+            </Suspense>
           }
         />
         <Route

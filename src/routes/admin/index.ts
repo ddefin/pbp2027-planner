@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { AdminError, adminGuard } from "../../lib/adminGuard.js";
 import { adminUsersRoutes } from "./users.js";
+import { adminSearchRoutes } from "./search.js";
 
 // Toutes les routes déclarées sous ce plugin (préfixe /api/admin) : relues par les tests
 // pour vérifier qu'AUCUNE n'est accessible sans le rôle ADMIN.
@@ -24,6 +25,7 @@ export async function adminRoutes(app: FastifyInstance) {
         return reply.code(500).send({ error: "internal_error" });
       });
       await admin.register(adminUsersRoutes);
+      await admin.register(adminSearchRoutes);
     },
     { prefix: "/admin" },
   );

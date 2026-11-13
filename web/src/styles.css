@@ -18,8 +18,14 @@
   --font-mono: "JetBrains Mono", monospace;
 }
 
+/* Thème : suit le système par défaut ; un choix manuel (sélecteur de thème, attribut
+   data-theme posé par index.html et useTheme) l'emporte. */
+:root {
+  color-scheme: light;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     /* Le navy de paris-brest-paris.org comme fond (c'est déjà leur propre
        traitement "sombre" pour les blocs mis en avant du site), corail
        éclairci pour rester lisible dessus.*/
@@ -33,7 +39,22 @@
     --ok: #3fcf8a;
     --warn: #f0b429;
     --bad: #ff7a5c;
+    color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f2a4f;
+  --panel: #16335c;
+  --fg: #eef2f7;
+  --fg-muted: #9fb0c4;
+  --line: #28456f;
+  --accent: #ff6b81;
+  --accent-fg: #1a0a10;
+  --ok: #3fcf8a;
+  --warn: #f0b429;
+  --bad: #ff7a5c;
+  color-scheme: dark;
 }
 
 a {

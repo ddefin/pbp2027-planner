@@ -7,6 +7,13 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
+    <script>
+      // Thème choisi à la main (clair/sombre), posé avant l'affichage pour éviter un flash.
+      try {
+        var t = localStorage.getItem("pbp.theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
     <title>PBP 2027 — Carnet de route</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
