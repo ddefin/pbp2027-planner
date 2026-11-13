@@ -38,6 +38,12 @@ export async function getSessionUser(request: FastifyRequest) {
     include: { user: true },
   });
   if (!session || session.expiresAt < new Date()) return null;
+  // Compte suspendu (ou compte système) : la session ne vaut plus rien, même si le cookie
+  // traîne encore dans un navigateur. On l'efface au passage.
+  if (session.user.suspendedAt || session.user.isSystem) {
+    await prisma.session.delete({ where: { id: session.id } }).catch(() => undefined);
+    return null;
+  }
 
   // Renouvellement glissant : repousse l'expiration tant que la session est active,
   // sans jamais dépasser l'intention de durée fixée à la création.

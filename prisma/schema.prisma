@@ -20,6 +20,11 @@ model User {
   notebook               String? // carnet de bord personnel, texte libre (matériel, nutrition, notes de brevet...)
   failedLoginAttempts    Int                   @default(0)
   lockedUntil            DateTime?
+  // Espace /admin : compte suspendu (connexion refusée, sessions coupées) et compte
+  // système « Membre supprimé » qui reçoit les contributions des comptes supprimés.
+  suspendedAt            DateTime?
+  suspendedReason        String?
+  isSystem               Boolean               @default(false)
   createdAt              DateTime              @default(now())
   sessions               Session[]
   passwordResetTokens    PasswordResetToken[]
@@ -567,4 +572,25 @@ model AuthEvent {
 
   @@index([email, createdAt])
   @@index([createdAt])
+}
+
+// Journal d'audit de l'espace /admin : qui a fait quoi, sur quoi, quand. En ajout seul
+// (aucune route ne modifie ni ne supprime une entrée). Les libellés sont copiés au moment
+// de l'action pour rester lisibles quand la cible ou l'auteur ont été supprimés.
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  actorId     String?
+  actorEmail  String
+  action      String
+  targetType  String
+  targetId    String
+  targetLabel String
+  metadata    String?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@index([actorId, createdAt])
 }

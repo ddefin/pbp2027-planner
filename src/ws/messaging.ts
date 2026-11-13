@@ -116,7 +116,7 @@ export async function messagingWsRoutes(app: FastifyInstance) {
         const { peerId } = request.params as { peerId: string };
         if (peerId === user.id) return reply.code(400).send({ error: "cannot_message_self" });
         const peer = await prisma.user.findUnique({ where: { id: peerId } });
-        if (!peer) return reply.code(404).send({ error: "not_found" });
+        if (!peer || peer.isSystem || peer.suspendedAt) return reply.code(404).send({ error: "not_found" });
 
         (request as DmRequest).pbpUser = user;
       },

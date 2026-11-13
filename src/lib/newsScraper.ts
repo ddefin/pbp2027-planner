@@ -156,7 +156,7 @@ export async function syncNewsNotifications(now = new Date()): Promise<number> {
   const since = new Date(now.getTime() - NEWS_NOTIFY_DAYS * 86_400_000);
   const items = await prisma.newsItem.findMany({ where: { publishedAt: { gte: since } }, orderBy: { publishedAt: "asc" } });
   if (items.length === 0) return 0;
-  const users = await prisma.user.findMany({ select: { id: true } });
+  const users = await prisma.user.findMany({ where: { isSystem: false, suspendedAt: null }, select: { id: true } });
   let created = 0;
   for (const item of items) {
     const message = `📰 ${SOURCE_META[item.source as NewsSource]?.label ?? "Actualité"} : ${item.title}`;

@@ -49,10 +49,14 @@ export async function authRoutes(app: FastifyInstance) {
     const limited = checkRateLimit(`forgot-password:${request.ip}`, 5, 15 * 60 * 1000);
     if (!limited.allowed) return reply.code(429).send({ error: "too_many_requests" });
 
-    const user = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+    const found = await prisma.user.findUnique({ where: { email: parsed.data.email } });
+    const user = found && !found.isSystem ? found : null;
     // Même réponse qu'il existe un compte ou non, pour ne pas révéler les comptes
     // existants — l'email n'est envoyé que si le compte existe vraiment.
-    if (user) {
+    if (user?.suspendedAt) {
+      // Compte suspendu : pas de lien (il ne rouvrirait pas l'accès), mais on garde la trace.
+      await logAuthEvent(user.email, "reset_suspended");
+    } else if (user) {
       const token = generateOpaqueToken();
       await prisma.passwordResetToken.create({
         data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
@@ -119,7 +123,8 @@ export async function authRoutes(app: FastifyInstance) {
     if (!limited.allowed) return reply.code(429).send({ error: "too_many_requests" });
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) {
+    // Le compte système « Membre supprimé » se comporte comme une adresse inconnue.
+    if (!user || user.isSystem) {
       await verifyPassword(password, "scrypt$16384$8$1$00$00"); // coût constant même si l'email n'existe pas
       return reply.code(401).send({ error: "invalid_credentials" });
     }
@@ -143,9 +148,17 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.code(401).send({ error: "invalid_credentials" });
     }
 
+    // Suspension vérifiée APRÈS le mot de passe : sans lui, on n'apprend pas qu'un compte
+    // est suspendu.
+    if (user.suspendedAt) {
+      await logAuthEvent(user.email, "login_suspended");
+      return reply.code(403).send({ error: "account_suspended" });
+    }
+
     if (user.failedLoginAttempts > 0) {
       await prisma.user.update({ where: { id: user.id }, data: { failedLoginAttempts: 0, lockedUntil: null } });
     }
+    await logAuthEvent(user.email, "login_ok");
 
     await createSession(user.id, reply, { userAgent: request.headers["user-agent"], ip });
     return reply.send({ status: "authenticated" });

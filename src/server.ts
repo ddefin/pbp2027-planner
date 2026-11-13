@@ -22,7 +22,7 @@ import { notificationsRoutes } from "./routes/notifications.js";
 import { pbpRoutesRoutes } from "./routes/pbpRoutes.js";
 import { roadbooksRoutes } from "./routes/roadbooks.js";
 import { stravaRoutes } from "./routes/strava.js";
-import { adminRoutes } from "./routes/admin.js";
+import { adminRoutes } from "./routes/admin/index.js";
 import { purgeAuthEvents } from "./lib/authEvents.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
 import { scrapeNews } from "./lib/newsScraper.js";

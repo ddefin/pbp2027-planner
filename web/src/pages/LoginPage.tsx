@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: "Email ou mot de passe incorrect.",
   account_locked: "Compte verrouillé temporairement après trop d'échecs. Réessaie dans quelques minutes.",
+  account_suspended: "Ce compte est suspendu. Contacte l'administrateur du site.",
   too_many_requests: "Trop de tentatives. Réessaie dans quelques minutes.",
   invalid_input: "Formulaire invalide.",
 };

@@ -34,3 +34,9 @@ setInterval(() => {
     if (bucket.resetAt <= now) buckets.delete(key);
   }
 }, 5 * 60 * 1000).unref();
+
+// Lecture sans incrémenter : pour ne compter que les ÉCHECS (ex. mot de passe erroné).
+export function isRateLimited(key: string, max: number): boolean {
+  const bucket = buckets.get(key);
+  return Boolean(bucket && bucket.resetAt > Date.now() && bucket.count >= max);
+}

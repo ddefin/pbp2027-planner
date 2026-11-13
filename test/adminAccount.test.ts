@@ -60,7 +60,7 @@ describe("Page Administration : diagnostic d'un compte", () => {
   it("refuse la page aux comptes qui ne sont pas administrateurs", async () => {
     const res = await server.inject({ method: "GET", url: `/api/admin/account?email=${PASCAL}`, headers: { cookie: userCookie } });
     expect(res.statusCode).toBe(403);
-    expect((await server.inject({ method: "GET", url: `/api/admin/account?email=${PASCAL}` })).statusCode).toBe(403);
+    expect((await server.inject({ method: "GET", url: `/api/admin/account?email=${PASCAL}` })).statusCode).toBe(401);
   });
 
   it("retrouve un compte, ses liens valides et son état, sans jamais renvoyer le hash", async () => {

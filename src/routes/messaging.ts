@@ -74,7 +74,8 @@ export async function messagingRoutes(app: FastifyInstance) {
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
 
     const users = await prisma.user.findMany({
-      where: { id: { not: user.id } },
+      // Ni le compte système « Membre supprimé », ni les comptes suspendus.
+      where: { id: { not: user.id }, isSystem: false, suspendedAt: null },
       select: { id: true, prenom: true },
       orderBy: { prenom: "asc" },
     });
@@ -243,7 +244,7 @@ export async function messagingRoutes(app: FastifyInstance) {
     const { peerId } = request.params as { peerId: string };
     if (peerId === user.id) return reply.code(400).send({ error: "cannot_message_self" });
     const peer = await prisma.user.findUnique({ where: { id: peerId } });
-    if (!peer) return reply.code(404).send({ error: "not_found" });
+    if (!peer || peer.isSystem || peer.suspendedAt) return reply.code(404).send({ error: "not_found" });
 
     const parsed = locationSchema.safeParse(request.body);
     if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
@@ -263,7 +264,7 @@ export async function messagingRoutes(app: FastifyInstance) {
     const { peerId } = request.params as { peerId: string };
     if (peerId === user.id) return reply.code(400).send({ error: "cannot_message_self" });
     const peer = await prisma.user.findUnique({ where: { id: peerId } });
-    if (!peer) return reply.code(404).send({ error: "not_found" });
+    if (!peer || peer.isSystem || peer.suspendedAt) return reply.code(404).send({ error: "not_found" });
 
     const file = await request.file({ limits: { fileSize: MAX_FILE_BYTES } });
     if (!file) return reply.code(400).send({ error: "no_file" });
