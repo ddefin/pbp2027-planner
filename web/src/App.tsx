@@ -11,7 +11,6 @@ import { CalendrierPage } from "./pages/CalendrierPage";
 import { NewsPage } from "./pages/NewsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
-import { AdminPage } from "./pages/AdminPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 import { NotificationBell } from "./components/NotificationBell";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -194,14 +193,7 @@ export default function App() {
             </Suspense>
           }
         />
-        <Route
-          path="/administration"
-          element={
-            <ProtectedLayout adminOnly>
-              <AdminPage />
-            </ProtectedLayout>
-          }
-        />
+        <Route path="/administration" element={<Navigate to="/admin" replace />} />
         <Route
           path="/webhooks"
           element={

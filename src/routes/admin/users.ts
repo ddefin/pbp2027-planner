@@ -6,7 +6,8 @@ import { AdminError, actorOf, confirmPassword, limitDeletions, type AdminUser } 
 import { auditEntry } from "../../lib/audit.js";
 import { anonymizeAndDeleteOps, ensureSystemUser, personalFiles, removeFiles, revokeExternalAccess } from "../../lib/accountDeletion.js";
 import { destroyAllSessions } from "../../lib/session.js";
-import { idParam, reasonSchema, bulkSchema, roleSchema, deleteSchema } from "../../shared/adminSchemas.js";
+import { idParam, reasonSchema, bulkSchema, roleSchema, deleteSchema, userListQuery } from "../../shared/adminSchemas.js";
+import type { Prisma } from "@prisma/client";
 
 const label = (u: { prenom: string; email: string }) => `${u.prenom} (${u.email})`;
 
@@ -46,7 +47,111 @@ async function unsuspendOne(request: FastifyRequest, actor: AdminUser, id: strin
   return true;
 }
 
+function statusOf(u: { suspendedAt: Date | null; lockedUntil: Date | null }, now = new Date()): "active" | "suspended" | "locked" {
+  if (u.suspendedAt) return "suspended";
+  if (u.lockedUntil && u.lockedUntil > now) return "locked";
+  return "active";
+}
+
+// Navigateur lisible à partir du user-agent (sans détail identifiant).
+function device(ua: string | null): string {
+  if (!ua) return "Appareil inconnu";
+  const os = /iPhone|iPad/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : /Mac OS X/.test(ua) ? "macOS" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "Autre";
+  const br = /Edg\//.test(ua) ? "Edge" : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : "Navigateur";
+  return `${br} · ${os}`;
+}
+
 export async function adminUsersRoutes(app: FastifyInstance) {
+  // Liste paginée côté serveur : recherche, filtres, tri sur une liste fermée de colonnes.
+  app.get("/users", async (request, reply) => {
+    actorOf(request);
+    const q = userListQuery.parse(request.query);
+    const now = new Date();
+    const where: Prisma.UserWhereInput = { isSystem: false };
+    const and: Prisma.UserWhereInput[] = [];
+    if (q.q) and.push({ OR: [{ prenom: { contains: q.q } }, { email: { contains: q.q.toLowerCase() } }, { club: { contains: q.q } }] });
+    if (q.status === "suspended") and.push({ suspendedAt: { not: null } });
+    if (q.status === "locked") and.push({ suspendedAt: null, lockedUntil: { gt: now } });
+    if (q.status === "active") and.push({ suspendedAt: null, OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }] });
+    if (q.role === "admin") and.push({ isAdmin: true });
+    if (q.role === "member") and.push({ isAdmin: false });
+    if (and.length) where.AND = and;
+
+    const select = { id: true, prenom: true, email: true, club: true, isAdmin: true, createdAt: true, suspendedAt: true, suspendedReason: true, lockedUntil: true } as const;
+    const total = await prisma.user.count({ where });
+    let rows: Prisma.UserGetPayload<{ select: typeof select }>[];
+    let lastSeen = new Map<string, Date>();
+    if (q.sort === "lastSeenAt") {
+      // Dernière activité = la plus récente de ses sessions : tri en mémoire (quelques centaines de comptes au plus).
+      const all = await prisma.user.findMany({ where, select });
+      const agg = await prisma.session.groupBy({ by: ["userId"], where: { userId: { in: all.map((u) => u.id) } }, _max: { lastSeenAt: true } });
+      lastSeen = new Map(agg.filter((a) => a._max.lastSeenAt).map((a) => [a.userId, a._max.lastSeenAt!]));
+      const t = (id: string) => lastSeen.get(id)?.getTime() ?? 0;
+      all.sort((a, b) => (q.dir === "asc" ? t(a.id) - t(b.id) : t(b.id) - t(a.id)));
+      rows = all.slice((q.page - 1) * q.pageSize, q.page * q.pageSize);
+    } else {
+      rows = await prisma.user.findMany({ where, select, orderBy: [{ [q.sort]: q.dir }, { id: "asc" }], skip: (q.page - 1) * q.pageSize, take: q.pageSize });
+      const agg = await prisma.session.groupBy({ by: ["userId"], where: { userId: { in: rows.map((u) => u.id) } }, _max: { lastSeenAt: true } });
+      lastSeen = new Map(agg.filter((a) => a._max.lastSeenAt).map((a) => [a.userId, a._max.lastSeenAt!]));
+    }
+    return reply.send({
+      items: rows.map((u) => ({
+        id: u.id,
+        prenom: u.prenom,
+        email: u.email,
+        club: u.club,
+        isAdmin: u.isAdmin,
+        createdAt: u.createdAt.toISOString(),
+        lastSeenAt: lastSeen.get(u.id)?.toISOString() ?? null,
+        status: statusOf(u, now),
+        suspendedReason: u.suspendedReason,
+      })),
+      total,
+      page: q.page,
+      pageSize: q.pageSize,
+    });
+  });
+
+  // Fiche d'un compte : état, données, appareils, événements de compte, historique admin.
+  app.get("/users/:id", async (request, reply) => {
+    actorOf(request);
+    const { id } = idParam.parse(request.params);
+    const u = await target(id);
+    const [sessions, resetLinks, events, audit, roadbooks, messages, brm, strava, telegram, pbpRoutes] = await Promise.all([
+      prisma.session.findMany({ where: { userId: id }, orderBy: { lastSeenAt: "desc" }, take: 5, select: { lastSeenAt: true, createdAt: true, userAgent: true } }),
+      prisma.passwordResetToken.count({ where: { userId: id, expiresAt: { gt: new Date() } } }),
+      prisma.authEvent.findMany({ where: { email: u.email }, orderBy: { createdAt: "desc" }, take: 30 }),
+      prisma.adminAuditLog.findMany({ where: { targetType: "user", targetId: id }, orderBy: { createdAt: "desc" }, take: 30 }),
+      prisma.roadbook.count({ where: { userId: id } }),
+      prisma.groupMessage.count({ where: { userId: id } }),
+      prisma.brmEvent.count({ where: { userId: id } }),
+      prisma.stravaAccount.findUnique({ where: { userId: id }, select: { lastSyncAt: true } }),
+      prisma.telegramLink.findUnique({ where: { userId: id }, select: { linkedAt: true } }),
+      prisma.pbpRoute.count({ where: { uploadedByUserId: id } }),
+    ]);
+    return reply.send({
+      user: {
+        id: u.id,
+        prenom: u.prenom,
+        email: u.email,
+        club: u.club,
+        licenceNumero: u.licenceNumero,
+        isAdmin: u.isAdmin,
+        createdAt: u.createdAt.toISOString(),
+        status: statusOf(u),
+        suspendedAt: u.suspendedAt?.toISOString() ?? null,
+        suspendedReason: u.suspendedReason,
+        lockedUntil: u.lockedUntil?.toISOString() ?? null,
+        failedLoginAttempts: u.failedLoginAttempts,
+        activeResetLinks: resetLinks,
+      },
+      data: { roadbooks, messages, brm, pbpRoutes, strava: Boolean(strava), telegram: Boolean(telegram) },
+      sessions: sessions.map((s) => ({ device: device(s.userAgent), lastSeenAt: s.lastSeenAt.toISOString(), createdAt: s.createdAt.toISOString() })),
+      events: events.map((e) => ({ kind: e.kind, detail: e.detail, at: e.createdAt.toISOString() })),
+      audit: audit.map((a) => ({ id: a.id, action: a.action, actorEmail: a.actorEmail, metadata: a.metadata ? JSON.parse(a.metadata) : null, at: a.createdAt.toISOString() })),
+    });
+  });
+
   app.post("/users/:id/suspend", async (request, reply) => {
     const actor = actorOf(request);
     const { id } = idParam.parse(request.params);
