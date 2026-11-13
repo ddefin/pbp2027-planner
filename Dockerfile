@@ -9,6 +9,10 @@ RUN npm ci
 COPY web/ ./
 # Calculs du roadbook partagés avec le serveur (importés par web/src/lib/roadbook.ts).
 COPY src/shared /app/src/shared
+# Le code partagé (src/shared) importe des dépendances (zod) : depuis /app/src/shared, Node
+# les cherche dans /app/node_modules, qui n'existe pas dans cette étape. On y relie celles
+# de l'interface (mêmes versions) pour que la construction trouve les mêmes modules qu'en local.
+RUN ln -s /app/web/node_modules /app/node_modules
 RUN npm run build
 
 FROM node:22-alpine AS backend-build
