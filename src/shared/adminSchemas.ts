@@ -42,3 +42,18 @@ export type UserListQuery = z.infer<typeof userListQuery>;
 
 export const PERIODS = ["7d", "30d", "12m"] as const;
 export const periodQuery = z.object({ period: z.enum(PERIODS).optional().default("30d") });
+
+export const listQuery = z.object({
+  q: z.string().trim().max(100).optional().default(""),
+  page: z.coerce.number().int().min(1).max(10_000).optional().default(1),
+  pageSize: z.coerce.number().int().min(5).max(100).optional().default(20),
+});
+
+export const AUDIT_ACTIONS = ["user.suspend", "user.unsuspend", "user.promote", "user.demote", "user.delete", "content.delete"] as const;
+export const auditQuery = listQuery.extend({ action: z.enum(AUDIT_ACTIONS).optional() });
+
+export const AUTH_KINDS = ["login_ok", "login_locked", "login_suspended", "reset_requested", "reset_no_account", "reset_suspended", "mail_sent", "mail_failed", "reset_ok", "reset_token_invalid"] as const;
+export const authEventsQuery = listQuery.extend({ kind: z.enum(AUTH_KINDS).optional() });
+
+// Suppression d'un contenu : motif obligatoire (il figure au journal d'audit).
+export const contentDeleteSchema = z.object({ reason: z.string().trim().min(3, "3 caractères minimum").max(300, "300 caractères maximum") });

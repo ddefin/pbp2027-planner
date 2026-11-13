@@ -1304,3 +1304,101 @@
   max-height: 440px;
   overflow-y: auto;
 }
+
+/* ───── Étape 4 : onglets, cellules, paramètres ───── */
+.ad-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+.ad-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--fg-muted);
+  font: 600 14px var(--font-body);
+  white-space: nowrap;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+.ad-tab[aria-selected="true"] {
+  color: var(--fg);
+  border-bottom-color: var(--accent);
+}
+.ad-tab:hover {
+  color: var(--fg);
+}
+.ad-stack {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ad-stack small,
+.ad-cell-sub {
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  overflow-wrap: anywhere;
+}
+.ad-cell-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 60ch;
+  overflow-wrap: anywhere;
+}
+.ad-nowrap {
+  white-space: nowrap;
+}
+.ad-event.is-ok {
+  color: var(--ok);
+}
+.ad-event.is-warn {
+  color: var(--warn);
+}
+.ad-event.is-error {
+  color: var(--bad);
+  font-weight: 600;
+}
+.ad-settings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.ad-setting {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 14px;
+}
+.ad-setting-icon {
+  flex: none;
+  margin-top: 2px;
+}
+.ad-setting-icon.is-ok {
+  color: var(--ok);
+}
+.ad-setting-icon.is-warn {
+  color: var(--warn);
+}
+.ad-setting-icon.is-off {
+  color: var(--bad);
+}
+.ad-setting-link a {
+  font-size: 14px;
+  font-weight: 600;
+}
+.ad-card-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

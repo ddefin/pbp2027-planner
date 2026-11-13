@@ -75,7 +75,9 @@ export async function confirmPassword(actor: AdminUser, password: unknown): Prom
   }
 }
 
-// Suppressions : débit plus serré que les autres modifications.
-export function limitDeletions(actor: AdminUser): void {
-  if (!checkRateLimit(`admin-delete:${actor.id}`, 5, 10 * 60_000).allowed) throw new AdminError(429, "too_many_requests");
+// Suppressions : débit plus serré que les autres modifications. Comptes : 5 / 10 min
+// (action lourde et rare) ; contenus : 30 / 10 min (nettoyer une rafale de spam doit rester possible).
+export function limitDeletions(actor: AdminUser, kind: "account" | "content" = "account"): void {
+  const max = kind === "account" ? 5 : 30;
+  if (!checkRateLimit(`admin-delete-${kind}:${actor.id}`, max, 10 * 60_000).allowed) throw new AdminError(429, "too_many_requests");
 }

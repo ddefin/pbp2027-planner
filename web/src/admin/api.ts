@@ -58,3 +58,27 @@ export const setRole = (id: string, isAdmin: boolean, password: string) => admin
 export const deleteUser = (id: string, confirmEmail: string, password: string) => adminRequest<{ ok: true }>(`/users/${encodeURIComponent(id)}/delete`, { method: "POST", json: { confirmEmail, password } });
 export const bulkUsers = (action: "suspend" | "unsuspend", ids: string[], reason?: string) =>
   adminRequest<{ results: { id: string; ok: boolean; error?: string }[] }>("/users/bulk", { method: "POST", json: { action, ids, ...(reason ? { reason } : {}) } });
+
+export interface MessageRow { id: string; text: string; kind: string; fileName: string | null; author: string; at: string }
+export interface RouteRow { id: string; label: string; kind: string; fileName: string; distanceKm: number; author: string; at: string }
+export interface TrackRow { id: string; type: "principale" | "variante"; label: string; catalogEventId: string; distanceKm: number | null; author: string; at: string }
+export interface AuditListRow { id: string; action: string; actorEmail: string; targetType: string; targetId: string; targetLabel: string; metadata: Record<string, unknown> | null; ip: string | null; at: string }
+export interface AuthEventRow { id: string; email: string; kind: string; detail: string | null; at: string }
+export interface Settings {
+  version: string;
+  publicUrl: string | null;
+  cookieSecure: boolean;
+  mail: { configured: boolean; host: string | null; port: number | null; from: string | null };
+  telegram: { bot: boolean; botUsername: string | null; newsChannel: boolean; trackingChannel: boolean };
+  strava: { configured: boolean; redirectUri: string | null; webhook: boolean };
+  weather: { configured: boolean };
+  backup: { lastAt: string | null; maxAgeDays: number };
+  retention: { authEventsDays: number; auditLog: string };
+}
+
+export type ContentKind = "messages" | "pbp-routes" | "brm-tracks";
+export const listContent = <T,>(kind: ContentKind, params: URLSearchParams) => adminRequest<Page<T>>(`/content/${kind}?${params}`);
+export const deleteContent = (kind: ContentKind, id: string, reason: string) => adminRequest<{ ok: true }>(`/content/${kind}/${encodeURIComponent(id)}/delete`, { method: "POST", json: { reason } });
+export const listAudit = (params: URLSearchParams) => adminRequest<Page<AuditListRow>>(`/audit?${params}`);
+export const listAuthEvents = (params: URLSearchParams) => adminRequest<Page<AuthEventRow>>(`/auth-events?${params}`);
+export const getSettings = () => adminRequest<Settings>("/settings");
