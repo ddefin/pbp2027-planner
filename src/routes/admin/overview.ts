@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { prisma } from "../../db.js";
 import { actorOf } from "../../lib/adminGuard.js";
 import { periodQuery } from "../../shared/adminSchemas.js";
+import { ONLINE_MS } from "../../shared/presence.js";
 
 const DAY = 86_400_000;
 const AUTH_RETENTION_DAYS = 60; // voir src/lib/authEvents.ts
@@ -82,11 +83,18 @@ export async function adminOverviewRoutes(app: FastifyInstance) {
     for (const c of checkins) { const i = idx.get(keyOf(c.at)); if (i !== undefined) series[i].pointages++; }
 
     const recentUsers = await prisma.user.findMany({ where: realUser, orderBy: { createdAt: "desc" }, take: 5, select: { id: true, prenom: true, email: true, createdAt: true } });
+    const onlineSessions = await prisma.session.findMany({
+      where: { lastSeenAt: { gte: new Date(now.getTime() - ONLINE_MS) }, user: realUser },
+      select: { user: { select: { id: true, prenom: true } } },
+      distinct: ["userId"],
+    });
+    const online = onlineSessions.map((x) => x.user).sort((a, b) => a.prenom.localeCompare(b.prenom, "fr"));
     const recentAudit = await prisma.adminAuditLog.findMany({ orderBy: { createdAt: "desc" }, take: 6 });
 
     return reply.send({
       period,
       totals: { members, admins, suspended },
+      online: { count: online.length, users: online.slice(0, 30) },
       kpis: {
         active: { value: active, previous: authComparable ? loginsPrev.length : null, change: authComparable ? change(active, loginsPrev.length) : null },
         newUsers: { value: newUsers.length, previous: newUsersPrev, change: change(newUsers.length, newUsersPrev) },

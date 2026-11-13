@@ -8,6 +8,10 @@ import { anonymizeAndDeleteOps, ensureSystemUser, personalFiles, removeFiles, re
 import { destroyAllSessions } from "../../lib/session.js";
 import { idParam, reasonSchema, bulkSchema, roleSchema, deleteSchema, userListQuery } from "../../shared/adminSchemas.js";
 import type { Prisma } from "@prisma/client";
+import { ONLINE_MS, RECENT_MS, presenceOf } from "../../shared/presence.js";
+import { issuePasswordReset } from "../../lib/passwordReset.js";
+import { checkRateLimit } from "../../lib/rateLimit.js";
+import { logAuthEvent } from "../../lib/authEvents.js";
 
 const label = (u: { prenom: string; email: string }) => `${u.prenom} (${u.email})`;
 
@@ -75,6 +79,15 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     if (q.status === "active") and.push({ suspendedAt: null, OR: [{ lockedUntil: null }, { lockedUntil: { lte: now } }] });
     if (q.role === "admin") and.push({ isAdmin: true });
     if (q.role === "member") and.push({ isAdmin: false });
+    if (q.presence !== "all") {
+      // Présence = dernière activité de ses sessions (quelques centaines de comptes au plus).
+      const seen = await prisma.session.groupBy({ by: ["userId"], _max: { lastSeenAt: true } });
+      const online = seen.filter((x) => x._max.lastSeenAt && now.getTime() - x._max.lastSeenAt.getTime() < ONLINE_MS).map((x) => x.userId);
+      const within72 = seen.filter((x) => x._max.lastSeenAt && now.getTime() - x._max.lastSeenAt.getTime() < RECENT_MS).map((x) => x.userId);
+      if (q.presence === "online") and.push({ id: { in: online } });
+      else if (q.presence === "recent") and.push({ id: { in: within72.filter((id) => !online.includes(id)) } });
+      else and.push({ id: { notIn: within72 } });
+    }
     if (and.length) where.AND = and;
 
     const select = { id: true, prenom: true, email: true, club: true, isAdmin: true, createdAt: true, suspendedAt: true, suspendedReason: true, lockedUntil: true } as const;
@@ -103,6 +116,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
         isAdmin: u.isAdmin,
         createdAt: u.createdAt.toISOString(),
         lastSeenAt: lastSeen.get(u.id)?.toISOString() ?? null,
+        presence: presenceOf(lastSeen.get(u.id), now),
         status: statusOf(u, now),
         suspendedReason: u.suspendedReason,
       })),
@@ -144,6 +158,8 @@ export async function adminUsersRoutes(app: FastifyInstance) {
         lockedUntil: u.lockedUntil?.toISOString() ?? null,
         failedLoginAttempts: u.failedLoginAttempts,
         activeResetLinks: resetLinks,
+        lastSeenAt: sessions[0]?.lastSeenAt.toISOString() ?? null,
+        presence: presenceOf(sessions[0]?.lastSeenAt),
       },
       data: { roadbooks, messages, brm, pbpRoutes, strava: Boolean(strava), telegram: Boolean(telegram) },
       sessions: sessions.map((s) => ({ device: device(s.userAgent), lastSeenAt: s.lastSeenAt.toISOString(), createdAt: s.createdAt.toISOString() })),
@@ -228,6 +244,22 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     ]);
     await removeFiles(files);
     return reply.send({ ok: true });
+  });
+
+  // Envoi d'un lien de réinitialisation par l'administrateur (membre qui n'y arrive pas
+  // seul). Le lien part UNIQUEMENT dans la boîte du membre : il n'est jamais renvoyé ici.
+  app.post("/users/:id/send-reset", async (request, reply) => {
+    const actor = actorOf(request);
+    const { id } = idParam.parse(request.params);
+    const u = await target(id);
+    if (u.suspendedAt) throw new AdminError(409, "account_suspended");
+    if (!config.smtp) throw new AdminError(503, "mail_not_configured");
+    if (!checkRateLimit(`admin-reset:${u.id}`, 3, 3_600_000).allowed) throw new AdminError(429, "too_many_requests");
+    const base = config.publicUrl || `${request.protocol}://${request.headers.host}`;
+    const result = await issuePasswordReset(u, base);
+    await logAuthEvent(u.email, result.ok ? "mail_sent" : "mail_failed", result.ok ? "envoyé par un administrateur" : result.error);
+    await auditEntry(request, actor, { action: "user.reset_link", targetType: "user", targetId: id, targetLabel: label(u), metadata: { sent: result.ok, error: result.error } });
+    return reply.send({ sent: result.ok, error: result.error });
   });
 
   // Diagnostic d'un compte par adresse (mot de passe oublié, verrouillage, envoi du mail).

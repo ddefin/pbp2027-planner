@@ -7,6 +7,7 @@ import { hashToken } from "../lib/tokens.js";
 import { createSession, destroySession, destroyAllSessions, getSessionUser } from "../lib/session.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
 import { generateOpaqueToken } from "../lib/tokens.js";
+import { createResetUrl } from "../lib/passwordReset.js";
 import { sendPasswordResetEmail } from "../lib/mailer.js";
 import { logAuthEvent } from "../lib/authEvents.js";
 
@@ -57,19 +58,12 @@ export async function authRoutes(app: FastifyInstance) {
       // Compte suspendu : pas de lien (il ne rouvrirait pas l'accès), mais on garde la trace.
       await logAuthEvent(user.email, "reset_suspended");
     } else if (user) {
-      const token = generateOpaqueToken();
-      await prisma.passwordResetToken.create({
-        data: { userId: user.id, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
-      });
       await logAuthEvent(user.email, "reset_requested");
-
       const base = config.publicUrl || `${request.protocol}://${request.headers.host}`;
-      const resetUrl = `${base}/reinitialiser-mot-de-passe?token=${token}`;
       // L'envoi tourne en arrière-plan ; son résultat (et sa cause en cas d'échec) est gardé
-      // dans le journal pour la page Administration.
-      void sendPasswordResetEmail(user.email, resetUrl).then((r) =>
-        logAuthEvent(user.email, r.ok ? "mail_sent" : "mail_failed", r.error),
-      );
+      // dans le journal pour la console d'administration.
+      const resetUrl = await createResetUrl(user, base);
+      void sendPasswordResetEmail(user.email, resetUrl).then((r) => logAuthEvent(user.email, r.ok ? "mail_sent" : "mail_failed", r.error));
     } else {
       await logAuthEvent(parsed.data.email, "reset_no_account");
     }

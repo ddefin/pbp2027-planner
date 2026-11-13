@@ -6,6 +6,8 @@ import { adminSearchRoutes } from "./search.js";
 import { adminOverviewRoutes } from "./overview.js";
 import { adminContentRoutes } from "./content.js";
 import { adminLogsRoutes } from "./logs.js";
+import { adminAttentionRoutes } from "./attention.js";
+import { adminAnnouncementsRoutes } from "./announcements.js";
 
 // Toutes les routes déclarées sous ce plugin (préfixe /api/admin) : relues par les tests
 // pour vérifier qu'AUCUNE n'est accessible sans le rôle ADMIN.
@@ -32,6 +34,8 @@ export async function adminRoutes(app: FastifyInstance) {
       await admin.register(adminOverviewRoutes);
       await admin.register(adminContentRoutes);
       await admin.register(adminLogsRoutes);
+      await admin.register(adminAttentionRoutes);
+      await admin.register(adminAnnouncementsRoutes);
     },
     { prefix: "/admin" },
   );
