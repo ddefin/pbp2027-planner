@@ -40,13 +40,16 @@ export function useBrmCatalog() {
   const choose = useCallback(
     async (id: string, status: string) => {
       // Mise à jour optimiste : l'UI répond tout de suite, on resynchronise sur erreur.
-      setEvents((prev) =>
-        (prev ?? []).map((e) => {
+      // Les autres participants sont repérés par `mine` (pas par le prénom : deux homonymes).
+      setEvents((prev) => {
+        const list = prev ?? [];
+        const myKey = list.flatMap((e) => e.participants).find((p) => p.mine)?.memberKey ?? "moi";
+        return list.map((e) => {
           if (e.id !== id) return e;
-          const others = e.participants.filter((p) => p.displayName !== publicNameOf(user?.prenom));
-          return { ...e, myStatus: status, participants: [...others, { displayName: publicNameOf(user?.prenom), status }] };
-        }),
-      );
+          const others = e.participants.filter((p) => !p.mine);
+          return { ...e, myStatus: status, participants: [...others, { displayName: publicNameOf(user?.prenom), status, mine: true, memberKey: myKey }] };
+        });
+      });
       try {
         await setParticipation(id, status);
       } catch {
@@ -61,7 +64,7 @@ export function useBrmCatalog() {
       setEvents((prev) =>
         (prev ?? []).map((e) =>
           e.id === id
-            ? { ...e, myStatus: null, participants: e.participants.filter((p) => p.displayName !== publicNameOf(user?.prenom)) }
+            ? { ...e, myStatus: null, participants: e.participants.filter((p) => !p.mine) }
             : e,
         ),
       );

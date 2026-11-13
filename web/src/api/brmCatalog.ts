@@ -3,6 +3,9 @@ import { ApiError } from "./auth";
 export interface CatalogParticipant {
   displayName: string;
   status: string;
+  // Identifiant opaque et stable (distingue deux homonymes) ; jamais l'email ni l'id.
+  memberKey: string;
+  mine: boolean;
 }
 
 export interface CatalogEvent {

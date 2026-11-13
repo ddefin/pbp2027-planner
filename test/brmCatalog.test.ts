@@ -192,6 +192,32 @@ describe("API catalogue BRM (ACP)", () => {
     expect(q.steps.filter((s: { done: boolean }) => s.done).map((s: { step: number }) => s.step)).toEqual([300]);    await prisma.brmParticipation.deleteMany({ where: { user: { email: { startsWith: "quali-" } } } });
   });
 
+  it("distingue deux randonneurs au même prénom (memberKey opaque et stable), et repère le sien (mine)", async () => {
+    // Deux comptes « Test » (même prénom) choisissent le même BRM.
+    const c1 = await registerWithSession(server, `homonyme-1-${Date.now()}@example.com`);
+    const c2 = await registerWithSession(server, `homonyme-2-${Date.now()}@example.com`);
+    const ev = (await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: c1 } })).json().events[0];
+    await server.inject({ method: "PUT", url: `/api/brm/catalog/${ev.id}/participation`, headers: { cookie: c1 }, payload: { status: "prevu" } });
+    await server.inject({ method: "PUT", url: `/api/brm/catalog/${ev.id}/participation`, headers: { cookie: c2 }, payload: { status: "inscrit" } });
+    const seen1 = (await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: c1 } })).json().events.find((e: { id: string }) => e.id === ev.id);
+    const seen2 = (await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: c2 } })).json().events.find((e: { id: string }) => e.id === ev.id);
+    const p1 = seen1.participants.filter((p: { displayName: string }) => p.displayName === "Test");
+    expect(p1).toHaveLength(2);
+    expect(new Set(p1.map((p: { memberKey: string }) => p.memberKey)).size).toBe(2); // homonymes distingués
+    expect(p1.filter((p: { mine: boolean }) => p.mine)).toHaveLength(1);
+    // Stable d'une requête et d'un utilisateur à l'autre.
+    const keysFrom2 = seen2.participants.map((p: { memberKey: string }) => p.memberKey).sort();
+    expect(keysFrom2).toEqual(p1.map((p: { memberKey: string }) => p.memberKey).sort());
+    // Rien d'identifiant : ni email, ni id interne du compte.
+    const users = await prisma.user.findMany({ where: { email: { startsWith: "homonyme-" } } });
+    const body = JSON.stringify(seen1.participants);
+    for (const u of users) {
+      expect(body).not.toContain(u.id);
+      expect(body).not.toContain(u.email);
+    }
+    await prisma.brmParticipation.deleteMany({ where: { user: { email: { startsWith: "homonyme-" } } } });
+  });
+
   it("ne garde que les BRM France de 200 à 1000 km, avec un id stable", async () => {
     const cookie = await registerAndLogin(server, `catalog-${Date.now()}@example.com`);
     const res = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } });
@@ -231,7 +257,8 @@ describe("API catalogue BRM (ACP)", () => {
     const listB = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie: cookieB } });
     const eventForB = listB.json().events.find((e: { id: string }) => e.id === eventId);
     expect(eventForB.myStatus).toBeNull();
-    expect(eventForB.participants).toEqual([{ displayName: eventForB.participants[0].displayName, status: "prevu" }]);
+    // Vu par B : le choix de A, qui n'est pas le sien, avec un identifiant opaque.
+    expect(eventForB.participants).toEqual([{ displayName: eventForB.participants[0].displayName, status: "prevu", mine: false, memberKey: expect.stringMatching(/^[A-Za-z0-9_-]{12}$/) }]);
 
     // A change d'avis -> "inscrit"
     await server.inject({

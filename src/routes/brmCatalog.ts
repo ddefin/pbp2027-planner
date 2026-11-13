@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
@@ -37,6 +38,12 @@ const controlPointSchema = z.object({
   lat: z.number().min(-90).max(90),
   lon: z.number().min(-180).max(180),
 });
+
+// Identifiant opaque et stable d'un randonneur dans le calendrier : distingue deux
+// homonymes (même prénom) sans exposer ni l'email ni l'id interne du compte.
+function memberKeyOf(userId: string): string {
+  return createHmac("sha256", config.mfaEncryptionKeyHex).update(`brm-member:${userId}`).digest("base64url").slice(0, 12);
+}
 
 export async function brmCatalogRoutes(app: FastifyInstance) {
   // Qualification PBP du randonneur connecté : BRM perso ET BRM du calendrier marqués
@@ -97,10 +104,10 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
         })
       : [];
 
-    const byEvent = new Map<string, { displayName: string; status: string; mine: boolean }[]>();
+    const byEvent = new Map<string, { displayName: string; status: string; mine: boolean; memberKey: string }[]>();
     for (const p of participations) {
       const list = byEvent.get(p.catalogEventId) ?? [];
-      list.push({ displayName: publicName(p.user), status: p.status, mine: p.userId === user.id });
+      list.push({ displayName: publicName(p.user), status: p.status, mine: p.userId === user.id, memberKey: memberKeyOf(p.userId) });
       byEvent.set(p.catalogEventId, list);
     }
 
@@ -109,7 +116,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
       const mine = participants.find((p) => p.mine);
       return {
         ...e,
-        participants: participants.map(({ displayName, status }) => ({ displayName, status })),
+        participants: participants.map(({ displayName, status, mine: isMine, memberKey }) => ({ displayName, status, mine: isMine, memberKey })),
         myStatus: mine?.status ?? null,
       };
     });
