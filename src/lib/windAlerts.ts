@@ -1,7 +1,7 @@
 import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { fetchFranceBrmCatalog } from "./acpCatalog.js";
-import { VALID_DISTANCES } from "./brm.js";
+import { CALENDAR_DISTANCES } from "./brm.js";
 import { fetchCityWeather, type ForecastSlot } from "./openWeather.js";
 import { triggerWebhooks } from "./webhooks.js";
 
@@ -40,7 +40,7 @@ export async function checkWindAlerts(): Promise<void> {
 
   let events;
   try {
-    events = await fetchFranceBrmCatalog({ from, to, distances: VALID_DISTANCES });
+    events = await fetchFranceBrmCatalog({ from, to, distances: CALENDAR_DISTANCES });
   } catch {
     return; // catalogue ACP indisponible : on retentera au prochain passage
   }

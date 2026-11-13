@@ -3,7 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { fetchFranceBrmCatalog } from "../lib/acpCatalog.js";
-import { CATALOG_STATUSES, VALID_DISTANCES } from "../lib/brm.js";
+import { CATALOG_STATUSES, CALENDAR_DISTANCES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
 import { triggerWebhooks } from "../lib/webhooks.js";
 import { fetchCityWeather } from "../lib/openWeather.js";
@@ -44,7 +44,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
 
     let events;
     try {
-      events = await fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: VALID_DISTANCES });
+      events = await fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: CALENDAR_DISTANCES });
     } catch {
       return reply.code(502).send({ error: "catalog_unavailable" });
     }
@@ -95,7 +95,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
 
     // Pas d'await sur l'ensemble : un fetch catalogue (quasi toujours en cache) ne doit
     // pas retarder la réponse à l'utilisateur qui vient de faire son choix.
-    void fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: VALID_DISTANCES })
+    void fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: CALENDAR_DISTANCES })
       .then((events) => {
         const match = events.find((e) => e.id === id);
         if (!match) return;
@@ -130,7 +130,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
 
     await prisma.brmParticipation.deleteMany({ where: { userId: user.id, catalogEventId: id } });
 
-    void fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: VALID_DISTANCES })
+    void fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: CALENDAR_DISTANCES })
       .then((events) => {
         const match = events.find((e) => e.id === id);
         if (!match) return;
@@ -161,7 +161,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
 
     let events;
     try {
-      events = await fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: VALID_DISTANCES });
+      events = await fetchFranceBrmCatalog({ from: CATALOG_FROM, to: CATALOG_TO, distances: CALENDAR_DISTANCES });
     } catch {
       return reply.code(502).send({ error: "catalog_unavailable" });
     }

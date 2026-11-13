@@ -6,9 +6,17 @@ export const OFFICIAL_LIMIT_MINUTES: Record<number, number> = {
   300: 20 * 60,
   400: 27 * 60,
   600: 40 * 60,
+  1000: 75 * 60,
 };
 
-export const VALID_DISTANCES = [200, 300, 400, 600] as const;
+// Distances qu'on peut enregistrer comme BRM perso. Le compteur de qualification reste sur
+// 4 étapes (200, 300, 400, 600) : un 1000 homologué y compte pour l'étape 600
+// (voir src/shared/qualification.ts).
+export const VALID_DISTANCES = [200, 300, 400, 600, 1000] as const;
+
+// Distances affichées dans le calendrier officiel (catalogue ACP) : les BRM 1000 en plus,
+// sans toucher à la qualification ci-dessus.
+export const CALENDAR_DISTANCES = [200, 300, 400, 600, 1000] as const;
 export type BrmDistance = (typeof VALID_DISTANCES)[number];
 
 export const VALID_STATUSES = ["a-venir", "inscrit", "fait", "homologue"] as const;

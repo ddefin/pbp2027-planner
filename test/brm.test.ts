@@ -137,3 +137,18 @@ describe("API BRM", () => {
     expect(deleteB.statusCode).toBe(404);
   });
 });
+
+describe("BRM 1000", () => {
+  it("s'enregistre comme BRM perso avec le délai officiel de 75 h", async () => {
+    const server = buildServer();
+    const email = `brm1000-${Date.now()}@example.com`;
+    await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password: "mot-de-passe-de-test-123", prenom: "Didier" } });
+    const login = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password: "mot-de-passe-de-test-123" } });
+    const raw = login.headers["set-cookie"];
+    const cookie = (Array.isArray(raw) ? raw[0] : raw!).split(";")[0];
+    const res = await server.inject({ method: "POST", url: "/api/brm", headers: { cookie }, payload: { distance: 1000, date: "2027-05-14T06:00:00.000Z", lieu: "Paris" } });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().event).toMatchObject({ distance: 1000, limiteMinutes: 75 * 60 });
+    expect((await server.inject({ method: "POST", url: "/api/brm", headers: { cookie }, payload: { distance: 1200, date: "2027-05-14T06:00:00.000Z", lieu: "Paris" } })).statusCode).toBe(400);
+  });
+});

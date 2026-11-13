@@ -1,6 +1,6 @@
 import { ApiError } from "./auth";
 
-export type BrmDistance = 200 | 300 | 400 | 600;
+export type BrmDistance = 200 | 300 | 400 | 600 | 1000;
 export type BrmStatus = "a-venir" | "inscrit" | "fait" | "homologue";
 
 export interface BrmEvent {

@@ -69,9 +69,11 @@ const FAKE_ACP_RESPONSE = [
     Contact: "B. Martin",
     NomClub: "Club B",
   },
+  // Doit être filtré par distance (hors des distances du calendrier).
+  { Date: "06/04/2027", Distance: 1200, Pays: "France", SiteWeb: "", Ville: "Brest", Departement: "", Region: "", RoadMap: "", Denivele: 0, Contact: "", NomClub: "Club 1200" },
   // Doit être filtré par pays côté acpCatalog.ts même si demandé en France.
   { Date: "01/03/2027", Distance: 200, Pays: "Ukraine", SiteWeb: "", Ville: "Kyiv", Departement: "", Region: "", RoadMap: "", Denivele: 0, Contact: "", NomClub: "Club UA" },
-  // Doit être filtré par distance (1000 hors scope qualification PBP).
+  // BRM 1000 : affiché dans le calendrier (il compte pour l'étape 600 de la qualification).
   { Date: "05/04/2027", Distance: 1000, Pays: "France", SiteWeb: "", Ville: "Paris", Departement: "", Region: "", RoadMap: "", Denivele: 0, Contact: "", NomClub: "Club 1000" },
 ];
 
@@ -152,14 +154,15 @@ describe("API catalogue BRM (ACP)", () => {
     vi.unstubAllGlobals();
   });
 
-  it("ne garde que les BRM France 200-600km, avec un id stable", async () => {
+  it("ne garde que les BRM France de 200 à 1000 km, avec un id stable", async () => {
     const cookie = await registerAndLogin(server, `catalog-${Date.now()}@example.com`);
     const res = await server.inject({ method: "GET", url: "/api/brm/catalog", headers: { cookie } });
     expect(res.statusCode).toBe(200);
 
     const { events } = res.json();
-    expect(events).toHaveLength(2);
-    expect(events.map((e: { ville: string }) => e.ville).sort()).toEqual(["Gacé", "Rambouillet"]);
+    expect(events).toHaveLength(3);
+    expect(events.map((e: { ville: string }) => e.ville).sort()).toEqual(["Gacé", "Paris", "Rambouillet"]);
+    expect(events.find((e: { ville: string }) => e.ville === "Paris").distance).toBe(1000);
     expect(events[0].id).toMatch(/^[0-9a-f]{16}$/);
     expect(events.every((e: { myStatus: unknown }) => e.myStatus === null)).toBe(true);
   });

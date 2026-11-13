@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { CatalogEvent } from "../api/brmCatalog";
 import { Disclosure } from "../components/Disclosure";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
-import { ACP_CALENDAR_URL, CATALOG_STATUS_LABEL, CATALOG_STATUS_OPTIONS, VALID_DISTANCES } from "../lib/brmMeta";
+import { ACP_CALENDAR_URL, CALENDAR_DISTANCES, CATALOG_STATUS_LABEL, CATALOG_STATUS_OPTIONS } from "../lib/brmMeta";
 
 const MONTH_LABEL = [
   "Janvier",
@@ -98,7 +98,7 @@ export function CalendrierPage() {
             <button type="button" className={`cal-chip${distances.size === 0 ? " active" : ""}`} onClick={() => setDistances(new Set())}>
               Toutes distances
             </button>
-            {VALID_DISTANCES.map((d) => (
+            {CALENDAR_DISTANCES.map((d) => (
               <button
                 key={d}
                 type="button"

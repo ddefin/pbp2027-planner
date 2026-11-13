@@ -4,7 +4,12 @@ import type { BrmDistance, BrmStatus } from "../api/brm";
 // compte à rebours en attendant la répartition définitive des créneaux.
 export const PBP_DATE = new Date("2027-08-22T16:00:00");
 
-export const VALID_DISTANCES: BrmDistance[] = [200, 300, 400, 600];
+// Distances qu'on peut enregistrer comme BRM perso (le 1000 vaut pour l'étape 600 de la
+// qualification, voir src/shared/qualification.ts).
+export const VALID_DISTANCES: BrmDistance[] = [200, 300, 400, 600, 1000];
+
+// Distances proposées dans le calendrier officiel : les BRM 1000 en plus.
+export const CALENDAR_DISTANCES = [200, 300, 400, 600, 1000] as const;
 
 // Repli quand le calendrier ACP ne fournit pas de site propre à l'événement (ex.
 // certains BRM organisés directement par l'Audax Club Parisien plutôt que par un

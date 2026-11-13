@@ -4,7 +4,7 @@ import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { OFFICIAL_LIMIT_MINUTES, VALID_DISTANCES, VALID_STATUSES } from "../lib/brm.js";
 
-const distanceSchema = z.union([z.literal(200), z.literal(300), z.literal(400), z.literal(600)]);
+const distanceSchema = z.union([z.literal(200), z.literal(300), z.literal(400), z.literal(600), z.literal(1000)]);
 const statusSchema = z.enum(VALID_STATUSES);
 
 const createSchema = z.object({
