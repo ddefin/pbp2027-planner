@@ -231,6 +231,9 @@ sudo docker compose up -d --build
      autre fichier du dépôt.)
    - `ÉCHEC build/démarrage` : l'erreur de build suit dans le journal ; l'ancienne
      version continue de tourner en attendant.
+   - `panne réseau vers GitHub` : la NAS n'a pas pu joindre github.com (Internet, DNS, VPN
+     actif…). Même principe : 3 essais, puis nouvel essai au passage suivant, une seule ligne
+     par panne. Test : `curl -sI https://github.com | head -1` sur la NAS.
    - `panne réseau vers le registre Docker` : la NAS n'a pas pu joindre Docker Hub
      (« TLS handshake timeout », DNS, VPN actif…). Le script a déjà réessayé 3 fois
      (attentes de 30 s puis 90 s) et recommence tout seul au passage suivant ; une seule

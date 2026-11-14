@@ -60,9 +60,29 @@ trap 'rmdir "$LOCK" 2>/dev/null' EXIT
 if [ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt 2000 ]; then tail -n 1000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"; fi
 
 BEFORE=$(git_ rev-parse --short HEAD 2>/dev/null || echo "?")
-if ! OUT=$(git_ pull --ff-only origin main 2>&1); then
-  log "ÉCHEC git pull (reste sur $BEFORE) : $OUT"
-  log "  → si des fichiers suivis ont été modifiés sur le NAS : git status, puis git checkout -- <fichier> (ou git stash)"
+# Panne réseau passagère (NAS sans Internet, DNS, VPN…) : on réessaie avant de conclure.
+NET_PATTERN='TLS handshake timeout|i/o timeout|no such host|connection reset|connection refused|Temporary failure in name resolution|dial tcp|Failed to connect|Could not resolve host|timed out|Could not connect'
+PULL_TRIES=1
+for WAIT in 30 90 ""; do
+  if OUT=$(git_ pull --ff-only origin main 2>&1); then PULL_OK=1; break; fi
+  PULL_OK=0
+  if [ -n "$WAIT" ] && echo "$OUT" | grep -Eq "$NET_PATTERN"; then
+    if [ -t 1 ]; then echo "panne réseau vers GitHub (essai $PULL_TRIES/3), nouvel essai dans ${WAIT} s"; fi
+    sleep "$WAIT"; PULL_TRIES=$((PULL_TRIES + 1))
+  else
+    break
+  fi
+done
+if [ "$PULL_OK" != "1" ]; then
+  if echo "$OUT" | grep -Eq "$NET_PATTERN"; then
+    # Une seule ligne par panne (pas une toutes les 5 minutes) ; le conseil sur « git
+    # status » ne concerne que les vrais refus de fusion, pas le réseau.
+    MSG="panne réseau vers GitHub (reste sur $BEFORE) : nouvel essai au prochain passage"
+    if [ "$(tail -n 1 "$LOG" 2>/dev/null | cut -d' ' -f3-)" != "$MSG" ]; then log "$MSG"; fi
+  else
+    log "ÉCHEC git pull (reste sur $BEFORE) : $OUT"
+    log "  → si des fichiers suivis ont été modifiés sur le NAS : git status, puis git checkout -- <fichier> (ou git stash)"
+  fi
   exit 1
 fi
 AFTER=$(git_ rev-parse --short HEAD 2>/dev/null || echo "?")
@@ -103,7 +123,7 @@ build_once() {
 }
 # Panne réseau passagère (Docker Hub injoignable depuis la NAS : « TLS handshake
 # timeout », DNS, VPN…) : sans rapport avec le code, on réessaie avant de conclure.
-NET_PATTERN='TLS handshake timeout|i/o timeout|no such host|connection reset|connection refused|Temporary failure in name resolution|dial tcp'
+# (NET_PATTERN : défini plus haut)
 build_once
 TRIES=1
 for WAIT in 30 90; do
