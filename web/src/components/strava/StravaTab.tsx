@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { disconnectStrava, getStravaConnectUrl, getStravaDashboard, getStravaStatus, syncStrava, type Dashboard, type StravaStatus } from "../../api/strava";
+import { disconnectStrava, getStravaConnectUrl, getStravaDashboard, getStravaRecords, getStravaStatus, syncStrava, type Dashboard, type StravaRecords, type StravaStatus } from "../../api/strava";
 import { Disclosure } from "../Disclosure";
 import { AiConnectors, CoachSettings } from "./AiConnectors";
 import { CoachCard } from "./CoachCard";
+import { RecordsCard } from "./RecordsCard";
+import { BrevetChallenges } from "./BrevetChallenges";
+import { SegmentTrophies } from "./SegmentTrophies";
 import { AcwrGauge, IntensityBar, TrendChart } from "./StravaCharts";
 
 const fmt = (n: number, d = 0) => n.toLocaleString("fr-FR", { maximumFractionDigits: d });
@@ -33,6 +36,7 @@ function ConnectButton({ onClick, busy }: { onClick: () => void; busy: boolean }
 export function StravaTab() {
   const [status, setStatus] = useState<StravaStatus | null>(null);
   const [dash, setDash] = useState<Dashboard | null>(null);
+  const [recs, setRecs] = useState<StravaRecords | null>(null);
   const [busy, setBusy] = useState<"connect" | "sync" | "disconnect" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -41,8 +45,14 @@ export function StravaTab() {
     try {
       const s = await getStravaStatus();
       setStatus(s);
-      if (s.connected) setDash(await getStravaDashboard().catch(() => null));
-      else setDash(null);
+      if (s.connected) {
+        const [d, r] = await Promise.all([getStravaDashboard().catch(() => null), getStravaRecords().catch(() => null)]);
+        setDash(d);
+        setRecs(r);
+      } else {
+        setDash(null);
+        setRecs(null);
+      }
     } catch {
       setError("Impossible de charger l'état Strava.");
     }
@@ -243,6 +253,35 @@ export function StravaTab() {
 
           <CoachCard coach={dash.coach} />
         </>
+      )}
+
+      {recs && !recs.empty && (
+        <section className="panel">
+          <Disclosure
+            title="🏆 Mes records"
+            summary={(() => {
+              const d = recs.records.find((r) => r.key === "distance");
+              return d ? `Plus longue sortie ${Math.round(d.value)} km` : "Records personnels";
+            })()}
+            storageKey="strava.records"
+          >
+            <RecordsCard data={recs} />
+          </Disclosure>
+          <Disclosure
+            title="🎯 Défis brevets"
+            summary={`${recs.challenges.steps.filter((s) => s.done).length} / ${recs.challenges.steps.length} paliers · ${recs.challenges.rides200} sortie${recs.challenges.rides200 > 1 ? "s" : ""} de 200 km+`}
+            storageKey="strava.defis"
+          >
+            <BrevetChallenges data={recs.challenges} />
+          </Disclosure>
+          <Disclosure
+            title="👑 KOM, Top 10 et PR"
+            summary={`${recs.trophies.kom} KOM/QOM · ${recs.trophies.top10} Top 10 · ${recs.trophies.prSeason} PR cette saison`}
+            storageKey="strava.trophees"
+          >
+            <SegmentTrophies data={recs.trophies} segments={recs.segments} />
+          </Disclosure>
+        </section>
       )}
 
       <section className="panel">

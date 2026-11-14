@@ -86,3 +86,47 @@ export const getStravaDashboard = () => request<Dashboard>("/strava/dashboard");
 export const getCoachPrefs = () => request<{ prefs: CoachPrefs }>("/strava/coach-prefs").then((r) => r.prefs);
 export const saveCoachPrefs = (p: CoachPrefs) => request<{ ok: boolean }>("/strava/coach-prefs", { method: "PUT", body: JSON.stringify(p) });
 export const testStravaMcp = () => request<{ reachable: boolean; status: number | null; message: string }>("/strava/mcp-test", { method: "POST" });
+
+// ─── Records, défis brevets, trophées de segments ───
+
+export interface RecordItem {
+  key: string;
+  label: string;
+  value: number;
+  unit: "km" | "m" | "h" | "km/h" | "jours";
+  activityId: string | null;
+  activityName: string | null;
+  date: string | null;
+  until?: string | null;
+}
+
+export interface Trophy {
+  id: string;
+  kind: "kom" | "top10" | "pr";
+  rank: number;
+  segmentId: string;
+  segmentName: string;
+  activityId: string;
+  km: number;
+  gradePct: number | null;
+  climbCategory: number | null;
+  city: string | null;
+  elapsedSec: number;
+  date: string;
+}
+
+export interface StravaRecords {
+  records: RecordItem[];
+  allTime: { biggestRideM: number | null; biggestClimbM: number | null; all: { count: number; distanceM: number; movingSec: number; elevationM: number } | null } | null;
+  challenges: {
+    steps: { km: number; done: boolean; activityId: string | null; date: string | null }[];
+    rides200: number;
+    best200: { kmh: number; activityId: string; name: string; date: string; km: number } | null;
+    bestMonth: { month: string; km: number; pct: number } | null;
+  };
+  trophies: { kom: number; top10: number; prSeason: number; list: Trophy[] };
+  segments: { analysed: number; total: number; syncing: boolean };
+  empty: boolean;
+}
+
+export const getStravaRecords = () => request<StravaRecords>("/strava/records");

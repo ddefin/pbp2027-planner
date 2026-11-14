@@ -532,6 +532,8 @@ model StravaAccount {
   connectedAt   DateTime  @default(now())
   lastSyncAt    DateTime?
   lastSyncError String?
+  // Totaux et records « depuis toujours » de /athletes/{id}/stats (JSON brut filtré).
+  allTimeStats  String?
 }
 
 // Activités synchronisées : seulement ce qui sert aux analyses (pas de tracé GPS ni de
@@ -555,8 +557,37 @@ model StravaActivity {
   avgSpeedMs    Float?
   load          Float // charge estimée (équivalent TSS), voir src/lib/stravaMetrics.ts
   zone          Int? // zone d'intensité 1-5 estimée d'après la FC ou la puissance moyenne
+  maxSpeedMs       Float?
+  elapsedSec       Int? // temps total, pauses comprises (moyenne « brevet »)
+  // Trophées annoncés par le résumé (gratuits) ; le détail des segments n'est lu que pour
+  // les sorties qui en ont, par petits lots (quota Strava). Null = détail pas encore lu.
+  achievementCount Int       @default(0)
+  prCount          Int       @default(0)
+  detailFetchedAt  DateTime?
+  efforts          StravaSegmentEffort[]
 
   @@index([userId, startLocal])
+}
+
+// Efforts marquants sur segments : PR (prRank 1-3) ou classement KOM/QOM - Top 10
+// (komRank 1-10), au moment de la sortie. Seulement ceux du sportif lui-même.
+model StravaSegmentEffort {
+  id            String         @id // identifiant Strava de l'effort
+  userId        String
+  activityId    String
+  activity      StravaActivity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  segmentId     String
+  segmentName   String
+  distanceM     Float
+  avgGradePct   Float?
+  climbCategory Int?
+  city          String?
+  elapsedSec    Int
+  startLocal    DateTime
+  prRank        Int?
+  komRank       Int?
+
+  @@index([userId, komRank])
 }
 
 // Réglages du Coach (analyse et bilans automatiques), indépendants de la connexion Strava.

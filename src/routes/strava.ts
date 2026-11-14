@@ -6,6 +6,8 @@ import { getSessionUser } from "../lib/session.js";
 import { checkRateLimit } from "../lib/rateLimit.js";
 import { StravaError, authorizeUrl, disconnect, exchangeCode, purgeLocal, readState, redirectUri, initialSync, isSyncing, saveConnection, stravaConfigured, syncAccount, syncOneActivity, validAccessToken } from "../lib/strava.js";
 import { analyze } from "../lib/stravaCoach.js";
+import { brevetChallenges, personalRecords, trophies } from "../lib/stravaRecords.js";
+import type { AllTimeStats } from "../lib/strava.js";
 import { fitness, intensityShare, lastDays, sinceYearStart, sumVolume, weeklySeries } from "../lib/stravaMetrics.js";
 import { loadActivities, parsePrefs, parisParts, sendActivityReport } from "../lib/coachReports.js";
 
@@ -129,6 +131,34 @@ export async function stravaRoutes(app: FastifyInstance) {
       weekly: weeklySeries(list, 8, ref),
       coach: analyze(list, prefs, ref),
       recent: recent.map((a) => ({ at: a.startLocal.toISOString(), km: Math.round(a.distanceM / 100) / 10, hours: Math.round((a.movingSec / 3600) * 10) / 10, elevationM: Math.round(a.elevationM), load: Math.round(a.load), zone: a.zone })),
+      empty: list.length === 0,
+    });
+  });
+
+  // Records, défis brevets, trophées de segments (KOM/QOM, Top 10, PR) et avancement du
+  // rattrapage des segments (lu par petits lots, quota Strava).
+  app.get("/strava/records", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    const acc = await prisma.stravaAccount.findUnique({ where: { userId: user.id } });
+    if (!acc) return reply.code(404).send({ error: "not_connected" });
+    const [list, efforts, withTrophies, analysed] = await Promise.all([
+      prisma.stravaActivity.findMany({
+        where: { userId: user.id },
+        select: { id: true, name: true, startLocal: true, distanceM: true, movingSec: true, elapsedSec: true, elevationM: true, maxSpeedMs: true },
+      }),
+      prisma.stravaSegmentEffort.findMany({ where: { userId: user.id } }),
+      prisma.stravaActivity.count({ where: { userId: user.id, achievementCount: { gt: 0 } } }),
+      prisma.stravaActivity.count({ where: { userId: user.id, achievementCount: { gt: 0 }, detailFetchedAt: { not: null } } }),
+    ]);
+    const seasonStart = new Date(`${parisParts(new Date()).date.slice(0, 4)}-01-01T00:00:00Z`);
+    reply.header("cache-control", "no-store");
+    return reply.send({
+      records: personalRecords(list),
+      allTime: acc.allTimeStats ? (JSON.parse(acc.allTimeStats) as AllTimeStats) : null,
+      challenges: brevetChallenges(list),
+      trophies: trophies(efforts, seasonStart),
+      segments: { analysed, total: withTrophies, syncing: isSyncing(user.id) },
       empty: list.length === 0,
     });
   });

@@ -157,6 +157,7 @@ export async function disconnect(userId: string): Promise<{ revoked: boolean }> 
 }
 
 export async function purgeLocal(userId: string): Promise<void> {
+  await prisma.stravaSegmentEffort.deleteMany({ where: { userId } });
   await prisma.stravaActivity.deleteMany({ where: { userId } });
   await prisma.stravaAccount.deleteMany({ where: { userId } });
 }
@@ -172,13 +173,30 @@ interface StravaSummary {
   start_date_local: string;
   distance: number;
   moving_time: number;
+  elapsed_time?: number;
   total_elevation_gain: number;
   average_heartrate?: number;
   max_heartrate?: number;
   average_watts?: number;
   weighted_average_watts?: number;
   average_speed?: number;
+  max_speed?: number;
+  achievement_count?: number;
+  pr_count?: number;
   trainer?: boolean;
+}
+
+// Détail d'une sortie (/activities/{id}) : on n'en garde que les efforts de segments.
+interface StravaSegmentEffortRaw {
+  id: number | string;
+  elapsed_time: number;
+  start_date_local: string;
+  pr_rank?: number | null;
+  kom_rank?: number | null;
+  segment?: { id: number | string; name?: string; distance?: number; average_grade?: number; climb_category?: number; city?: string | null };
+}
+interface StravaDetailed extends StravaSummary {
+  segment_efforts?: StravaSegmentEffortRaw[];
 }
 
 const isRide = (a: StravaSummary) => /ride/i.test(a.sport_type ?? a.type ?? "");
@@ -203,6 +221,10 @@ function activityUpsert(userId: string, a: StravaSummary, settings: AthleteSetti
     avgWatts: inp.avgWatts,
     weightedWatts: inp.weightedWatts,
     avgSpeedMs: a.average_speed ?? null,
+    maxSpeedMs: a.max_speed ?? null,
+    elapsedSec: a.elapsed_time ?? null,
+    achievementCount: a.achievement_count ?? 0,
+    prCount: a.pr_count ?? 0,
     load: estimateLoad(inp, settings),
     zone: estimateZone(inp, settings),
   };
@@ -218,11 +240,29 @@ async function saveActivities(userId: string, rides: StravaSummary[], settings: 
   }
 }
 
+type RawTotals = { count?: number; distance?: number; moving_time?: number; elevation_gain?: number };
+type RawStats = { biggest_ride_distance?: number | null; biggest_climb_elevation_gain?: number | null; all_ride_totals?: RawTotals; ytd_ride_totals?: RawTotals };
+export interface AllTimeStats {
+  biggestRideM: number | null;
+  biggestClimbM: number | null;
+  all: { count: number; distanceM: number; movingSec: number; elevationM: number } | null;
+}
+function pickStats(s: RawStats): AllTimeStats {
+  const t = s.all_ride_totals;
+  return {
+    biggestRideM: s.biggest_ride_distance ?? null,
+    biggestClimbM: s.biggest_climb_elevation_gain ?? null,
+    all: t ? { count: t.count ?? 0, distanceM: t.distance ?? 0, movingSec: t.moving_time ?? 0, elevationM: t.elevation_gain ?? 0 } : null,
+  };
+}
+
 async function refreshAthlete(userId: string, token: string, batchMaxHr = 0): Promise<AthleteSettings> {
   const [athlete, zones] = await Promise.all([
-    api<{ ftp?: number | null; profile?: string; firstname?: string; lastname?: string }>(token, "/athlete").catch(() => null),
+    api<{ id?: number; ftp?: number | null; profile?: string; firstname?: string; lastname?: string }>(token, "/athlete").catch(() => null),
     api<{ heart_rate?: { zones?: { min: number; max: number }[] } }>(token, "/athlete/zones").catch(() => null),
   ]);
+  // Records « depuis toujours » (l'historique synchronisé ne couvre que 13 mois).
+  const stats = athlete?.id ? await api<RawStats>(token, `/athletes/${athlete.id}/stats`).catch(() => null) : null;
   const hz = zones?.heart_rate?.zones?.map((z) => [z.min, z.max] as [number, number]) ?? null;
   const observed = await prisma.stravaActivity.aggregate({ where: { userId }, _max: { maxHr: true } });
   const maxHr = Math.round(Math.max(observed._max.maxHr ?? 0, batchMaxHr, hz?.[hz.length - 1]?.[0] ?? 0)) || null;
@@ -232,11 +272,84 @@ async function refreshAthlete(userId: string, token: string, batchMaxHr = 0): Pr
       ftp: athlete?.ftp ?? null,
       maxHr,
       hrZones: hz ? JSON.stringify(hz) : null,
+      ...(stats ? { allTimeStats: JSON.stringify(pickStats(stats)) } : {}),
       ...(athlete?.profile?.startsWith("http") ? { profilePhoto: athlete.profile } : {}),
       ...(athlete?.firstname ? { athleteName: [athlete.firstname, athlete.lastname].filter(Boolean).join(" ") } : {}),
     },
   });
   return { ftp: athlete?.ftp ?? null, maxHr, hrZones: hz };
+}
+
+// ─── Segments : PR, KOM/QOM, Top 10 ───
+
+// Sorties analysées par passage : le détail coûte 1 requête par sortie, sur un quota
+// partagé par toute l'appli (100 / 15 min, 1 000 / jour). L'historique est rattrapé en
+// quelques passages (bouton « Synchroniser », synchro toutes les 6 h, webhook).
+export const SEGMENT_BUDGET = 25;
+
+async function saveEfforts(userId: string, a: StravaDetailed): Promise<void> {
+  const keep = (a.segment_efforts ?? []).filter((e) => (e.pr_rank ?? 0) > 0 || (e.kom_rank ?? 0) > 0);
+  const activityId = String(a.id);
+  await prisma.$transaction([
+    prisma.stravaSegmentEffort.deleteMany({ where: { activityId } }),
+    ...keep.map((e) =>
+      prisma.stravaSegmentEffort.create({
+        data: {
+          id: String(e.id),
+          userId,
+          activityId,
+          segmentId: String(e.segment?.id ?? ""),
+          segmentName: (e.segment?.name ?? "Segment").slice(0, 200),
+          distanceM: e.segment?.distance ?? 0,
+          avgGradePct: e.segment?.average_grade ?? null,
+          climbCategory: e.segment?.climb_category ?? null,
+          city: e.segment?.city ? e.segment.city.slice(0, 100) : null,
+          elapsedSec: e.elapsed_time,
+          startLocal: new Date(e.start_date_local),
+          prRank: e.pr_rank && e.pr_rank > 0 ? e.pr_rank : null,
+          komRank: e.kom_rank && e.kom_rank > 0 ? e.kom_rank : null,
+        },
+      }),
+    ),
+    prisma.stravaActivity.update({ where: { id: activityId }, data: { detailFetchedAt: new Date() } }),
+  ]);
+}
+
+// Lit le détail des sorties à trophées pas encore analysées, des plus récentes aux plus
+// anciennes. S'arrête au premier refus de quota (429) : la suite viendra au prochain passage.
+export async function fetchSegmentDetails(userId: string, budget = SEGMENT_BUDGET, token?: string): Promise<{ fetched: number; remaining: number; throttled: boolean }> {
+  const todo = await prisma.stravaActivity.findMany({
+    where: { userId, achievementCount: { gt: 0 }, detailFetchedAt: null },
+    orderBy: { startDate: "desc" },
+    select: { id: true },
+  });
+  let fetched = 0;
+  let handled = 0; // lues + introuvables (404) : ne seront plus redemandées
+  let throttled = false;
+  if (todo.length) {
+    const tk = token ?? (await validAccessToken(userId));
+    for (const { id } of todo.slice(0, budget)) {
+      try {
+        const a = await api<StravaDetailed>(tk, `/activities/${id}`);
+        await saveEfforts(userId, a);
+        fetched++;
+        handled++;
+      } catch (err) {
+        if (err instanceof StravaError && err.status === 429) {
+          throttled = true;
+          break;
+        }
+        // Sortie supprimée ou devenue privée : on ne la redemande pas indéfiniment.
+        if (err instanceof StravaError && err.status === 404) {
+          await prisma.stravaActivity.update({ where: { id }, data: { detailFetchedAt: new Date() } });
+          handled++;
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+  return { fetched, remaining: todo.length - handled, throttled };
 }
 
 // Comptes en cours de synchronisation (une seule instance du serveur) : l'interface s'en
@@ -262,6 +375,8 @@ export async function syncAccount(userId: string, opts: { force?: boolean; now?:
     const rides = all.filter(isRide);
     const settings = await refreshAthlete(userId, token, Math.max(0, ...rides.map((r) => r.max_heartrate ?? 0)));
     await saveActivities(userId, rides, settings);
+    // Segments : en complément, jamais bloquant pour le reste de la synchro.
+    await fetchSegmentDetails(userId, SEGMENT_BUDGET, token).catch((err) => console.error("[strava] segments non lus :", err instanceof Error ? err.message : err));
     await prisma.stravaAccount.update({ where: { userId }, data: { lastSyncAt: now, lastSyncError: null } });
     return { ok: true, synced: rides.length };
   } catch (err) {
@@ -296,9 +411,11 @@ export async function syncOneActivity(athleteId: string, activityId: string, asp
   }
   try {
     const token = await validAccessToken(acc.userId);
-    const a = await api<StravaSummary>(token, `/activities/${activityId}`);
+    // La réponse de /activities/{id} est déjà le DÉTAIL : segments enregistrés sans requête en plus.
+    const a = await api<StravaDetailed>(token, `/activities/${activityId}`);
     if (!isRide(a)) return null;
     await activityUpsert(acc.userId, a, settingsOf(acc));
+    if (a.segment_efforts) await saveEfforts(acc.userId, a);
     return { userId: acc.userId, created: aspect === "create" };
   } catch (err) {
     console.error("[strava] activité non synchronisée :", err instanceof Error ? err.message : err);

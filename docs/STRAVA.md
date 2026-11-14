@@ -34,3 +34,21 @@ Aucune clé d'IA n'est nécessaire : le Coach est un moteur de règles exécuté
 ## Connecteurs IA
 
 Seuls Claude (Anthropic) et Google Gemini sont proposés, avec le serveur MCP Strava `https://mcp.strava.com/mcp` (lecture seule, abonnement Strava requis). Le test vérifie uniquement que le serveur MCP est joignable (un 401 est normal) : la liaison se fait dans l'assistant, ce site n'y a pas accès.
+
+## Records, défis brevets, KOM / Top 10 / PR
+
+Trois sections de l'onglet Strava (repliées par défaut), servies par `GET /api/strava/records` :
+
+- **🏆 Mes records** : plus longue sortie, plus gros D+, plus long temps en selle, meilleure moyenne (≥ 50 km),
+  vitesse max, meilleure semaine, meilleur mois, plus longue série de jours — sur les sorties vélo synchronisées
+  (13 mois), avec lien vers la sortie. Ligne « Depuis toujours » d'après `/athletes/{id}/stats`.
+- **🎯 Défis brevets** : paliers 200/300/400/600/1000 km, nombre de sorties ≥ 200 km, meilleure moyenne pauses
+  comprises (temps total) sur ≥ 200 km comparée aux 15 km/h d'un BRM et 13,3 km/h du PBP, plus gros mois vs 1 200 km.
+- **👑 KOM, Top 10 et PR** : compteurs, puis récap complet de tous les KOM/QOM et Top 10 (filtrable, triable par
+  rang ou par date), et la liste des PR de la saison. Rang = celui au moment de la sortie (`kom_rank` / `pr_rank`
+  des efforts) : il a pu changer depuis. Seuls les efforts du sportif lui-même sont stockés et affichés.
+
+Quota : le détail des segments coûte une requête par sortie. Il n'est lu que pour les sorties qui annoncent des
+trophées (`achievement_count > 0`), 25 par passage (`SEGMENT_BUDGET`), en s'arrêtant au premier 429. L'historique
+est rattrapé au fil des synchronisations (bouton, toutes les 6 h) ; une nouvelle sortie reçue par webhook est
+analysée tout de suite sans requête supplémentaire.
