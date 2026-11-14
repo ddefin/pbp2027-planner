@@ -126,6 +126,7 @@ export interface StravaRecords {
   };
   trophies: { kom: number; top10: number; prSeason: number; list: Trophy[] };
   segments: { analysed: number; total: number; syncing: boolean };
+  history: { done: boolean; oldestLoaded: string | null; firstRideAt: string | null };
   empty: boolean;
 }
 

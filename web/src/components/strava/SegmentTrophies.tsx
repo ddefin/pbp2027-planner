@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Crown, ExternalLink, Medal, Trophy as TrophyIcon } from "lucide-react";
 import type { StravaRecords, Trophy } from "../../api/strava";
-import { activityUrl, chrono, frDate, num, segmentUrl } from "./stravaFormat";
+import { activityUrl, chrono, frDate, monthLabel, num, segmentUrl } from "./stravaFormat";
 
 type Filter = "ranked" | "kom" | "top10" | "pr"; // ranked = tous les KOM et Top 10
 type Sort = "rank" | "date";
@@ -29,7 +29,7 @@ function RankBadge({ t }: { t: Trophy }) {
 const CAT = ["", "Cat. 4", "Cat. 3", "Cat. 2", "Cat. 1", "HC"];
 
 // « 👑 KOM, Top 10 et PR » : compteurs puis récap complet, filtrable et triable.
-export function SegmentTrophies({ data, segments }: { data: StravaRecords["trophies"]; segments: StravaRecords["segments"] }) {
+export function SegmentTrophies({ data, segments, history }: { data: StravaRecords["trophies"]; segments: StravaRecords["segments"]; history: StravaRecords["history"] }) {
   const [filter, setFilter] = useState<Filter>("ranked");
   const [sort, setSort] = useState<Sort>("rank");
   const list = useMemo(() => {
@@ -38,7 +38,17 @@ export function SegmentTrophies({ data, segments }: { data: StravaRecords["troph
   }, [data.list, filter, sort]);
   const pending = segments.total - segments.analysed;
   const toggle = (f: Filter) => setFilter(filter === f ? "ranked" : f);
-  const title = { ranked: "Tous mes KOM/QOM et Top 10", kom: "Mes KOM/QOM", top10: "Mes Top 10", pr: "Mes PR de la saison" }[filter];
+  const since = history.done && history.firstRideAt ? ` depuis ${history.firstRideAt.slice(0, 4)}` : "";
+  const title = { ranked: `Tous mes KOM/QOM et Top 10${since}`, kom: `Mes KOM/QOM${since}`, top10: `Mes Top 10${since}`, pr: "Mes PR de la saison" }[filter];
+  const pct = segments.total > 0 ? Math.round((segments.analysed / segments.total) * 100) : 100;
+  const inProgress = !history.done || pending > 0;
+  // Regroupement par année quand la liste est triée par date.
+  const groups = useMemo(() => {
+    if (sort !== "date") return [{ year: null as string | null, items: list }];
+    const m = new Map<string, Trophy[]>();
+    for (const t of list) m.set(t.date.slice(0, 4), [...(m.get(t.date.slice(0, 4)) ?? []), t]);
+    return [...m.entries()].map(([year, items]) => ({ year: year as string | null, items }));
+  }, [list, sort]);
 
   return (
     <div className="st-tro">
@@ -60,11 +70,19 @@ export function SegmentTrophies({ data, segments }: { data: StravaRecords["troph
         </button>
       </div>
 
-      {pending > 0 && (
-        <p className="sv-notice st-pending" role="status">
-          Analyse des segments en cours : {segments.analysed} / {segments.total} sorties à trophées. La suite arrive à chaque synchronisation (Strava limite le nombre de
-          lectures).
-        </p>
+      {inProgress && (
+        <div className="sv-notice st-pending" role="status">
+          <p>
+            {!history.done
+              ? `Lecture de ton historique Strava en cours (jusqu'à ${history.oldestLoaded ? monthLabel(history.oldestLoaded.slice(0, 7)).toLowerCase() : "…"} pour l'instant).`
+              : "Historique lu en entier."}{" "}
+            Analyse des segments : <strong>{pct} %</strong> ({segments.analysed} / {segments.total} sorties à trophées).
+          </p>
+          <div className="st-gauge" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-label="Analyse des segments">
+            <span style={{ width: `${pct}%` }} />
+          </div>
+          <p className="st-pending-note">Strava limite le nombre de lectures : la suite arrive toute seule, à petit débit (quelques jours au plus pour un long historique).</p>
+        </div>
       )}
 
       {data.list.length === 0 ? (
@@ -92,8 +110,15 @@ export function SegmentTrophies({ data, segments }: { data: StravaRecords["troph
             </label>
           </div>
           {list.length === 0 && <p className="hint">Rien dans cette catégorie pour l'instant.</p>}
+          {groups.map((g) => (
+          <div key={g.year ?? "all"} className="st-tro-group">
+          {g.year && (
+            <h4 className="st-tro-year">
+              {g.year} <span>{g.items.length}</span>
+            </h4>
+          )}
           <ul className="st-tro-list">
-            {list.map((t) => (
+            {g.items.map((t) => (
               <li key={`${t.kind}-${t.segmentId}`} className={`st-tro-row is-${t.kind}`}>
                 <RankBadge t={t} />
                 <div className="st-tro-seg">
@@ -114,6 +139,8 @@ export function SegmentTrophies({ data, segments }: { data: StravaRecords["troph
               </li>
             ))}
           </ul>
+          </div>
+          ))}
           <p className="hint">
             KOM/QOM et Top 10 : ton rang au classement du segment au moment de la sortie (il a pu changer depuis). PR : ton meilleur temps personnel. Seuls tes propres efforts sont
             affichés.

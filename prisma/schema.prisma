@@ -534,6 +534,11 @@ model StravaAccount {
   lastSyncError String?
   // Totaux et records « depuis toujours » de /athletes/{id}/stats (JSON brut filtré).
   allTimeStats  String?
+  // Rattrapage de tout l'historique (records, KOM, Top 10 depuis la première sortie) :
+  // lecture vers le passé à partir de historyBefore, terminée quand historyDoneAt est posé.
+  historyBefore DateTime?
+  historyDoneAt DateTime?
+  firstRideAt   DateTime?
 }
 
 // Activités synchronisées : seulement ce qui sert aux analyses (pas de tracé GPS ni de

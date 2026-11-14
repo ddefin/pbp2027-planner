@@ -261,7 +261,7 @@ export function StravaTab() {
             title="🏆 Mes records"
             summary={(() => {
               const d = recs.records.find((r) => r.key === "distance");
-              return d ? `Plus longue sortie ${Math.round(d.value)} km` : "Records personnels";
+              return d ? `Plus longue sortie ${Math.round(d.value)} km${recs.history.done && recs.history.firstRideAt ? ` · depuis ${recs.history.firstRideAt.slice(0, 4)}` : ""}` : "Records personnels";
             })()}
             storageKey="strava.records"
           >
@@ -279,7 +279,7 @@ export function StravaTab() {
             summary={`${recs.trophies.kom} KOM/QOM · ${recs.trophies.top10} Top 10 · ${recs.trophies.prSeason} PR cette saison`}
             storageKey="strava.trophees"
           >
-            <SegmentTrophies data={recs.trophies} segments={recs.segments} />
+            <SegmentTrophies data={recs.trophies} segments={recs.segments} history={recs.history} />
           </Disclosure>
         </section>
       )}

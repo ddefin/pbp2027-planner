@@ -27,6 +27,9 @@ const ride = (id: string, iso: string, km: number, o: Partial<import("../src/lib
 
 let calls: string[] = [];
 let quotaAfter = Infinity;
+let usageHeader: string | null = null; // ex. "70,100" : consommation 15 min / jour simulée
+// Historique distant simulé, du plus récent au plus ancien (start_date décroissante).
+let history: { id: string; start: string; achievements: number; sport?: string }[] = [];
 const effortsFor = (id: string) => [
   { id: `${id}-1`, elapsed_time: 300, start_date_local: "2027-05-01T09:00:00Z", kom_rank: 1, pr_rank: 1, segment: { id: 11, name: "Côte de la Madeleine", distance: 2100, average_grade: 6.2, climb_category: 1, city: "Rambouillet" } },
   { id: `${id}-2`, elapsed_time: 120, start_date_local: "2027-05-01T09:10:00Z", kom_rank: 4, pr_rank: null, segment: { id: 12, name: "Sprint du stade", distance: 600, average_grade: 0.5, climb_category: 0, city: null } },
@@ -58,12 +61,21 @@ afterAll(async () => {
 beforeEach(() => {
   calls = [];
   quotaAfter = Infinity;
+  usageHeader = null;
+  strava?.resetQuotaForTests();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       const u = String(url);
       calls.push(u);
-      const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+      const headers: Record<string, string> = usageHeader ? { "X-RateLimit-Usage": usageHeader, "X-RateLimit-Limit": "100,1000" } : {};
+      const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers });
+      if (u.includes("/athlete/activities?before=")) {
+        const before = Number(new URL(u).searchParams.get("before")) * 1000;
+        const per = Number(new URL(u).searchParams.get("per_page"));
+        const page = history.filter((h) => Date.parse(h.start) < before).slice(0, per);
+        return json(page.map((h) => ({ id: h.id, name: `Ancienne ${h.id}`, sport_type: h.sport ?? "Ride", start_date: h.start, start_date_local: h.start, distance: 90000, moving_time: 12000, total_elevation_gain: 800, achievement_count: h.achievements })));
+      }
       const m = u.match(/\/activities\/(\w+)$/);
       if (m) {
         if (calls.filter((c) => /\/activities\/\w+$/.test(c)).length > quotaAfter) return json({ message: "Rate Limit Exceeded" }, 429);
@@ -187,5 +199,93 @@ describe("Lecture des segments et API", () => {
     expect((await prisma.stravaActivity.findUniqueOrThrow({ where: { id: "neuf" } })).detailFetchedAt).not.toBeNull();
     await strava.purgeLocal(userId);
     expect(await prisma.stravaSegmentEffort.count({ where: { userId } })).toBe(0);
+  });
+});
+
+describe("Rattrapage de tout l'historique", () => {
+  const mkUser = async (tag: string) => {
+    const u = await prisma.user.create({ data: { email: `hist-${tag}-${Date.now()}@example.com`, passwordHash: "x", prenom: tag } });
+    await prisma.stravaAccount.create({
+      data: { userId: u.id, athleteId: `a-${tag}-${Date.now()}`, athleteName: tag, scope: "read,activity:read_all", accessToken: crypto_.encryptSecret("t"), refreshToken: crypto_.encryptSecret("r"), expiresAt: new Date(Date.now() + 3600_000) },
+    });
+    // Une sortie récente déjà synchronisée : le rattrapage repart d'avant elle.
+    await prisma.stravaActivity.create({ data: { id: `recent-${tag}`, userId: u.id, name: "Récente", sportType: "Ride", startDate: new Date("2026-10-01T08:00:00Z"), startLocal: new Date("2026-10-01T08:00:00Z"), distanceM: 50000, movingSec: 7200, elevationM: 300, load: 50 } });
+    return u.id;
+  };
+  // 450 sorties de 2016 à 2025 (une sur trois à trophées) + une course à pied.
+  const makeHistory = (prefix: string) =>
+    Array.from({ length: 450 }, (_, i) => ({ id: `${prefix}${i}`, start: new Date(Date.UTC(2025, 8, 1) - i * 7 * 86_400_000).toISOString(), achievements: i % 3 === 0 ? 2 : 0, sport: i === 5 ? "Run" : "Ride" }));
+
+  it("lit les pages vers le passé, s'arrête sur la dernière, puis analyse les segments anciens", async () => {
+    const userId = await mkUser("hist1");
+    history = makeHistory("h");
+    let guard = 0;
+    while (!(await prisma.stravaAccount.findUniqueOrThrow({ where: { userId } })).historyDoneAt && guard++ < 10) {
+      const r = await strava.backfillHistory(userId, 4, () => false);
+      expect(r.requests).toBeLessThanOrEqual(4); // budget respecté (1 page + segments)
+    }
+    const acc = await prisma.stravaAccount.findUniqueOrThrow({ where: { userId } });
+    expect(acc.historyDoneAt).not.toBeNull();
+    expect(acc.firstRideAt!.toISOString().slice(0, 10)).toBe(history[449].start.slice(0, 10));
+    expect(await prisma.stravaActivity.count({ where: { userId } })).toBe(1 + 449); // course à pied ignorée
+    expect(calls.filter((c) => c.includes("before=")).length).toBe(3); // 200 + 200 + 50
+    // Les pages suivantes ne relisent plus la liste : seulement les segments.
+    calls = [];
+    await strava.backfillHistory(userId, 10, () => false);
+    expect(calls.some((c) => c.includes("before="))).toBe(false);
+    expect(calls.filter((c) => /\/activities\/\w+$/.test(c))).toHaveLength(10);
+  });
+
+  it("partage le budget horaire entre les comptes et s'arrête quand le quota réel est trop haut", async () => {
+    await prisma.stravaSegmentEffort.deleteMany({});
+    await prisma.stravaActivity.deleteMany({});
+    await prisma.stravaAccount.deleteMany({});
+    const a = await mkUser("ha");
+    const b = await mkUser("hb");
+    history = makeHistory("x");
+    calls = [];
+    const used = await strava.backfillAll(12, () => false);
+    expect(used).toBeLessThanOrEqual(12);
+    const touched = (await prisma.stravaAccount.findMany({ where: { userId: { in: [a, b] } } })).filter((x) => x.historyBefore !== null);
+    expect(touched).toHaveLength(2); // les deux comptes ont avancé
+
+    // Consommation réelle à 70 % du quota de 15 min : rien de plus n'est demandé.
+    usageHeader = "70,100";
+    calls = [];
+    await strava.backfillHistory(a, 10); // garde par défaut : quota réel
+    const afterFirst = calls.length;
+    expect(afterFirst).toBeLessThanOrEqual(1); // la 1re réponse révèle le quota, on s'arrête
+    expect(strava.quotaUsage().short).toBeCloseTo(0.7);
+    calls = [];
+    expect(await strava.backfillAll(12)).toBe(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("records et trophées sur tout l'historique, défis brevets sur 13 mois", async () => {
+    const server = buildServer();
+    const email = `rec-all-${Date.now()}@example.com`;
+    const password = "mot-de-passe-de-test-123";
+    await server.inject({ method: "POST", url: "/api/auth/register", payload: { email, password, prenom: "Rec" } });
+    const login = await server.inject({ method: "POST", url: "/api/auth/login", payload: { email, password } });
+    const raw = login.headers["set-cookie"];
+    const cookie = (Array.isArray(raw) ? raw[0] : raw!).split(";")[0];
+    const userId = (await prisma.user.findUniqueOrThrow({ where: { email } })).id;
+    await prisma.stravaAccount.create({
+      data: { userId, athleteId: `rec-${Date.now()}`, athleteName: "Rec", scope: "read,activity:read_all", accessToken: crypto_.encryptSecret("t"), refreshToken: crypto_.encryptSecret("r"), expiresAt: new Date(Date.now() + 3600_000), historyDoneAt: new Date(), firstRideAt: new Date("2017-05-20T05:00:00Z") },
+    });
+    const mk = (id: string, start: Date, km: number) =>
+      prisma.stravaActivity.create({ data: { id, userId, name: id, sportType: "Ride", startDate: start, startLocal: start, distanceM: km * 1000, movingSec: (km / 25) * 3600, elapsedSec: (km / 18) * 3600, elevationM: km * 8, load: 100, achievementCount: 1, detailFetchedAt: new Date() } });
+    await mk("old-600", new Date("2017-05-20T07:00:00Z"), 605);
+    await mk("recent-210", new Date(Date.now() - 10 * 86_400_000), 210);
+    await prisma.stravaSegmentEffort.create({ data: { id: "kom-2017", userId, activityId: "old-600", segmentId: "s-old", segmentName: "Col de 2017", distanceM: 4000, elapsedSec: 700, startLocal: new Date("2017-05-20T09:00:00Z"), komRank: 1 } });
+    const j = (await server.inject({ method: "GET", url: "/api/strava/records", headers: { cookie } })).json();
+    expect(j.records.find((r: { key: string }) => r.key === "distance")).toMatchObject({ activityId: "old-600", value: 605 }); // record de 2017
+    expect(j.trophies.list[0]).toMatchObject({ kind: "kom", segmentName: "Col de 2017", date: "2017-05-20" }); // KOM ancien
+    expect(j.challenges.steps.find((x: { km: number }) => x.km === 600).done).toBe(false); // défis : 13 mois seulement
+    expect(j.challenges.steps.find((x: { km: number }) => x.km === 200).done).toBe(true);
+    expect(j.history).toMatchObject({ done: true, firstRideAt: "2017-05-20", oldestLoaded: "2017-05-20" });
+    // Le tableau de bord ignore les sorties anciennes (30 jours : seulement la récente).
+    const dash = (await server.inject({ method: "GET", url: "/api/strava/dashboard", headers: { cookie } })).json();
+    expect(dash.kpis.d30.rides).toBe(1);
   });
 });

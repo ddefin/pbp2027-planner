@@ -110,8 +110,38 @@ export async function validAccessToken(userId: string, now = Date.now()): Promis
   return t.access_token;
 }
 
+// ─── Quota Strava réellement consommé (en-têtes de chaque réponse) ───
+// X-RateLimit-Usage: "12,345" (15 min, jour) et X-RateLimit-Limit: "100,1000". Strava publie
+// aussi des en-têtes X-ReadRateLimit-* pour les lectures : on garde la plus forte proportion.
+const quota = { shortRatio: 0, dailyRatio: 0, at: 0, day: "" };
+
+function readQuota(h: Headers, now = Date.now()) {
+  const pair = (v: string | null) => (v ? v.split(",").map((x) => Number(x.trim())) : null);
+  let short = 0;
+  let daily = 0;
+  for (const prefix of ["X-RateLimit", "X-ReadRateLimit"]) {
+    const used = pair(h.get(`${prefix}-Usage`));
+    const limit = pair(h.get(`${prefix}-Limit`));
+    if (!used || !limit || used.length < 2 || limit.length < 2) continue;
+    if (limit[0] > 0) short = Math.max(short, used[0] / limit[0]);
+    if (limit[1] > 0) daily = Math.max(daily, used[1] / limit[1]);
+  }
+  if (short || daily) Object.assign(quota, { shortRatio: short, dailyRatio: daily, at: now, day: new Date(now).toISOString().slice(0, 10) });
+}
+
+// Proportion consommée, en tenant compte des remises à zéro (15 min, minuit UTC).
+export function quotaUsage(now = Date.now()): { short: number; daily: number } {
+  const fresh = now - quota.at < 15 * 60_000;
+  const sameDay = quota.day === new Date(now).toISOString().slice(0, 10);
+  return { short: fresh ? quota.shortRatio : 0, daily: sameDay ? quota.dailyRatio : 0 };
+}
+export function resetQuotaForTests() {
+  Object.assign(quota, { shortRatio: 0, dailyRatio: 0, at: 0, day: "" });
+}
+
 async function api<T>(token: string, path: string): Promise<T> {
   const res = await fetch(`${API}${path}`, { headers: { authorization: `Bearer ${token}` } });
+  readQuota(res.headers);
   if (res.status === 429) throw new StravaError("Limite de requêtes Strava atteinte : réessaie dans quelques minutes.", 429);
   if (!res.ok) throw new StravaError(`Strava a répondu HTTP ${res.status}`, res.status);
   return (await res.json()) as T;
@@ -264,7 +294,9 @@ async function refreshAthlete(userId: string, token: string, batchMaxHr = 0): Pr
   // Records « depuis toujours » (l'historique synchronisé ne couvre que 13 mois).
   const stats = athlete?.id ? await api<RawStats>(token, `/athletes/${athlete.id}/stats`).catch(() => null) : null;
   const hz = zones?.heart_rate?.zones?.map((z) => [z.min, z.max] as [number, number]) ?? null;
-  const observed = await prisma.stravaActivity.aggregate({ where: { userId }, _max: { maxHr: true } });
+  // FC max observée sur la période récente seulement : une valeur aberrante d'il y a des
+  // années (capteur défaillant) ne doit pas fausser les zones actuelles.
+  const observed = await prisma.stravaActivity.aggregate({ where: { userId, startDate: { gte: new Date(Date.now() - HISTORY_DAYS * 86_400_000) } }, _max: { maxHr: true } });
   const maxHr = Math.round(Math.max(observed._max.maxHr ?? 0, batchMaxHr, hz?.[hz.length - 1]?.[0] ?? 0)) || null;
   await prisma.stravaAccount.update({
     where: { userId },
@@ -317,7 +349,12 @@ async function saveEfforts(userId: string, a: StravaDetailed): Promise<void> {
 
 // Lit le détail des sorties à trophées pas encore analysées, des plus récentes aux plus
 // anciennes. S'arrête au premier refus de quota (429) : la suite viendra au prochain passage.
-export async function fetchSegmentDetails(userId: string, budget = SEGMENT_BUDGET, token?: string): Promise<{ fetched: number; remaining: number; throttled: boolean }> {
+export async function fetchSegmentDetails(
+  userId: string,
+  budget = SEGMENT_BUDGET,
+  token?: string,
+  stop: () => boolean = () => false,
+): Promise<{ fetched: number; remaining: number; throttled: boolean; requests: number }> {
   const todo = await prisma.stravaActivity.findMany({
     where: { userId, achievementCount: { gt: 0 }, detailFetchedAt: null },
     orderBy: { startDate: "desc" },
@@ -326,9 +363,15 @@ export async function fetchSegmentDetails(userId: string, budget = SEGMENT_BUDGE
   let fetched = 0;
   let handled = 0; // lues + introuvables (404) : ne seront plus redemandées
   let throttled = false;
-  if (todo.length) {
+  let requests = 0;
+  if (todo.length && budget > 0) {
     const tk = token ?? (await validAccessToken(userId));
     for (const { id } of todo.slice(0, budget)) {
+      if (stop()) {
+        throttled = true;
+        break;
+      }
+      requests++;
       try {
         const a = await api<StravaDetailed>(tk, `/activities/${id}`);
         await saveEfforts(userId, a);
@@ -349,7 +392,85 @@ export async function fetchSegmentDetails(userId: string, budget = SEGMENT_BUDGE
       }
     }
   }
-  return { fetched, remaining: todo.length - handled, throttled };
+  return { fetched, remaining: todo.length - handled, throttled, requests };
+}
+
+// ─── Rattrapage de tout l'historique (records, KOM, Top 10 depuis la première sortie) ───
+
+// Requêtes de rattrapage par heure pour TOUTE l'appli (≈ 600 / jour sur 1 000 autorisées),
+// et seuils de consommation réelle au-delà desquels on laisse la place aux synchros normales.
+export const BACKFILL_BUDGET_PER_HOUR = 25;
+export const BACKFILL_MAX_SHORT = 0.6;
+export const BACKFILL_MAX_DAILY = 0.7;
+export const quotaTooHigh = () => {
+  const q = quotaUsage();
+  return q.short > BACKFILL_MAX_SHORT || q.daily > BACKFILL_MAX_DAILY;
+};
+
+// Un passage pour un compte : une page de sorties plus anciennes (tant que l'historique
+// n'est pas fini), puis le détail des sorties à trophées. Retourne les requêtes utilisées.
+export async function backfillHistory(userId: string, budget: number, stop: () => boolean = quotaTooHigh): Promise<{ requests: number; historyDone: boolean; throttled: boolean }> {
+  const acc = await prisma.stravaAccount.findUnique({ where: { userId } });
+  if (!acc || budget <= 0) return { requests: 0, historyDone: Boolean(acc?.historyDoneAt), throttled: false };
+  const token = await validAccessToken(userId);
+  let requests = 0;
+  let historyDone = Boolean(acc.historyDoneAt);
+  if (!historyDone && !stop()) {
+    const oldest = await prisma.stravaActivity.findFirst({ where: { userId }, orderBy: { startDate: "asc" }, select: { startDate: true } });
+    const before = acc.historyBefore ?? oldest?.startDate ?? new Date();
+    requests++;
+    let page: StravaSummary[];
+    try {
+      page = await api<StravaSummary[]>(token, `/athlete/activities?before=${Math.floor(before.getTime() / 1000)}&per_page=200`);
+    } catch (err) {
+      if (err instanceof StravaError && err.status === 429) return { requests, historyDone, throttled: true };
+      throw err;
+    }
+    await saveActivities(userId, page.filter(isRide), settingsOf(acc));
+    const minStart = page.reduce<Date | null>((m, a) => {
+      const d = new Date(a.start_date);
+      return !m || d < m ? d : m;
+    }, null);
+    if (page.length < 200) {
+      historyDone = true;
+      const first = await prisma.stravaActivity.findFirst({ where: { userId }, orderBy: { startDate: "asc" }, select: { startDate: true } });
+      await prisma.stravaAccount.update({ where: { userId }, data: { historyDoneAt: new Date(), historyBefore: minStart ?? before, firstRideAt: first?.startDate ?? null } });
+    } else {
+      await prisma.stravaAccount.update({ where: { userId }, data: { historyBefore: minStart ?? before } });
+    }
+  }
+  const seg = await fetchSegmentDetails(userId, budget - requests, token, stop);
+  return { requests: requests + seg.requests, historyDone, throttled: seg.throttled };
+}
+
+let backfillTurn = 0;
+
+// Tâche horaire : les comptes encore incomplets sont servis à tour de rôle, dans la limite
+// du budget horaire et du quota réellement consommé. Jamais d'exception.
+export async function backfillAll(budget = BACKFILL_BUDGET_PER_HOUR, stop: () => boolean = quotaTooHigh): Promise<number> {
+  if (!stravaConfigured()) return 0;
+  const accounts = await prisma.stravaAccount.findMany({ select: { userId: true, historyDoneAt: true }, orderBy: { connectedAt: "asc" } });
+  const pending: string[] = [];
+  for (const a of accounts) {
+    const segs = await prisma.stravaActivity.count({ where: { userId: a.userId, achievementCount: { gt: 0 }, detailFetchedAt: null } });
+    if (!a.historyDoneAt || segs > 0) pending.push(a.userId);
+  }
+  if (!pending.length) return 0;
+  const start = backfillTurn++ % pending.length;
+  const order = [...pending.slice(start), ...pending.slice(0, start)];
+  const share = Math.max(3, Math.ceil(budget / order.length));
+  let left = budget;
+  for (const userId of order) {
+    if (left <= 0 || stop()) break;
+    try {
+      const r = await backfillHistory(userId, Math.min(share, left), stop);
+      left -= r.requests;
+      if (r.throttled) break;
+    } catch (err) {
+      console.error("[strava] rattrapage de l'historique :", err instanceof Error ? err.message : err);
+    }
+  }
+  return budget - left;
 }
 
 // Comptes en cours de synchronisation (une seule instance du serveur) : l'interface s'en

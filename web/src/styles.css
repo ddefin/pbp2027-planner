@@ -4846,3 +4846,36 @@ button.link {
     font-size: 19px;
   }
 }
+.st-pending {
+  display: grid;
+  gap: 8px;
+}
+.st-pending p {
+  margin: 0;
+}
+.st-pending-note {
+  color: var(--fg-muted);
+  font-size: 12.5px;
+}
+.st-tro-group {
+  display: grid;
+  gap: 6px;
+}
+.st-tro-group + .st-tro-group {
+  margin-top: 10px;
+}
+.st-tro-year {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font: 800 13px var(--font-body);
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+.st-tro-year span {
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--fg) 7%, transparent);
+  font-variant-numeric: tabular-nums;
+}

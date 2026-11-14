@@ -63,7 +63,7 @@ export function BrevetChallenges({ data }: { data: StravaRecords["challenges"] }
 
       {data.bestMonth && (
         <div>
-          <p className="st-cap">Plus gros mois</p>
+          <p className="st-cap">Plus gros mois (13 derniers mois)</p>
           <p className="st-avg">
             <strong>{num(data.bestMonth.km)} km</strong> en {monthLabel(data.bestMonth.month).toLowerCase()} — {data.bestMonth.pct} % des 1 200 km du PBP
           </p>

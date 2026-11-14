@@ -152,13 +152,22 @@ export async function stravaRoutes(app: FastifyInstance) {
       prisma.stravaActivity.count({ where: { userId: user.id, achievementCount: { gt: 0 }, detailFetchedAt: { not: null } } }),
     ]);
     const seasonStart = new Date(`${parisParts(new Date()).date.slice(0, 4)}-01-01T00:00:00Z`);
+    // Records et trophées : tout l'historique stocké (rattrapé en tâche de fond). Défis
+    // brevets : 13 derniers mois, c'est la préparation au PBP qui compte.
+    const recentFrom = new Date(Date.now() - 400 * 86_400_000);
+    const oldest = list.reduce<Date | null>((m, a) => (!m || a.startLocal < m ? a.startLocal : m), null);
     reply.header("cache-control", "no-store");
     return reply.send({
       records: personalRecords(list),
       allTime: acc.allTimeStats ? (JSON.parse(acc.allTimeStats) as AllTimeStats) : null,
-      challenges: brevetChallenges(list),
+      challenges: brevetChallenges(list.filter((a) => a.startLocal >= recentFrom)),
       trophies: trophies(efforts, seasonStart),
       segments: { analysed, total: withTrophies, syncing: isSyncing(user.id) },
+      history: {
+        done: Boolean(acc.historyDoneAt),
+        oldestLoaded: oldest ? oldest.toISOString().slice(0, 10) : null,
+        firstRideAt: acc.firstRideAt ? acc.firstRideAt.toISOString().slice(0, 10) : null,
+      },
       empty: list.length === 0,
     });
   });

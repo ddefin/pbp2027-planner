@@ -43,7 +43,11 @@ export function RecordsCard({ data }: { data: StravaRecords }) {
           );
         })}
       </ul>
-      <p className="hint st-rec-scope">Calculés sur tes sorties à vélo des 13 derniers mois.</p>
+      <p className="hint st-rec-scope">
+        {data.history.done
+          ? `Depuis ta première sortie à vélo sur Strava${data.history.firstRideAt ? ` (${frDate(data.history.firstRideAt)})` : ""}.`
+          : `Historique lu jusqu'à ${data.history.oldestLoaded ? monthLabel(data.history.oldestLoaded.slice(0, 7)).toLowerCase() : "…"} : les sorties plus anciennes arrivent automatiquement (quelques jours au plus).`}
+      </p>
       {all && (all.biggestRideM || all.all) && (
         <div className="st-alltime">
           <span className="st-alltime-cap">Depuis toujours sur Strava</span>

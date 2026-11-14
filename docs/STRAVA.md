@@ -52,3 +52,13 @@ Quota : le détail des segments coûte une requête par sortie. Il n'est lu que 
 trophées (`achievement_count > 0`), 25 par passage (`SEGMENT_BUDGET`), en s'arrêtant au premier 429. L'historique
 est rattrapé au fil des synchronisations (bouton, toutes les 6 h) ; une nouvelle sortie reçue par webhook est
 analysée tout de suite sans requête supplémentaire.
+
+### Tout l'historique (depuis la première sortie sur Strava)
+
+Records et trophées (KOM/QOM, Top 10) portent sur **tout** l'historique de chaque randonneur ; les défis brevets
+restent sur 13 mois et les PR sur la saison. L'historique ancien est rattrapé en tâche de fond, toutes les heures
+(`backfillAll`) : une page de 200 sorties plus anciennes par passage (`/athlete/activities?before=…`), puis le
+détail des sorties à trophées. Budget : 25 requêtes par heure pour toute l'appli, et arrêt dès que la consommation
+réelle annoncée par Strava (`X-RateLimit-Usage`) dépasse 60 % du quota 15 min ou 70 % du quota du jour. Un long
+historique est donc complet en quelques jours ; l'onglet affiche l'avancement. Le tableau de bord et le Coach ne
+lisent que les 400 derniers jours : les anciennes sorties ne les modifient pas.
