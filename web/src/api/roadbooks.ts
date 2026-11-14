@@ -13,6 +13,7 @@ export interface RoadbookSettings {
   title: string;
   liveTrackUrl?: string | null;
   telegramAnnounce?: boolean;
+  groupShare?: boolean;
   classKm: number;
   limitMinutes: number;
   startAt: string | null;
@@ -54,7 +55,7 @@ export interface Checkin {
   at: string;
 }
 
-export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken" | "telegramAnnounce" | "announceStatus" | "checklist"> {
+export interface SharedRoadbook extends Omit<RoadbookWithPoints, "id" | "shareToken" | "telegramAnnounce" | "announceStatus" | "checklist" | "groupShare"> {
   author: string;
 }
 
@@ -172,4 +173,26 @@ export interface LiveView {
 
 export function getSharedLive(token: string) {
   return request<LiveView>(`/roadbooks/shared/${encodeURIComponent(token)}/live`);
+}
+
+export interface GroupRider {
+  id: string;
+  prenom: string;
+  avatar: import("./auth").AvatarData;
+  mine: boolean;
+  title: string;
+  startAt: string;
+  totalKm: number;
+  km: number;
+  lat: number;
+  lon: number;
+  checkinAt: string | null;
+  finished: boolean;
+  level: "ok" | "tight" | "late" | null;
+  nextControl: string | null;
+  track: [number, number][];
+}
+
+export function getGroupLive() {
+  return request<{ riders: GroupRider[]; at: string }>("/group/live");
 }

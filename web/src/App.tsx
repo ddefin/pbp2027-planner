@@ -22,6 +22,7 @@ const PbpRoutePage = lazy(() => import("./pages/PbpRoutePage").then((m) => ({ de
 const RoadbooksPage = lazy(() => import("./pages/RoadbooksPage").then((m) => ({ default: m.RoadbooksPage })));
 const RoadbookPage = lazy(() => import("./pages/RoadbookPage").then((m) => ({ default: m.RoadbookPage })));
 const AdminApp = lazy(() => import("./admin/AdminApp"));
+const GroupMapPage = lazy(() => import("./pages/GroupMapPage").then((m) => ({ default: m.GroupMapPage })));
 const SharedRoadbookPage = lazy(() => import("./pages/SharedRoadbookPage").then((m) => ({ default: m.SharedRoadbookPage })));
 
 const pageFallback = <p className="hint" style={{ padding: 24 }}>Chargement…</p>;
@@ -48,6 +49,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
     { to: "/parcours-pbp", label: "Parcours PBP" },
     { to: "/calendrier", label: "Calendrier BRM" },
     { to: "/roadbooks", label: "Roadbook" },
+    { to: "/carte-groupe", label: "Carte du groupe" },
     { to: "/actualites", label: "Actualités" },
     { to: "/messagerie", label: "Messagerie" },
     { to: "/profil", label: "Mon profil" },
@@ -154,6 +156,16 @@ export default function App() {
             <Suspense fallback={pageFallback}>
               <SharedRoadbookPage />
             </Suspense>
+          }
+        />
+        <Route
+          path="/carte-groupe"
+          element={
+            <ProtectedLayout>
+              <Suspense fallback={pageFallback}>
+                <GroupMapPage />
+              </Suspense>
+            </ProtectedLayout>
           }
         />
         <Route

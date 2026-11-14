@@ -22,6 +22,7 @@ import { notificationsRoutes } from "./routes/notifications.js";
 import { pbpRoutesRoutes } from "./routes/pbpRoutes.js";
 import { roadbooksRoutes } from "./routes/roadbooks.js";
 import { stravaRoutes } from "./routes/strava.js";
+import { groupRoutes } from "./routes/group.js";
 import { adminRoutes } from "./routes/admin/index.js";
 import { purgeAuthEvents } from "./lib/authEvents.js";
 import { checkWindAlerts } from "./lib/windAlerts.js";
@@ -77,6 +78,7 @@ export function buildServer() {
       api.register(pbpRoutesRoutes);
       api.register(roadbooksRoutes);
       api.register(stravaRoutes);
+      api.register(groupRoutes);
       api.register(adminRoutes);
     },
     { prefix: "/api" },

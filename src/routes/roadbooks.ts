@@ -47,6 +47,7 @@ const liveTrackSchema = z
 const patchSchema = z.object({
   liveTrackUrl: liveTrackSchema.nullable().optional(),
   telegramAnnounce: z.boolean().optional(),
+  groupShare: z.boolean().optional(),
   title: z.string().trim().min(1).max(100).optional(),
   classKm: z.number().int().min(50).max(1300).optional(),
   limitMinutes: z.number().int().min(60).max(6000).optional(),
@@ -157,6 +158,7 @@ function serialize(r: RoadbookRow, withPoints: boolean) {
     shareToken: r.shareToken,
     liveTrackUrl: r.liveTrackUrl,
     telegramAnnounce: r.telegramAnnounce,
+    groupShare: r.groupShare,
     announceStatus: {
       lastPublishedAt: r.lastAnnouncedAt?.toISOString() ?? null,
       lastAttemptAt: r.lastAnnounceAttemptAt?.toISOString() ?? null,
@@ -435,7 +437,7 @@ export async function roadbooksRoutes(app: FastifyInstance) {
     const r = await prisma.roadbook.findUnique({ where: { shareToken: token }, include: { user: { select: { prenom: true } } } });
     if (!r) return reply.code(404).send({ error: "not_found" });
     const checkins = await prisma.roadbookCheckin.findMany({ where: { roadbookId: r.id }, orderBy: { at: "desc" }, take: 200 });
-    const { shareToken: _token, id: _id, telegramAnnounce: _announce, announceStatus: _status, checklist: _checklist, ...rest } = serialize(r, true);
+    const { shareToken: _token, id: _id, telegramAnnounce: _announce, announceStatus: _status, checklist: _checklist, groupShare: _group, ...rest } = serialize(r, true);
     reply.header("cache-control", "no-store");
     return reply.send({ roadbook: { ...rest, author: publicName(r.user) }, checkins: checkins.map(serializeCheckin) });
   });

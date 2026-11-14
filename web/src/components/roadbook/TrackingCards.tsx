@@ -228,3 +228,35 @@ export function TelegramCard({
     </Disclosure>
   );
 }
+
+// Carte du groupe le jour J : consentement explicite, désactivé par défaut.
+export function GroupShareCard({ roadbookId, groupShare, onSaved }: { roadbookId: string; groupShare: boolean; onSaved: (patch: { groupShare: boolean }) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  async function toggle(next: boolean) {
+    setBusy(true);
+    setError(false);
+    try {
+      await updateRoadbook(roadbookId, { groupShare: next });
+      onSaved({ groupShare: next });
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Disclosure title="🗺️ Carte du groupe" summary={groupShare ? "✓ Visible des membres pendant ce brevet" : "Désactivé — ton pointage reste privé"} tone={groupShare ? "ok" : "muted"} storageKey="rb.partage.groupe">
+      <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+        <input type="checkbox" checked={groupShare} disabled={busy} onChange={(e) => void toggle(e.target.checked)} style={{ width: 20, height: 20, marginTop: 2, flex: "none" }} />
+        <span>
+          <strong>Montrer mon dernier pointage aux membres du groupe</strong>
+          <span className="hint" style={{ display: "block", margin: "2px 0 0" }}>
+            Pendant ce brevet seulement (de 12 h avant le départ à 6 h après le délai), sur la page « Carte du groupe ». Seuls tes pointages volontaires sont montrés : aucun suivi GPS continu.
+          </span>
+        </span>
+      </label>
+      {error && <p className="hint" style={{ color: "var(--bad)", margin: 0 }}>Échec de l'enregistrement.</p>}
+    </Disclosure>
+  );
+}

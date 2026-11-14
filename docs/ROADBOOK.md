@@ -248,3 +248,11 @@ Aucun suivi GPS continu (batterie) : tout part des pointages volontaires.
 - **Compteur GPS** (Réglages) : `GET /api/roadbooks/:id/export?format=gpx|tcx` — tracé + contrôles (heures d'ouverture/fermeture/prévue) + points d'eau/ravito. TCX « Course » pour Garmin Connect (noms ≤ 10 caractères).
 - **Vue en direct pour les proches** : `GET /api/roadbooks/shared/:token/live` (sans session) — km, ville, arrivée prévue et au rythme actuel, marge de barrière, prochain contrôle, météo devant ; recalculée au plus toutes les 10 min par roadbook, page rafraîchie toutes les 5 min.
 - **Sauvegarde** : voir DEPLOY.md (alerte si plus de sauvegarde depuis `BACKUP_MAX_AGE_DAYS` jours).
+
+## Carte du groupe le jour J
+
+Page « Carte du groupe » (`/carte-groupe`, membres connectés) : dernier pointage des randonneurs en brevet. Un roadbook n'y apparaît que si son auteur a coché « Carte du groupe » dans l'onglet Partage (`Roadbook.groupShare`, désactivé par défaut), et seulement de 12 h avant le départ à 6 h après le délai. Aucun suivi GPS continu : la position est celle du dernier pointage (ou du tracé au km pointé). Route : `GET /api/group/live`.
+
+## Rappels avant un BRM
+
+Pour chaque BRM « Prévu » ou « Inscrit » du calendrier : rappel à J-7 et la veille (avec la météo prévue au départ quand elle est disponible), dans la cloche et sur Telegram si le compte est lié. Une seule fois par échéance (`BrmReminder`), à partir de 7 h (heure de Paris). Code : `src/lib/brmReminders.ts`.

@@ -14,7 +14,7 @@ import {
 import { RoadbookView, type RoadbookData } from "../components/roadbook/RoadbookView";
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
 import { Disclosure } from "../components/Disclosure";
-import { LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
+import { GroupShareCard, LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
 import { enqueue, flushQueue, isNetworkError, newClientId, queuedFor } from "../lib/checkinQueue";
 import { ChecklistCard, GpsExportCard } from "../components/roadbook/PrepCards";
 import { QuickShare, ShareLinkCard, WhatsAppCard } from "../components/roadbook/ShareCards";
@@ -204,6 +204,7 @@ export function RoadbookPage() {
               announceStatus={data.announceStatus}
               onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))}
             />
+            <GroupShareCard roadbookId={data.id} groupShare={data.groupShare ?? false} onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))} />
             <LiveTrackCard roadbookId={data.id} liveTrackUrl={data.liveTrackUrl ?? null} onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))} />
           </>
         ),

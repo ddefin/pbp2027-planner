@@ -3272,3 +3272,146 @@ button.link {
 .ad-online a .av {
   margin-right: 4px;
 }
+
+/* ───── Carte du groupe ───── */
+.gm-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.gm-head h2 {
+  margin: 0;
+}
+.gm-map {
+  height: min(62vh, 520px);
+  min-height: 300px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 0;
+}
+.gm-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: auto;
+}
+.gm-pin-av {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: #334155;
+  color: #fff;
+  font: 800 14px var(--font-body);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.gm-pin-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gm-pin.is-me .gm-pin-av {
+  border-color: #e8536a;
+}
+.gm-pin.is-late .gm-pin-av {
+  background: #c2410c;
+}
+.gm-pin-name {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0c1420;
+  font: 700 11.5px/1.5 var(--font-body);
+  white-space: nowrap;
+}
+.gm-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+}
+.gm-rider button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gm-rider.is-focus button {
+  border-color: var(--fg);
+}
+.gm-rider.is-me button {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.gm-rider-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.gm-rider-main small,
+.gm-rider-side small {
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gm-rider-side {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
+  flex: none;
+}
+.gm-km {
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+}
+.gm-km small {
+  font-weight: 500;
+}
+.gm-bar {
+  display: block;
+  height: 5px;
+  margin-top: 3px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.gm-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.gm-empty {
+  padding: 18px 4px 4px;
+  text-align: center;
+  color: var(--fg-muted);
+}
+.gm-empty strong {
+  color: var(--fg);
+}
+.gm-empty p {
+  max-width: 52ch;
+  margin: 6px auto 0;
+  font-size: 14px;
+}
