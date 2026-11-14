@@ -1,0 +1,24 @@
+{
+  "_comment": "Jeu d'exemple de la page de suivi des proches (scripts/demo-live.ts). Parcours simulé Rambouillet → Brest, ~600 km ; heures relatives à maintenant.",
+  "rider": { "prenom": "Didier", "email": "demo-suivi@example.com", "password": "mot-de-passe-de-demo-123" },
+  "brevet": { "title": "BRM 600 Rambouillet – Brest", "classKm": 600, "limitMinutes": 2400, "targetKm": 600, "startHoursAgo": 16 },
+  "route": [
+    { "name": "Départ Rambouillet", "lat": 48.6436, "lon": 1.8296, "control": false },
+    { "name": "Contrôle Mortagne-au-Perche", "lat": 48.5206, "lon": 0.547 },
+    { "name": "Contrôle Villaines-la-Juhel", "lat": 48.3445, "lon": -0.2869 },
+    { "name": "Contrôle Fougères", "lat": 48.3524, "lon": -1.1989 },
+    { "name": "Contrôle Tinténiac", "lat": 48.3285, "lon": -1.836 },
+    { "name": "Contrôle Loudéac", "lat": 48.1778, "lon": -2.7535 },
+    { "name": "Contrôle Carhaix", "lat": 48.276, "lon": -3.573 },
+    { "name": "Arrivée Brest", "lat": 48.3904, "lon": -4.4861, "control": false }
+  ],
+  "checkins": [
+    { "control": "Départ", "hoursAgo": 16, "status": "route", "message": "C'est parti, belle météo !" },
+    { "control": "Contrôle Mortagne-au-Perche", "hoursAgo": 10.5, "status": "route", "message": null },
+    { "control": "Contrôle Fougères", "hoursAgo": 1.3, "status": "route", "message": "RAS, tout va bien" }
+  ],
+  "links": {
+    "liveTrackUrl": "https://livetrack.garmin.com/session/demo-0000/token/DEMO",
+    "beaconUrl": "https://www.strava.com/beacon/demo123"
+  }
+}

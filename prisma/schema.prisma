@@ -427,6 +427,7 @@ model Roadbook {
   // Lien de suivi du compteur GPS (Garmin LiveTrack) : affiché aux proches et dans
   // le canal Telegram, jamais interrogé par le serveur (pas d'API ouverte).
   liveTrackUrl           String?
+  beaconUrl              String? // lien Strava Beacon (suivi continu externe)
   // Publier un résumé de situation sur le canal Telegram du groupe à chaque pointage
   // (opt-out possible : ce sont les positions de la personne).
   telegramAnnounce       Boolean           @default(true)
@@ -458,6 +459,9 @@ model RoadbookCheckin {
   lat        Float?
   lon        Float?
   source     String // "gps" | "manuel" | "controle"
+  // État déclaré par le randonneur au pointage, montré aux proches.
+  status     String   @default("route") // "route" | "pause" | "arrive" | "abandon"
+  message    String? // petit mot pour les proches (texte brut, 140 caractères)
   at         DateTime @default(now())
   // Identifiant généré par le téléphone : un pointage mis en file hors réseau puis
   // renvoyé (parfois alors que le premier envoi était en fait passé, réponse perdue) ne

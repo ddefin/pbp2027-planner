@@ -1,37 +1,45 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { getSharedLive, getSharedRoadbook, getSharedSituation, type Checkin, type LiveView, type SharedRoadbook } from "../api/roadbooks";
+import { ElevationProfile } from "../components/ElevationProfile";
+import { Disclosure } from "../components/Disclosure";
 import { WhatsAppShare } from "../components/roadbook/WhatsAppShare";
-import { LiveCard } from "../components/roadbook/LiveCard";
-import { RoadbookView } from "../components/roadbook/RoadbookView";
+import { ScheduleTable } from "../components/roadbook/ScheduleTable";
+import { LiveHeader } from "../components/live/LiveHeader";
+import { LiveMap } from "../components/live/LiveMap";
+import { ProgressPanel } from "../components/live/ProgressPanel";
+import { CheckinTimeline } from "../components/live/CheckinTimeline";
+import { WeatherWind } from "../components/live/WeatherWind";
+import { buildModel } from "../components/live/model";
+import { pointAtKm } from "../lib/routeMath";
 
 const REFRESH_MS = 60_000;
 
-function ago(iso: string): string {
-  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
-  if (min < 1) return "à l'instant";
-  if (min < 60) return `il y a ${min} min`;
-  return `il y a ${Math.floor(min / 60)}h${String(min % 60).padStart(2, "0")}`;
-}
-
-// Page publique (sans compte) ouverte depuis le lien de suivi : lecture seule,
-// rafraîchie chaque minute pour suivre la progression pendant le brevet.
+// Page publique (sans compte) ouverte par les proches depuis le lien de suivi : 4 blocs
+// (statut et liens de suivi continu, carte, progression et journal, météo et vent).
+// Tout part des pointages volontaires du randonneur : pas de suivi GPS continu ici.
 export function SharedRoadbookPage() {
   const { token } = useParams<{ token: string }>();
   const [data, setData] = useState<{ roadbook: SharedRoadbook; checkins: Checkin[] } | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [situation, setSituation] = useState<{ whatsapp: string; at: string } | null>(null);
   const [live, setLive] = useState<LiveView | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const lastAt = data?.checkins[0]?.at ?? null;
 
-  // Le résumé (météo, ville...) n'est recalculé que lorsqu'un NOUVEAU pointage arrive,
-  // pas à chaque rafraîchissement de la page.
+  // « il y a … », position estimée : recalculés chaque minute sans recharger.
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Le résumé à partager n'est recalculé qu'à l'arrivée d'un NOUVEAU pointage.
   useEffect(() => {
     if (!token || !lastAt) return;
     getSharedSituation(token).then(setSituation).catch(() => setSituation(null));
   }, [token, lastAt]);
 
-  // Vue en direct (arrivée prévue, barrière, météo devant) : le serveur la garde 10 min.
+  // Vue en direct (météo, prévisions) : le serveur la garde 10 min.
   useEffect(() => {
     if (!token || !lastAt) return;
     const load = () => getSharedLive(token).then(setLive).catch(() => undefined);
@@ -55,6 +63,12 @@ export function SharedRoadbookPage() {
     };
   }, [token]);
 
+  const model = useMemo(() => (data ? buildModel(data.roadbook, data.checkins, live, now) : null), [data, live, now]);
+
+  useEffect(() => {
+    if (data) document.title = `${data.roadbook.author} · ${data.roadbook.title} — suivi`;
+  }, [data]);
+
   if (notFound && !data) {
     return (
       <div className="auth-shell">
@@ -65,27 +79,48 @@ export function SharedRoadbookPage() {
       </div>
     );
   }
-  if (!data) return <p className="hint" style={{ padding: 24 }}>Chargement…</p>;
+  if (!data || !model) return <p className="hint" style={{ padding: 24 }}>Chargement du suivi…</p>;
 
-  const last = data.checkins[0];
+  const rb = data.roadbook;
+  const last = data.checkins[0] ?? null;
+  const position = last ? (last.lat !== null && last.lon !== null ? { lat: last.lat, lon: last.lon } : pointAtKm(rb.points, last.km)) : null;
+  const markers = model.schedule.filter((r) => r.index > 0).map((r) => ({ km: r.km, label: String(r.index) }));
+
   return (
-    <div>
-      <div className="topbar">
-        <strong>
-          PBP<span style={{ color: "var(--accent)" }}>2027</span>
-        </strong>
-        <span className="hint" style={{ margin: 0 }}>
-          {last ? `Dernière position ${ago(last.at)}` : "Pas encore de position"}
-        </span>
-      </div>
-      {live && <LiveCard live={live} />}
-      <RoadbookView
-        data={data.roadbook}
-        author={data.roadbook.author}
-        editable={false}
-        slots={{ quickShare: () => <WhatsAppShare text={situation?.whatsapp ?? null} at={situation?.at} /> }}
-        position={last ? { km: last.km, lat: last.lat, lon: last.lon, at: last.at, source: last.source } : null}
-      />
+    <div className="lv">
+      <LiveHeader author={rb.author} title={rb.title} model={model} liveTrackUrl={rb.liveTrackUrl} beaconUrl={rb.beaconUrl} now={now} />
+      <main className="lv-grid">
+        <div className="lv-col-main">
+          <section className="lv-card lv-card-flush" aria-label="Carte du parcours">
+            <LiveMap points={rb.points} model={model} now={now} />
+          </section>
+          <ProgressPanel model={model} limitMinutes={rb.limitMinutes} now={now} />
+          <section className="lv-card" aria-labelledby="lv-prof-title">
+            <h2 id="lv-prof-title">Profil du parcours</h2>
+            <p className="lv-sub">Partie déjà parcourue plus foncée, trait bleu au dernier pointage, numéros des contrôles en bas.</p>
+            <ElevationProfile points={rb.points} markers={markers} cursorKm={last ? last.km : null} doneKm={last ? last.km : null} showClimbList={false} />
+          </section>
+        </div>
+        <div className="lv-col-side">
+          <WeatherWind live={live} position={position} now={now} />
+          <CheckinTimeline checkins={data.checkins} points={rb.points} model={model} now={now} />
+          <section className="lv-card">
+            <Disclosure title="Horaires prévus aux contrôles" summary={`${model.schedule.length} contrôles · plan de ${rb.author}`}>
+              <ScheduleTable schedule={model.schedule} controls={rb.controls} startAt={rb.startAt} passedKm={last?.km ?? null} editable={false} />
+            </Disclosure>
+          </section>
+          {last && (
+            <section className="lv-card">
+              <h2>Partager le point de situation</h2>
+              <WhatsAppShare text={situation?.whatsapp ?? null} at={situation?.at} />
+            </section>
+          )}
+        </div>
+      </main>
+      <footer className="lv-footer">
+        Page mise à jour automatiquement à chaque pointage du randonneur. Entre deux pointages, sa position n'est pas connue
+        {rb.liveTrackUrl || rb.beaconUrl ? " : utilisez le suivi GPS continu en haut de page." : "."}
+      </footer>
     </div>
   );
 }

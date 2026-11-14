@@ -11,6 +11,8 @@ export interface QueuedCheckin {
   lat: number | null;
   lon: number | null;
   source: "gps" | "manuel" | "controle";
+  status?: "route" | "pause" | "arrive" | "abandon";
+  message?: string | null;
   at: string;
 }
 

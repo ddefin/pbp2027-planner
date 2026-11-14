@@ -411,3 +411,45 @@ export function nutritionPlan(
     totalKcal: totalCarbsG * 4,
   };
 }
+
+// ─── Suivi des proches (page publique) ───
+
+export type CheckinStatus = "route" | "pause" | "arrive" | "abandon";
+export const CHECKIN_STATUSES: readonly CheckinStatus[] = ["route", "pause", "arrive", "abandon"];
+export const CHECKIN_STATUS_LABEL: Record<CheckinStatus, string> = {
+  route: "En route",
+  pause: "En pause / Repos",
+  arrive: "Arrivé",
+  abandon: "Abandon",
+};
+export const CHECKIN_MESSAGE_MAX = 140;
+
+// Heure réelle de passage à chaque contrôle : le premier pointage fait au contrôle ou
+// au plus 1 km après lui (un pointage plus loin ne dit pas QUAND il y est passé).
+export function controlPassages(controls: { km: number }[], checkins: { km: number; at: string }[]): (string | null)[] {
+  const chrono = [...checkins].sort((a, b) => a.at.localeCompare(b.at));
+  return controls.map((c) => chrono.find((k) => k.km >= c.km - 0.3 && k.km <= c.km + 1)?.at ?? null);
+}
+
+// Position théorique à l'instant `now`, au rythme moyen constaté (pauses comprises) depuis
+// le départ. Seulement « en route » ; plafonnée au prochain contrôle (il s'y arrêtera) et à
+// 6 h d'extrapolation (au-delà, l'estimation n'a plus de sens). L'incertitude grandit avec
+// le temps écoulé depuis le pointage.
+export const ESTIMATE_MAX_HOURS = 6;
+export function estimatedKm(p: {
+  lastKm: number;
+  lastAt: string;
+  avgKmh: number | null;
+  now: Date;
+  totalKm: number;
+  nextControlKm: number | null;
+  status: CheckinStatus;
+}): { km: number; uncertaintyKm: number; capped: boolean } | null {
+  if (p.status !== "route" || !p.avgKmh || p.avgKmh <= 0 || p.lastKm >= p.totalKm - 0.05) return null;
+  const hours = (p.now.getTime() - new Date(p.lastAt).getTime()) / 3_600_000;
+  if (hours < 0.05 || hours > ESTIMATE_MAX_HOURS) return null;
+  const cap = Math.min(p.totalKm, p.nextControlKm ?? p.totalKm);
+  const raw = p.lastKm + p.avgKmh * hours;
+  const km = Math.min(raw, cap);
+  return { km, uncertaintyKm: Math.max(1, (km - p.lastKm) * 0.2), capped: raw >= cap };
+}

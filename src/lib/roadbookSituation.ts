@@ -1,6 +1,6 @@
 import { prisma } from "../db.js";
 import { config } from "../config.js";
-import { fromCompactPoint, pointAtKm, routeBearingAt, type CompactPoint, type RoutePoint } from "./geo.js";
+import { bearingDeg, fromCompactPoint, pointAtKm, routeBearingAt, type CompactPoint, type RoutePoint } from "./geo.js";
 import { fetchCurrentAt, fetchForecastAt, pickForecastSlot, reverseGeocode, type PointForecastSlot } from "./openWeather.js";
 import { alertsFor, windAlongRoute, type WeatherAlert, type WindRelation } from "./routeWeather.js";
 import { escapeHtml, sendTelegramLong } from "./telegram.js";
@@ -15,6 +15,8 @@ import {
   type PacingSettings,
   type RoadbookControl,
   type ScheduleRow,
+  type CheckinStatus,
+  CHECKIN_STATUS_LABEL,
 } from "../shared/roadbookCalc.js";
 
 // Évite qu'un double appui (ou un pointage web + Telegram simultanés) publie deux
@@ -57,6 +59,9 @@ export interface Situation {
   remainingGainM: number | null;
   place: string | null;
   weather: WeatherPoint[];
+  // Déclaré par le randonneur au pointage (absent pour un résumé calculé sans pointage).
+  riderStatus?: CheckinStatus;
+  note?: string | null;
 }
 
 export interface RoadbookForSituation {
@@ -115,12 +120,12 @@ export function computeSituation(rb: RoadbookForSituation, km: number, at: Date,
   };
 }
 
-async function weatherAt(points: RoutePoint[], label: string, km: number, at: Date, current = false): Promise<WeatherPoint | null> {
+async function weatherAt(points: RoutePoint[], label: string, km: number, at: Date, current = false, bearing?: number): Promise<WeatherPoint | null> {
   const p = pointAtKm(points, km);
   // "Maintenant" : observation réelle ; ensuite : prévision au créneau de l'heure estimée.
   const slot = current ? await fetchCurrentAt(p.lat, p.lon) : pickForecastSlot((await fetchForecastAt(p.lat, p.lon))?.slots ?? [], at);
   if (!slot) return null;
-  const wind = slot.windFromDeg !== null ? windAlongRoute(slot.windFromDeg, slot.windSpeedKmh, routeBearingAt(points, km)) : null;
+  const wind = slot.windFromDeg !== null ? windAlongRoute(slot.windFromDeg, slot.windSpeedKmh, bearing ?? routeBearingAt(points, km)) : null;
   return { label, km, at, slot, relation: wind?.relation ?? null, alongKmh: wind?.alongKmh ?? null, alerts: alertsFor(slot, wind?.alongKmh ?? null) };
 }
 
@@ -144,6 +149,39 @@ export async function gatherSituation(rb: RoadbookForSituation, km: number, at: 
   return { ...base, place, weather: weather.filter((w): w is WeatherPoint => w !== null) };
 }
 
+// Cap moyen du tronçon en cours (dernier pointage → prochain contrôle) : c'est lui qui dit
+// si le vent sera de dos ou de face sur les prochaines heures, pas le cap d'un virage local.
+export function sectionBearing(points: RoutePoint[], fromKm: number, toKm: number | null): number {
+  const total = points[points.length - 1].distKm;
+  const end = Math.min(total, toKm !== null && toKm > fromKm + 1 ? toKm : fromKm + 20);
+  if (end - fromKm < 0.5) return routeBearingAt(points, fromKm);
+  return bearingDeg(pointAtKm(points, fromKm), pointAtKm(points, end));
+}
+
+// Météo pour les proches : maintenant au dernier pointage, puis à +2 h et +3 h à l'endroit
+// où il devrait être à son rythme constaté (pas d'avancée en pause, à l'arrivée ou à l'abandon).
+export async function liveOutlook(
+  points: RoutePoint[],
+  p: { km: number; at: Date; avgKmh: number | null; nextControlKm: number | null; moving: boolean; now: Date },
+): Promise<{ bearing: number; items: (WeatherPoint & { hoursAhead: number })[] }> {
+  const total = points[points.length - 1].distKm;
+  const bearing = sectionBearing(points, p.km, p.nextControlKm);
+  const kmAt = (t: Date) => {
+    if (!p.moving || !p.avgKmh) return p.km;
+    const h = Math.max(0, (t.getTime() - p.at.getTime()) / 3_600_000);
+    return Math.min(total, p.km + p.avgKmh * h);
+  };
+  const plan = [0, 2, 3].map((h) => ({ h, at: new Date(p.now.getTime() + h * 3_600_000) }));
+  const items = await Promise.all(
+    plan.map(async ({ h, at }) => {
+      const km = h === 0 ? p.km : kmAt(at);
+      const w = await weatherAt(points, h === 0 ? "Maintenant" : `Dans ${h} h`, km, at, h === 0, bearing);
+      return w ? { ...w, hoursAhead: h } : null;
+    }),
+  );
+  return { bearing, items: items.filter((w): w is WeatherPoint & { hoursAhead: number } => w !== null) };
+}
+
 const time = (d: Date) => d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
 const dayTime = (d: Date, ref: Date) => {
   const sameDay = d.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" }) === ref.toLocaleDateString("fr-FR", { timeZone: "Europe/Paris" });
@@ -152,6 +190,7 @@ const dayTime = (d: Date, ref: Date) => {
 const kmFmt = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 1 });
 const signed = (min: number) => (min >= 0 ? `+${formatMinutes(min)}` : formatMinutes(min));
 const LEVEL_DOT = { ok: "🟢", tight: "🟠", late: "🔴" } as const;
+const STATUS_EMOJI: Record<CheckinStatus, string> = { route: "🚴", pause: "⏸️", arrive: "🏁", abandon: "🛑" };
 const RELATION_TXT: Record<WindRelation, string> = { face: "de face", dos: "de dos", travers: "de travers" };
 const ALERT_TXT: Record<WeatherAlert, string> = { vent_fort: "vent fort", vent_de_face: "vent de face", pluie: "pluie", froid: "froid", chaleur: "chaleur" };
 
@@ -185,12 +224,14 @@ export interface SituationMeta {
   classKm: number;
   limitMinutes: number;
   liveTrackUrl: string | null;
+  beaconUrl?: string | null;
   shareUrl: string | null;
 }
 
-export function linksLine(meta: Pick<SituationMeta, "liveTrackUrl" | "shareUrl">): string | null {
+export function linksLine(meta: Pick<SituationMeta, "liveTrackUrl" | "beaconUrl" | "shareUrl">): string | null {
   const links: string[] = [];
   if (meta.liveTrackUrl) links.push(`<a href="${escapeHtml(meta.liveTrackUrl)}">📡 Garmin LiveTrack</a>`);
+  if (meta.beaconUrl) links.push(`<a href="${escapeHtml(meta.beaconUrl)}">📡 Strava Beacon</a>`);
   if (meta.shareUrl) links.push(`<a href="${escapeHtml(meta.shareUrl)}">🗺️ Roadbook et suivi</a>`);
   return links.length ? links.join("  ·  ") : null;
 }
@@ -198,12 +239,16 @@ export function linksLine(meta: Pick<SituationMeta, "liveTrackUrl" | "shareUrl">
 export function formatSituationMessage(s: Situation, meta: SituationMeta): string {
   const blocks: string[][] = [];
   const st = s.status;
-  const finished = s.kmLeft === 0;
+  const finished = s.kmLeft === 0 || s.riderStatus === "arrive";
+  const abandoned = s.riderStatus === "abandon";
 
   // En-tête : qui, quel brevet, où, quand.
   const head = [`🚴 <b>${escapeHtml(meta.author)}</b> · ${escapeHtml(meta.title)}`];
   head.push(`📍 ${s.place ? `Près de <b>${escapeHtml(s.place)}</b> — ` : ""}pointage à ${time(s.at)}`);
   if (s.delayed) head.push("⏳ <i>Pointage envoyé avec retard (réseau indisponible) : la position date de l'heure indiquée.</i>");
+  const rider = s.riderStatus ?? "route";
+  if (rider !== "route") head.push(`${STATUS_EMOJI[rider]} <b>${CHECKIN_STATUS_LABEL[rider]}</b>`);
+  if (s.note) head.push(`💬 « ${escapeHtml(s.note)} »`);
   blocks.push(head);
 
   // Progression.
@@ -211,6 +256,13 @@ export function formatSituationMessage(s: Situation, meta: SituationMeta): strin
   if (!finished) prog.push(`Restants : <b>${kmFmt(s.kmLeft)} km</b>${s.remainingGainM ? ` · D+ restant ${s.remainingGainM} m` : ""}`);
   if (s.elapsedMin !== null) prog.push(`En route depuis : ${formatMinutes(s.elapsedMin)}`);
   blocks.push(prog);
+
+  if (abandoned) {
+    // Abandon : ni délais ni arrivée estimée, seulement où il s'est arrêté et les liens.
+    const links = linksLine(meta);
+    if (links) blocks.push([links]);
+    return blocks.map((b) => b.join("\n")).join("\n\n");
+  }
 
   if (finished) {
     const inTime = s.limitAt ? s.at <= s.limitAt : null;
@@ -302,23 +354,23 @@ export interface SituationContext {
   telegramAnnounce: boolean;
 }
 
-export async function buildSituation(
-  roadbookId: string,
-  checkin: { km: number; lat: number | null; lon: number | null; at: Date },
-  now = new Date(),
-): Promise<SituationContext | null> {
+type CheckinForSituation = { km: number; lat: number | null; lon: number | null; at: Date; status?: string; message?: string | null };
+
+export async function buildSituation(roadbookId: string, checkin: CheckinForSituation, now = new Date()): Promise<SituationContext | null> {
   const r = await prisma.roadbook.findUnique({ where: { id: roadbookId }, include: { user: { select: { prenom: true } } } });
   if (!r) return null;
   const situation = await gatherSituation(toSituationInput(r), checkin.km, checkin.at, checkin.lat !== null && checkin.lon !== null ? { lat: checkin.lat, lon: checkin.lon } : null, now);
+  situation.riderStatus = (checkin.status as CheckinStatus | undefined) ?? "route";
+  situation.note = checkin.message ?? null;
   return { situation, meta: roadbookMeta(r), telegramAnnounce: r.telegramAnnounce };
 }
 
 export function roadbookMeta(r: RoadbookRow & { user: { prenom: string } }): SituationMeta {
   const shareUrl = r.shareToken && config.publicUrl ? `${config.publicUrl.replace(/\/$/, "")}/r/${r.shareToken}` : null;
-  return { author: r.user.prenom, title: r.title, classKm: r.classKm, limitMinutes: r.limitMinutes, liveTrackUrl: r.liveTrackUrl, shareUrl };
+  return { author: r.user.prenom, title: r.title, classKm: r.classKm, limitMinutes: r.limitMinutes, liveTrackUrl: r.liveTrackUrl, beaconUrl: r.beaconUrl, shareUrl };
 }
 
-export async function buildSituationMessage(roadbookId: string, checkin: { km: number; lat: number | null; lon: number | null; at: Date }): Promise<string | null> {
+export async function buildSituationMessage(roadbookId: string, checkin: CheckinForSituation): Promise<string | null> {
   const ctx = await buildSituation(roadbookId, checkin);
   return ctx ? formatSituationMessage(ctx.situation, ctx.meta) : null;
 }
@@ -401,6 +453,8 @@ export type CheckinInput = {
   lat: number | null;
   lon: number | null;
   source: "gps" | "manuel" | "controle";
+  status?: CheckinStatus;
+  message?: string | null;
   // Heure réelle du pointage (file hors réseau) ; par défaut, maintenant.
   at?: Date;
   // Identifiant fourni par le téléphone : un renvoi du même pointage ne crée pas de doublon.
@@ -409,7 +463,7 @@ export type CheckinInput = {
   announce?: boolean;
 };
 
-type StoredCheckin = { id: string; km: number; lat: number | null; lon: number | null; source: string; at: Date };
+type StoredCheckin = { id: string; km: number; lat: number | null; lon: number | null; source: string; status: string; message: string | null; at: Date };
 
 // Enregistre un pointage (web ou Telegram), borne l'historique et publie le résumé sur
 // le canal si le randonneur l'a accepté. La publication n'est jamais bloquante ni

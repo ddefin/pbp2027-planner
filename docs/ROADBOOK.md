@@ -256,3 +256,27 @@ Page « Carte du groupe » (`/carte-groupe`, membres connectés) : dernier point
 ## Rappels avant un BRM
 
 Pour chaque BRM « Prévu » ou « Inscrit » du calendrier : rappel à J-7 et la veille (avec la météo prévue au départ quand elle est disponible), dans la cloche et sur Telegram si le compte est lié. Une seule fois par échéance (`BrmReminder`), à partir de 7 h (heure de Paris). Code : `src/lib/brmReminders.ts`.
+
+## Page de suivi des proches (lien public `/r/<jeton>`)
+
+Page sans compte, pensée pour la famille et les amis, en 4 blocs :
+
+1. **En-tête collant** : prénom, brevet, dernier pointage (« Pointé à Fougères à 15h37 — il y a 1 h 18 »),
+   état déclaré (En route, En pause / Repos, Arrivé, Abandon) et boutons « Suivre sur Garmin LiveTrack » /
+   « Suivre sur Strava Beacon » quand les liens sont renseignés (onglet Partage du roadbook).
+2. **Carte** : tronçon parcouru en trait plein, restant en pointillé ; contrôles passés cochés (heure réelle au
+   clic), contrôles à venir (distance, fenêtre d'ouverture, passage estimé) ; dernier pointage mis en valeur ;
+   **position estimée** au rythme moyen (seulement « En route », plafonnée au prochain contrôle et à 6 h,
+   présentée comme une estimation, jamais comme une position réelle).
+3. **Progression** : barre en %, distance faite/restante, D+ fait/restant, rythme moyen pauses comprises,
+   prochain contrôle avec fourchette d'arrivée ; profil avec la partie parcourue ; journal des pointages.
+4. **Météo et vent** : maintenant, +2 h et +3 h à l'endroit où il devrait être ; vent moyen et rafales, de dos
+   ou de face selon le cap du tronçon en cours ; coucher / lever du soleil (calcul local, sans réseau).
+
+Aucun suivi GPS continu : tout part des pointages volontaires. Au pointage, le randonneur peut choisir son état
+et laisser un petit mot (140 caractères) ; les deux partent aussi depuis la file hors réseau et apparaissent
+dans le résumé Telegram / WhatsApp.
+
+Démo : sur un serveur de **test** local, `BASE=http://localhost:3001 npx tsx scripts/demo-live.ts` crée un
+brevet de 600 km avec 3 pointages et affiche le lien (données : `docs/examples/live-demo.json`). La météo n'y
+apparaît que si `OPENWEATHER_API_KEY` est configurée.

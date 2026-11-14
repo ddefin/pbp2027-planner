@@ -82,6 +82,81 @@ export function LiveTrackCard({
   );
 }
 
+function isBeaconUrl(v: string): boolean {
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "https:") return false;
+    if (u.hostname === "strava.app.link") return u.pathname.length > 1;
+    return (u.hostname === "www.strava.com" || u.hostname === "strava.com") && /^\/beacon\/./.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
+// Carte « Strava Beacon » : même principe que LiveTrack, mais depuis l'app Strava
+// (abonnement Strava requis). Le lien est montré aux proches en haut de leur page.
+export function BeaconCard({
+  roadbookId,
+  beaconUrl,
+  onSaved,
+}: {
+  roadbookId: string;
+  beaconUrl: string | null;
+  onSaved: (patch: { beaconUrl: string | null }) => void;
+}) {
+  const [url, setUrl] = useState(beaconUrl ?? "");
+  const [state, setState] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    const value = url.trim();
+    if (value && !isBeaconUrl(value)) {
+      setState({ kind: "error", text: "Colle le lien Beacon envoyé par Strava (https://www.strava.com/beacon/…)." });
+      return;
+    }
+    try {
+      await updateRoadbook(roadbookId, { beaconUrl: value || null });
+      onSaved({ beaconUrl: value || null });
+      setState({ kind: "ok", text: value ? "✓ Lien enregistré : visible par tes proches et sur le canal." : "✓ Lien retiré." });
+    } catch (err) {
+      setState({ kind: "error", text: err instanceof ApiError && err.status === 400 ? "Lien refusé : seuls les liens Strava Beacon sont acceptés." : "Échec de l'enregistrement." });
+    }
+  }
+
+  return (
+    <Disclosure
+      title="📡 Strava Beacon"
+      summary={beaconUrl ? "✓ Lien enregistré — visible par tes proches" : "Non renseigné (optionnel)"}
+      tone={beaconUrl ? "ok" : "muted"}
+      storageKey="rb.partage.beacon"
+    >
+      <p className="hint" style={{ margin: 0 }}>
+        Dans l'app Strava, active Beacon au démarrage de l'enregistrement, puis copie le lien de partage et colle-le ici. Le
+        téléphone envoie alors sa position en continu (consomme de la batterie). Le lien change à chaque activité.
+      </p>
+      <form onSubmit={save} style={{ display: "flex", gap: 6 }}>
+        <input
+          className="rb-input"
+          style={{ flex: 1 }}
+          type="url"
+          inputMode="url"
+          placeholder="https://www.strava.com/beacon/…"
+          aria-label="Lien Strava Beacon"
+          value={url}
+          onChange={(e) => {
+            setUrl(e.target.value);
+            setState(null);
+          }}
+        />
+        <button type="submit" className="ghost">
+          Enregistrer
+        </button>
+      </form>
+      {state && <div className={`live-feedback live-feedback-${state.kind}`}>{state.text}</div>}
+    </Disclosure>
+  );
+}
+
 // Carte « Canal Telegram » : publication automatique du résumé à chaque pointage, état de
 // la dernière publication, test admin, et mode d'emploi pour pointer depuis Telegram.
 export function TelegramCard({

@@ -1,6 +1,6 @@
 import { ApiError } from "./auth";
 import type { TrackPoint } from "./brmCatalog";
-import type { RoadbookControl } from "../lib/roadbook";
+import type { CheckinStatus, RoadbookControl } from "../lib/roadbook";
 
 export interface RoadbookPoi {
   name: string;
@@ -12,6 +12,7 @@ export interface RoadbookPoi {
 export interface RoadbookSettings {
   title: string;
   liveTrackUrl?: string | null;
+  beaconUrl?: string | null;
   telegramAnnounce?: boolean;
   groupShare?: boolean;
   classKm: number;
@@ -52,6 +53,8 @@ export interface Checkin {
   lat: number | null;
   lon: number | null;
   source: "gps" | "manuel" | "controle";
+  status: CheckinStatus;
+  message: string | null;
   at: string;
 }
 
@@ -103,7 +106,7 @@ export function setRoadbookSharing(id: string, enabled: boolean) {
 
 export function postCheckin(
   id: string,
-  input: { km: number; lat?: number | null; lon?: number | null; source: Checkin["source"]; at?: string; clientId?: string; announce?: boolean },
+  input: { km: number; lat?: number | null; lon?: number | null; source: Checkin["source"]; status?: CheckinStatus; message?: string | null; at?: string; clientId?: string; announce?: boolean },
 ) {
   return request<{ checkin: Checkin }>(`/roadbooks/${id}/checkins`, { method: "POST", body: JSON.stringify(input) }).then((r) => r.checkin);
 }
@@ -149,6 +152,8 @@ export interface LiveWeather {
   description: string;
   icon: string;
   windSpeedKmh: number;
+  windGustsKmh: number | null;
+  windFromDeg: number | null;
   relation: "dos" | "face" | "travers" | null;
   rainProbability: number;
   alerts: string[];
@@ -169,6 +174,11 @@ export interface LiveView {
   barrierLevel: "ok" | "tight" | "late" | null;
   nextControl: { name: string; km: number; eta: string | null; closeAt: string | null } | null;
   weather: LiveWeather[];
+  status: CheckinStatus;
+  message: string | null;
+  avgAllKmh: number | null;
+  sectionBearing: number | null;
+  outlook: (LiveWeather & { hoursAhead: number })[];
 }
 
 export function getSharedLive(token: string) {

@@ -10,6 +10,7 @@ import { OFFICIAL_LIMIT_MINUTES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
 import { looksLikeControl } from "../shared/roadbookCalc.js";
 import { latestSituationMessage, recordCheckin, toWhatsAppText } from "../lib/roadbookSituation.js";
+import { CHECKIN_MESSAGE_MAX } from "../shared/roadbookCalc.js";
 import { explainTelegramError, sendTelegram } from "../lib/telegram.js";
 import { config } from "../config.js";
 import { buildGpx, buildTcx } from "../lib/gpsExport.js";
@@ -44,8 +45,26 @@ const liveTrackSchema = z
     }
   });
 
+// Strava Beacon : lien de suivi continu de Strava, republié tel quel aux proches. Même
+// règle que pour Garmin : https et domaine Strava uniquement (pas de hameçonnage).
+const beaconSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((v) => {
+    try {
+      const u = new URL(v);
+      if (u.protocol !== "https:") return false;
+      if (u.hostname === "strava.app.link") return u.pathname.length > 1;
+      return (u.hostname === "www.strava.com" || u.hostname === "strava.com") && /^\/beacon\/./.test(u.pathname);
+    } catch {
+      return false;
+    }
+  });
+
 const patchSchema = z.object({
   liveTrackUrl: liveTrackSchema.nullable().optional(),
+  beaconUrl: beaconSchema.nullable().optional(),
   telegramAnnounce: z.boolean().optional(),
   groupShare: z.boolean().optional(),
   title: z.string().trim().min(1).max(100).optional(),
@@ -63,6 +82,14 @@ const checkinSchema = z.object({
   lat: z.number().min(-90).max(90).nullable().optional(),
   lon: z.number().min(-180).max(180).nullable().optional(),
   source: z.enum(["gps", "manuel", "controle"]),
+  // État et petit mot montrés aux proches (texte brut, jamais interprété comme HTML).
+  status: z.enum(["route", "pause", "arrive", "abandon"]).optional(),
+  message: z
+    .string()
+    .transform((v) => v.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim())
+    .pipe(z.string().max(CHECKIN_MESSAGE_MAX))
+    .nullable()
+    .optional(),
   // File hors réseau : heure réelle du pointage, identifiant anti-doublon, publication.
   at: z.string().datetime().optional(),
   clientId: z.string().min(8).max(64).optional(),
@@ -157,6 +184,7 @@ function serialize(r: RoadbookRow, withPoints: boolean) {
     fileName: r.fileName,
     shareToken: r.shareToken,
     liveTrackUrl: r.liveTrackUrl,
+    beaconUrl: r.beaconUrl,
     telegramAnnounce: r.telegramAnnounce,
     groupShare: r.groupShare,
     announceStatus: {
@@ -171,8 +199,8 @@ function serialize(r: RoadbookRow, withPoints: boolean) {
   };
 }
 
-function serializeCheckin(c: { km: number; lat: number | null; lon: number | null; source: string; at: Date }) {
-  return { km: c.km, lat: c.lat, lon: c.lon, source: c.source, at: c.at.toISOString() };
+function serializeCheckin(c: { km: number; lat: number | null; lon: number | null; source: string; status: string; message: string | null; at: Date }) {
+  return { km: c.km, lat: c.lat, lon: c.lon, source: c.source, status: c.status, message: c.message, at: c.at.toISOString() };
 }
 
 async function ownedRoadbook(id: string, userId: string) {
@@ -345,6 +373,8 @@ export async function roadbooksRoutes(app: FastifyInstance) {
       lat: parsed.data.lat ?? null,
       lon: parsed.data.lon ?? null,
       source: parsed.data.source,
+      status: parsed.data.status ?? "route",
+      message: parsed.data.message || null,
       at,
       clientId: parsed.data.clientId ?? null,
       announce: parsed.data.announce,

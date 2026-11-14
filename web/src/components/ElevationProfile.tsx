@@ -20,7 +20,10 @@ export function ElevationProfile({
   markers,
   onSelectKm,
   showClimbList = true,
+  doneKm,
 }: {
+  // Suivi : partie déjà parcourue, ombrée plus fort que le reste.
+  doneKm?: number | null;
   points: TrackPoint[];
   // Position survolée reportée au composant parent, pour la montrer aussi sur la
   // carte (voir TrackMap `highlight`) — comme le fait OpenRunner entre son profil et
@@ -145,6 +148,14 @@ export function ElevationProfile({
         ))}
 
         <path d={areaPath} fill="var(--accent)" opacity={0.18} />
+        {typeof doneKm === "number" && doneKm > 0 && (
+          <>
+            <clipPath id="ep-done">
+              <rect x={PAD_L} y={0} width={Math.max(0, x(Math.min(doneKm, totalKm)) - PAD_L)} height={VB_H} />
+            </clipPath>
+            <path d={areaPath} fill="var(--accent)" opacity={0.42} clipPath="url(#ep-done)" />
+          </>
+        )}
         <path d={linePath} fill="none" stroke="var(--accent)" strokeWidth={2} />
 
         {/* axe Y : min / max altitude */}

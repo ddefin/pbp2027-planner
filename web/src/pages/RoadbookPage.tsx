@@ -14,7 +14,9 @@ import {
 import { RoadbookView, type RoadbookData } from "../components/roadbook/RoadbookView";
 import { LiveTracker, type LivePosition } from "../components/roadbook/LiveTracker";
 import { Disclosure } from "../components/Disclosure";
-import { GroupShareCard, LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
+import { BeaconCard, GroupShareCard, LiveTrackCard, TelegramCard } from "../components/roadbook/TrackingCards";
+import { CheckinExtras } from "../components/roadbook/CheckinExtras";
+import type { CheckinStatus } from "../lib/roadbook";
 import { enqueue, flushQueue, isNetworkError, newClientId, queuedFor } from "../lib/checkinQueue";
 import { ChecklistCard, GpsExportCard } from "../components/roadbook/PrepCards";
 import { QuickShare, ShareLinkCard, WhatsAppCard } from "../components/roadbook/ShareCards";
@@ -27,6 +29,8 @@ export function RoadbookPage() {
   const [data, setData] = useState<(RoadbookData & { id: string; announceStatus?: AnnounceStatus }) | null>(null);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [position, setPosition] = useState<LivePosition | null>(null);
+  const [checkinStatus, setCheckinStatus] = useState<CheckinStatus>("route");
+  const [checkinNote, setCheckinNote] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [situation, setSituation] = useState<{ whatsapp: string; at: string } | null>(null);
@@ -98,7 +102,7 @@ export function RoadbookPage() {
   const flush = useCallback(async () => {
     if (!id || queuedFor(id).length === 0) return;
     const n = await flushQueue(id, (c, announce) =>
-      postCheckin(id, { km: c.km, lat: c.lat, lon: c.lon, source: c.source, at: c.at, clientId: c.clientId, announce }),
+      postCheckin(id, { km: c.km, lat: c.lat, lon: c.lon, source: c.source, status: c.status, message: c.message, at: c.at, clientId: c.clientId, announce }),
     );
     setQueued(queuedFor(id).length);
     if (n > 0) afterSend();
@@ -125,19 +129,27 @@ export function RoadbookPage() {
     async (p: LivePosition): Promise<"sent" | "queued" | false> => {
       if (!id) return false;
       setPosition(p);
-      const entry = { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source, at: p.at, clientId: newClientId() };
+      const note = checkinNote.trim().slice(0, 140) || null;
+      const entry = { km: Math.round(p.km * 100) / 100, lat: p.lat, lon: p.lon, source: p.source, status: checkinStatus, message: note, at: p.at, clientId: newClientId() };
+      const done = () => {
+        // Le mot ne vaut que pour ce pointage ; une pause se termine en repartant.
+        setCheckinNote("");
+        if (checkinStatus === "pause") setCheckinStatus("route");
+      };
       try {
         await postCheckin(id, entry);
+        done();
         afterSend();
         void flush();
         return "sent";
       } catch (err) {
         if (!isNetworkError(err)) return false;
         enqueue({ roadbookId: id, ...entry });
+        done();
         return "queued";
       }
     },
-    [id, afterSend, flush],
+    [id, afterSend, flush, checkinStatus, checkinNote],
   );
 
   if (error) return <div className="wrap"><div className="error-banner">{error}</div></div>;
@@ -157,6 +169,7 @@ export function RoadbookPage() {
         pointage: (
           <>
             <h3 className="rb-h3">Pointer ma position</h3>
+            <CheckinExtras status={checkinStatus} onStatus={setCheckinStatus} message={checkinNote} onMessage={setCheckinNote} />
             {queued > 0 && (
               <div className="live-feedback live-feedback-warn" role="status">
                 📵 {queued} pointage{queued > 1 ? "s" : ""} en attente d'envoi : {queued > 1 ? "ils seront envoyés" : "il sera envoyé"} automatiquement dès que le réseau revient.
@@ -206,6 +219,7 @@ export function RoadbookPage() {
             />
             <GroupShareCard roadbookId={data.id} groupShare={data.groupShare ?? false} onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))} />
             <LiveTrackCard roadbookId={data.id} liveTrackUrl={data.liveTrackUrl ?? null} onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))} />
+            <BeaconCard roadbookId={data.id} beaconUrl={data.beaconUrl ?? null} onSaved={(patch) => setData((prev) => (prev ? { ...prev, ...patch } : prev))} />
           </>
         ),
         preparation: (

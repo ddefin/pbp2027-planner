@@ -1,5 +1,6 @@
 import { prisma } from "../db.js";
-import { gatherSituation, toSituationInput } from "./roadbookSituation.js";
+import { gatherSituation, liveOutlook, toSituationInput, type WeatherPoint } from "./roadbookSituation.js";
+import type { CheckinStatus } from "../shared/roadbookCalc.js";
 
 // Vue « en direct » pour la page de suivi publique : mêmes calculs que le résumé du
 // canal (heure d'arrivée, barrière, météo devant), en JSON structuré. La météo vient
@@ -17,6 +18,8 @@ export interface LiveWeather {
   description: string;
   icon: string;
   windSpeedKmh: number;
+  windGustsKmh: number | null;
+  windFromDeg: number | null; // d'où vient le vent (convention météo)
   relation: "dos" | "face" | "travers" | null;
   rainProbability: number;
   alerts: string[];
@@ -37,6 +40,30 @@ export interface LiveView {
   barrierLevel: "ok" | "tight" | "late" | null;
   nextControl: { name: string; km: number; eta: string | null; closeAt: string | null } | null;
   weather: LiveWeather[];
+  // Suivi des proches : état déclaré, rythme, et météo maintenant / +2 h / +3 h.
+  status: CheckinStatus;
+  message: string | null;
+  avgAllKmh: number | null;
+  sectionBearing: number | null; // cap moyen du tronçon en cours (degrés)
+  outlook: (LiveWeather & { hoursAhead: number })[];
+}
+
+function toLiveWeather(w: WeatherPoint): LiveWeather {
+  return {
+    label: w.label,
+    km: w.km,
+    at: w.at.toISOString(),
+    tempC: w.slot.tempC,
+    feelsLikeC: w.slot.feelsLikeC,
+    description: w.slot.description,
+    icon: w.slot.icon,
+    windSpeedKmh: w.slot.windSpeedKmh,
+    windGustsKmh: w.slot.windGustsKmh,
+    windFromDeg: w.slot.windFromDeg,
+    relation: w.relation,
+    rainProbability: w.slot.precipitationProbability,
+    alerts: w.alerts,
+  };
 }
 
 export async function liveView(roadbookId: string): Promise<LiveView | null> {
@@ -47,15 +74,25 @@ export async function liveView(roadbookId: string): Promise<LiveView | null> {
 
   const r = await prisma.roadbook.findUnique({ where: { id: roadbookId } });
   if (!r) return null;
-  const s = await gatherSituation(toSituationInput(r), last.km, last.at, last.lat !== null && last.lon !== null ? { lat: last.lat, lon: last.lon } : null);
+  const input = toSituationInput(r);
+  const s = await gatherSituation(input, last.km, last.at, last.lat !== null && last.lon !== null ? { lat: last.lat, lon: last.lon } : null);
   const nc = s.nextControl;
+  const status: CheckinStatus = last.status === "abandon" || last.status === "pause" ? last.status : last.status === "arrive" || s.kmLeft === 0 ? "arrive" : "route";
+  const outlook = await liveOutlook(input.points, {
+    km: s.km,
+    at: last.at,
+    avgKmh: s.avgAllKmh,
+    nextControlKm: nc?.km ?? null,
+    moving: status === "route",
+    now: new Date(),
+  }).catch(() => ({ bearing: null, items: [] }));
   const value: LiveView = {
     checkinAt: last.at.toISOString(),
     km: s.km,
     kmLeft: s.kmLeft,
     totalKm: s.totalKm,
     place: s.place,
-    finished: s.kmLeft === 0,
+    finished: status === "arrive",
     plannedFinishAt: s.kmLeft > 0 ? s.plannedFinishAt?.toISOString() ?? null : null,
     paceFinishAt: s.paceFinishAt?.toISOString() ?? null,
     limitAt: s.limitAt?.toISOString() ?? null,
@@ -65,19 +102,13 @@ export async function liveView(roadbookId: string): Promise<LiveView | null> {
     nextControl: nc
       ? { name: nc.name, km: nc.km, eta: s.nextControlEta?.toISOString() ?? null, closeAt: s.startAt ? new Date(s.startAt.getTime() + nc.closeMin * 60_000).toISOString() : null }
       : null,
-    weather: s.weather.map((w) => ({
-      label: w.label,
-      km: w.km,
-      at: w.at.toISOString(),
-      tempC: w.slot.tempC,
-      feelsLikeC: w.slot.feelsLikeC,
-      description: w.slot.description,
-      icon: w.slot.icon,
-      windSpeedKmh: w.slot.windSpeedKmh,
-      relation: w.relation,
-      rainProbability: w.slot.precipitationProbability,
-      alerts: w.alerts,
-    })),
+    weather: s.weather.map(toLiveWeather),
+    status,
+    message: last.message,
+    avgAllKmh: s.avgAllKmh,
+    sectionBearing: outlook.bearing,
+    // Après une arrivée ou un abandon, seule la météo « maintenant » a un sens.
+    outlook: outlook.items.filter((w) => status === "route" || w.hoursAhead === 0).map((w) => ({ ...toLiveWeather(w), hoursAhead: w.hoursAhead })),
   };
   cache.set(roadbookId, { checkinId: last.id, at: Date.now(), value });
   return value;
