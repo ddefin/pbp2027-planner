@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../api/auth";
+import { DaysToPbp } from "../components/DaysToPbp";
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -40,6 +41,7 @@ export function RegisterPage() {
       <div className="auth-card">
         <div className="brand">
           PBP<span>2027</span>
+          <DaysToPbp />
         </div>
         <form onSubmit={handleSubmit}>
           <h1>Créer un compte</h1>

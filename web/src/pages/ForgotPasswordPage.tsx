@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { ApiError, forgotPassword } from "../api/auth";
+import { DaysToPbp } from "../components/DaysToPbp";
 
 // Le backend limite à 5 essais / 15 min par IP (voir src/routes/auth.ts) — un
 // cooldown visible plus court évite surtout les doubles clics/soumissions
@@ -115,6 +116,7 @@ export function ForgotPasswordPage() {
       <div className="auth-card">
         <div className="brand">
           PBP<span>2027</span>
+          <DaysToPbp />
         </div>
         <form onSubmit={handleSubmit}>
           <h1>Mot de passe oublié</h1>

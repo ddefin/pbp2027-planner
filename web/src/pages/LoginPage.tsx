@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiError, login } from "../api/auth";
 import { useAuth } from "../context/AuthContext";
+import { DaysToPbp } from "../components/DaysToPbp";
 
 const ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: "Email ou mot de passe incorrect.",
@@ -51,6 +52,7 @@ export function LoginPage() {
       <div className="auth-card">
         <div className="brand">
           PBP<span>2027</span>
+          <DaysToPbp />
         </div>
 
         <form onSubmit={handleSubmit}>
