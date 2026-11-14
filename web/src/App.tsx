@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
 import { RegisterPage } from "./pages/RegisterPage";
@@ -12,8 +12,7 @@ import { NewsPage } from "./pages/NewsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
-import { NotificationBell } from "./components/NotificationBell";
-import { Avatar } from "./components/Avatar";
+import { AppNav } from "./components/nav/AppNav";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 // Page la plus lourde de l'app (carte, profil, simulation, météo) : chargée seulement
@@ -28,10 +27,8 @@ const SharedRoadbookPage = lazy(() => import("./pages/SharedRoadbookPage").then(
 const pageFallback = <p className="hint" style={{ padding: 24 }}>Chargement…</p>;
 
 function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
-  const { status, user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { status, user } = useAuth();
   const location = useLocation();
-  const [menuOpen, setMenuOpen] = useState(false);
 
   // Une nouvelle version attend (voir main.tsx) : on l'applique au changement de page,
   // moment où un rechargement ne fait rien perdre.
@@ -44,62 +41,9 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
   if (status === "anonymous") return <Navigate to={`/login?next=${encodeURIComponent(location.pathname + location.search + location.hash)}`} replace />;
   if (adminOnly && !user?.isAdmin) return <Navigate to="/" replace />;
 
-  const links = [
-    { to: "/", label: "Tableau de bord" },
-    { to: "/parcours-pbp", label: "Parcours PBP" },
-    { to: "/calendrier", label: "Calendrier BRM" },
-    { to: "/roadbooks", label: "Roadbook" },
-    { to: "/carte-groupe", label: "Carte du groupe" },
-    { to: "/actualites", label: "Actualités" },
-    { to: "/messagerie", label: "Messagerie" },
-    { to: "/profil", label: "Mon profil" },
-    ...(user?.isAdmin ? [{ to: "/webhooks", label: "Webhooks" }, { to: "/admin", label: "Administration" }] : []),
-  ];
-
   return (
     <div>
-      <div className="topbar">
-        <strong className="brand-link">
-          <img src="/favicon.svg" alt="" width={28} height={28} className="brand-logo" />
-          <span>
-            PBP<span style={{ color: "var(--accent)" }}>2027</span>
-          </span>
-        </strong>
-        <button
-          type="button"
-          className="menu-toggle"
-          aria-label={menuOpen ? "Fermer le menu" : "Ouvrir le menu"}
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          <span />
-          <span />
-          <span />
-        </button>
-        <nav className={menuOpen ? "nav-open" : undefined}>
-          {links.map((l) => (
-            <Link key={l.to} to={l.to} className={location.pathname === l.to || (l.to !== "/" && location.pathname.startsWith(`${l.to}/`)) ? "active" : undefined} onClick={() => setMenuOpen(false)}>
-              {l.label}
-            </Link>
-          ))}
-          {user && <NotificationBell />}
-          {user && (
-            <span className="hint nav-greeting nav-me">
-              <Avatar name={user.prenom} avatar={user.avatar} size={26} /> Bonjour, {user.prenom}
-            </span>
-          )}
-          <button
-            className="ghost"
-            onClick={async () => {
-              setMenuOpen(false);
-              await logout();
-              navigate("/login", { replace: true });
-            }}
-          >
-            Déconnexion
-          </button>
-        </nav>
-      </div>
+      <AppNav />
       {children}
     </div>
   );
