@@ -90,18 +90,42 @@ if [ "$ENV_NOW" != "$(cat "$ENV_STATE" 2>/dev/null)" ]; then
   log ".env.production modifié (ou première vérification) : conteneur recréé pour relire les variables"
 fi
 BUILD_OUT=$(mktemp)
-if [ -t 1 ]; then
-  # En terminal : progression visible en direct, et gardée pour le journal.
-  # Le code de retour de docker ne traverse pas un tube en sh POSIX (pas de
-  # pipefail) : on l'écrit dans le flux puis on le relit.
-  { docker compose up -d --build $RECREATE 2>&1; echo "__EXIT__$?"; } | tee "$BUILD_OUT" | grep -v '^__EXIT__'
-  STATUS=$(sed -n 's/^__EXIT__//p' "$BUILD_OUT" | tail -n 1)
-else
-  docker compose up -d --build $RECREATE > "$BUILD_OUT" 2>&1; STATUS=$?
-fi
+build_once() {
+  if [ -t 1 ]; then
+    # En terminal : progression visible en direct, et gardée pour le journal.
+    # Le code de retour de docker ne traverse pas un tube en sh POSIX (pas de
+    # pipefail) : on l'écrit dans le flux puis on le relit.
+    { docker compose up -d --build $RECREATE 2>&1; echo "__EXIT__$?"; } | tee "$BUILD_OUT" | grep -v '^__EXIT__'
+    STATUS=$(sed -n 's/^__EXIT__//p' "$BUILD_OUT" | tail -n 1)
+  else
+    docker compose up -d --build $RECREATE > "$BUILD_OUT" 2>&1; STATUS=$?
+  fi
+}
+# Panne réseau passagère (Docker Hub injoignable depuis la NAS : « TLS handshake
+# timeout », DNS, VPN…) : sans rapport avec le code, on réessaie avant de conclure.
+NET_PATTERN='TLS handshake timeout|i/o timeout|no such host|connection reset|connection refused|Temporary failure in name resolution|dial tcp'
+build_once
+TRIES=1
+for WAIT in 30 90; do
+  [ "$STATUS" = "0" ] && break
+  grep -Eq "$NET_PATTERN" "$BUILD_OUT" || break
+  if [ -t 1 ]; then echo "panne réseau pendant la construction (essai $TRIES/3), nouvel essai dans ${WAIT} s"; fi
+  sleep "$WAIT"
+  build_once
+  TRIES=$((TRIES + 1))
+done
 if [ "$STATUS" != "0" ]; then
-  log "ÉCHEC build/démarrage ($AFTER), l'ancienne version continue de tourner :"
-  tail -n 40 "$BUILD_OUT" >> "$LOG"
+  if grep -Eq "$NET_PATTERN" "$BUILD_OUT"; then
+    # Une seule ligne par panne (pas 40 lignes toutes les 5 minutes) : le prochain passage
+    # de la tâche planifiée réessaiera tout seul.
+    MSG="panne réseau vers le registre Docker ($AFTER pas encore déployé, l'ancienne version continue de tourner) : nouvel essai au prochain passage"
+    if [ "$(tail -n 1 "$LOG" 2>/dev/null | cut -d' ' -f3-)" != "$MSG" ]; then
+      log "$MSG"
+    fi
+  else
+    log "ÉCHEC build/démarrage ($AFTER), l'ancienne version continue de tourner :"
+    tail -n 40 "$BUILD_OUT" >> "$LOG"
+  fi
   rm -f "$BUILD_OUT"
   exit 1
 fi
@@ -109,7 +133,7 @@ rm -f "$BUILD_OUT"
 echo "$ENV_NOW" > "$ENV_STATE"
 # Pas une ligne toutes les 5 min quand rien ne change : seulement s'il y a du nouveau
 # code, un lancement à la main, ou une réussite qui suit un échec.
-if [ "$BEFORE" != "$AFTER" ] || [ -t 1 ] || tail -n 45 "$LOG" 2>/dev/null | grep -q "ÉCHEC"; then
+if [ "$BEFORE" != "$AFTER" ] || [ -t 1 ] || tail -n 45 "$LOG" 2>/dev/null | grep -Eq "ÉCHEC|panne réseau vers"; then
   log "en service : $APP_VERSION"
 fi
 docker image prune -f > /dev/null 2>&1 || true

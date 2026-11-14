@@ -231,6 +231,10 @@ sudo docker compose up -d --build
      autre fichier du dépôt.)
    - `ÉCHEC build/démarrage` : l'erreur de build suit dans le journal ; l'ancienne
      version continue de tourner en attendant.
+   - `panne réseau vers le registre Docker` : la NAS n'a pas pu joindre Docker Hub
+     (« TLS handshake timeout », DNS, VPN actif…). Le script a déjà réessayé 3 fois
+     (attentes de 30 s puis 90 s) et recommence tout seul au passage suivant ; une seule
+     ligne est écrite par panne. Si ça dure : `sudo docker pull node:22-alpine`.
 3. **Forcer un déploiement tout de suite** : `sudo sh scripts/auto-deploy.sh`. Lancé dans
    un terminal, il affiche sa progression ; la reconstruction prend plusieurs minutes sur
    le NAS. Un seul déploiement à la fois : si la tâche planifiée est déjà en train de
