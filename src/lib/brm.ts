@@ -25,3 +25,8 @@ export type BrmStatus = (typeof VALID_STATUSES)[number];
 // Statuts pour le choix d'un randonneur sur un BRM du calendrier officiel (catalogue ACP).
 export const CATALOG_STATUSES = ["prevu", "inscrit", "fait", "homologue"] as const;
 export type CatalogStatus = (typeof CATALOG_STATUSES)[number];
+
+// Fenêtre du calendrier officiel affiché (saison de qualification). Partagée par le
+// calendrier et les rappels : une seule entrée de cache côté ACP.
+export const CATALOG_FROM = "2027-01-01";
+export const CATALOG_TO = "2027-06-30";

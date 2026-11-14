@@ -4,7 +4,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { fetchFranceBrmCatalog } from "../lib/acpCatalog.js";
-import { CATALOG_STATUSES, CALENDAR_DISTANCES } from "../lib/brm.js";
+import { CATALOG_FROM, CATALOG_STATUSES, CATALOG_TO, CALENDAR_DISTANCES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
 import { AVATAR_SELECT, avatarOf } from "../lib/avatar.js";
 import { QUALIFYING_STEPS, qualifiedSteps, stepFor } from "../shared/qualification.js";
@@ -25,8 +25,6 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 // Fenêtre de qualification PBP 2027 demandée : saison précédant le départ.
-const CATALOG_FROM = "2027-01-01";
-const CATALOG_TO = "2027-06-30";
 
 const statusSchema = z.enum(CATALOG_STATUSES);
 const catalogIdSchema = z.string().regex(/^[0-9a-f]{16}$/);

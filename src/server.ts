@@ -29,6 +29,7 @@ import { scrapeNews } from "./lib/newsScraper.js";
 import { checkRoadbookAlerts } from "./lib/roadbookAlerts.js";
 import { ensureWebhookSubscription, syncAllAccounts } from "./lib/strava.js";
 import { sendWeeklyReports } from "./lib/coachReports.js";
+import { sendBrmReminders } from "./lib/brmReminders.js";
 import { checkBackup, lastBackupAt } from "./lib/backupWatch.js";
 import { checkOfficialRoute } from "./lib/pbpRouteWatch.js";
 import { startTelegramPolling } from "./lib/telegramBot.js";
@@ -154,6 +155,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     // aussi les jetons), bilans hebdomadaires du Coach (dimanche soir).
     void ensureWebhookSubscription().then((r) => r === "error" && app.log.warn("abonnement webhook Strava impossible"));
     setInterval(() => void syncAllAccounts().catch((err) => app.log.error(err, "syncAllAccounts a échoué")), 6 * 3_600_000);
+    // Rappels J-7 et J-1 des BRM choisis sur le calendrier.
+    void sendBrmReminders().catch((err) => app.log.error(err, "sendBrmReminders a échoué"));
+    setInterval(() => void sendBrmReminders().catch((err) => app.log.error(err, "sendBrmReminders a échoué")), 3_600_000);
     setInterval(() => void sendWeeklyReports().catch((err) => app.log.error(err, "sendWeeklyReports a échoué")), 30 * 60_000);
     setInterval(alerts, 10 * 60_000);
     setInterval(route, 60 * 60_000);
