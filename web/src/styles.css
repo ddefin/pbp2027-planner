@@ -860,112 +860,6 @@ button.link {
   min-width: 160px;
 }
 
-.cal-month {
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--fg-muted);
-  margin: 22px 0 10px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-
-.cal-month:first-of-type {
-  margin-top: 0;
-  padding-top: 0;
-  border-top: none;
-}
-
-.cal-row {
-  display: grid;
-  grid-template-columns: 76px 1fr auto auto;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--line);
-}
-@media (max-width: 680px) {
-  .cal-row {
-    grid-template-columns: 1fr;
-    gap: 6px;
-  }
-}
-
-.cal-row:last-child {
-  border-bottom: none;
-}
-
-.cal-row .cal-date {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--fg-muted);
-  white-space: nowrap;
-}
-
-.cal-row .cal-main {
-  min-width: 0;
-}
-
-.cal-row .cal-dist {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 20px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  margin-right: 8px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-.cal-row .cal-ville {
-  font-weight: 700;
-  font-size: 13.5px;
-}
-
-.cal-row .cal-sub {
-  font-size: 12px;
-  color: var(--fg-muted);
-  margin-top: 2px;
-}
-
-.cal-row .cal-participants {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.cal-row .cal-pname {
-  font-size: 11px;
-  color: var(--fg-muted);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-.cal-row select {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 7px 14px;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--fg);
-  font-family: inherit;
-  transition: border-color 0.15s;
-}
-
-.cal-row select:hover {
-  border-color: var(--accent);
-}
-
 /* iOS Safari zoome automatiquement la page au focus sur un champ texte dont le
    font-size est sous 16px — et comme la navigation ensuite se fait en SPA (pas de
    rechargement complet), ce zoom reste collé sur la page suivante (ex. le menu
@@ -977,7 +871,8 @@ button.link {
   .chat-input input,
   .cal-select,
   .cal-search,
-  .cal-row select {
+  .gb-search input,
+  .gb-status {
     font-size: 16px;
   }
 }
@@ -3414,4 +3309,127 @@ button.link {
   max-width: 52ch;
   margin: 6px auto 0;
   font-size: 14px;
+}
+
+/* Calendrier des BRM : présentation gb-* + colonne « Mon statut » */
+.gb-cal-sub {
+  font-size: 13px;
+}
+.gb-c-action {
+  grid-area: action;
+  min-width: 0;
+}
+.gb-row.has-action .gb-c-people.is-empty {
+  display: none;
+}
+.gb-row.has-action {
+  grid-template-areas:
+    "dist date date"
+    "place place elev"
+    "people people people"
+    "action action more"
+    "details details details";
+}
+.gb-choose,
+.gb-status {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  margin: 0;
+  border-radius: 999px;
+  font: 700 14px var(--font-body);
+  cursor: pointer;
+}
+.gb-choose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 14px;
+  border: 1px dashed var(--fg-muted);
+  background: transparent;
+  color: var(--fg);
+}
+.gb-choose:hover {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.gb-status {
+  --c: var(--fg-muted);
+  padding: 0 12px;
+  border: 1px solid var(--c);
+  background-color: color-mix(in srgb, var(--c) 16%, var(--panel));
+  color: var(--fg);
+  text-align: center;
+}
+.gb-status.is-prevu { --c: var(--d200); }
+.gb-status.is-inscrit { --c: var(--warn); }
+.gb-status.is-fait { --c: var(--fg); }
+.gb-status.is-homologue { --c: var(--ok); }
+.gb-status option {
+  background: var(--panel);
+  color: var(--fg);
+}
+.gb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 240px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--fg-muted);
+}
+.gb-search:focus-within {
+  border-color: var(--accent);
+}
+.gb-search input {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg);
+  font: 600 14px var(--font-body);
+}
+.gb-cal-switches {
+  justify-content: flex-start;
+  gap: 4px 20px;
+}
+/* Longue liste : le navigateur ne met en page que les mois proches de l'écran. */
+.gb-cal .gb-month {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+@media (min-width: 768px) {
+  .gb-timeline--action .gb-head,
+  .gb-row.has-action {
+    grid-template-columns: 8rem 5.5rem minmax(0, 2fr) 5.5rem minmax(0, 1.4fr) 9rem 6.5rem;
+  }
+  .gb-row.has-action {
+    grid-template-areas: "date dist place elev people action more" "details details details details details details details";
+  }
+}
+.gb-cal-filters {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.gb-cal-filters .gb-switch {
+  flex: 0 0 auto;
+}
+@media (max-width: 767px) {
+  .gb-cal .gb-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .gb-cal .gb-pill {
+    min-width: 44px;
+    padding: 0 11px;
+  }
 }

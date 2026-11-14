@@ -1,198 +1,203 @@
-import { useMemo, useState } from "react";
-import type { CatalogEvent } from "../api/brmCatalog";
-import { Disclosure } from "../components/Disclosure";
+import { useEffect, useRef } from "react";
+import { CalendarClock, CalendarDays, Route, Search, SearchX, X } from "lucide-react";
+import { DistanceBadge } from "../components/groupBrm/DistanceBadge";
+import { StatusPicker } from "../components/groupBrm/StatusPicker";
+import { TimelineView } from "../components/groupBrm/TimelineView";
+import { dayLabel, GROUP_DISTANCES } from "../components/groupBrm/model";
+import { useCalendarFilters } from "../components/groupBrm/useCalendarFilters";
 import { useBrmCatalog } from "../hooks/useBrmCatalog";
-import { ACP_CALENDAR_URL, CALENDAR_DISTANCES, CATALOG_STATUS_LABEL, CATALOG_STATUS_OPTIONS } from "../lib/brmMeta";
+import { daysUntil } from "../lib/brmMeta";
 
-const MONTH_LABEL = [
-  "Janvier",
-  "Février",
-  "Mars",
-  "Avril",
-  "Mai",
-  "Juin",
-  "Juillet",
-  "Août",
-  "Septembre",
-  "Octobre",
-  "Novembre",
-  "Décembre",
-];
-
-function monthKey(date: string) {
-  return date.slice(0, 7); // yyyy-mm
-}
-
-function monthLabel(date: string) {
-  const [year, month] = date.split("-");
-  return `${MONTH_LABEL[Number(month) - 1]} ${year}`;
-}
-
+// Calendrier officiel des BRM : même présentation que « BRM choisis par le groupe »
+// (composants gb-*), avec en plus le choix de son propre statut sur chaque ligne.
 export function CalendrierPage() {
   const { events, loading, error, choose, clear } = useBrmCatalog();
-  const [search, setSearch] = useState("");
-  const [distances, setDistances] = useState<Set<number>>(new Set());
-  const [region, setRegion] = useState("");
+  const f = useCalendarFilters(events);
+  const barRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
-  // Filtres repliés sur téléphone (ils occupaient un écran entier avant la liste) ; le
-  // résumé rappelle ce qui est actif.
-  const activeFilters = (distances.size > 0 ? 1 : 0) + (region ? 1 : 0) + (search.trim() ? 1 : 0);
-  const filterSummary = [
-    activeFilters > 0 ? `${activeFilters} filtre${activeFilters > 1 ? "s" : ""} actif${activeFilters > 1 ? "s" : ""}` : "Aucun filtre",
-    distances.size > 0 ? `${[...distances].sort((a, b) => a - b).join(", ")} km` : null,
-    region || null,
-    search.trim() ? `« ${search.trim()} »` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // Hauteur de la barre collante : les titres de mois se collent juste en dessous.
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar || !sectionRef.current || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => sectionRef.current?.style.setProperty("--gb-bar-h", `${bar.offsetHeight}px`));
+    ro.observe(bar);
+    return () => ro.disconnect();
+  }, [loading]);
 
-  const regions = useMemo(() => {
-    const set = new Set((events ?? []).map((e) => e.region).filter(Boolean));
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [events]);
-
-  const filtered = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return (events ?? []).filter((e) => {
-      if (distances.size > 0 && !distances.has(e.distance)) return false;
-      if (region && e.region !== region) return false;
-      if (term && !`${e.ville} ${e.club}`.toLowerCase().includes(term)) return false;
-      return true;
-    });
-  }, [events, search, distances, region]);
-
-  const groups = useMemo(() => {
-    const map = new Map<string, CatalogEvent[]>();
-    for (const e of filtered) {
-      const key = monthKey(e.date);
-      const list = map.get(key) ?? [];
-      list.push(e);
-      map.set(key, list);
-    }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
-  }, [filtered]);
-
-  function toggleDistance(d: number) {
-    setDistances((prev) => {
-      const next = new Set(prev);
-      if (next.has(d)) next.delete(d);
-      else next.add(d);
-      return next;
-    });
-  }
+  const next = f.stats.next;
+  const j = next ? daysUntil(next.date) : null;
+  const n = f.visible.length;
 
   return (
     <div className="wrap-wide">
-      <section className="panel">
-        <h2>Calendrier des BRM — France, janvier à juin 2027</h2>
+      <section className="panel gb gb-cal" ref={sectionRef} aria-labelledby="cal-title">
+        <div className="gb-title-row">
+          <h2 id="cal-title">Calendrier des BRM</h2>
+          <span className="gb-muted gb-cal-sub">France · janvier à juin 2027 · source Audax Club Parisien</span>
+        </div>
         <p className="hint">
-          Source : calendrier officiel de l'Audax Club Parisien. Choisis les brevets que tu comptes faire — ton
-          statut est visible par les autres randonneurs connectés.
+          Appuie sur « Choisir » pour les brevets que tu comptes faire, puis mets ton statut à jour (Inscrit, Fait,
+          Homologué). Tes choix sont visibles par le groupe et alimentent ton compteur de qualification.
         </p>
 
         {error && <div className="error-banner">{error}</div>}
-
-        <Disclosure title="Filtres" summary={filterSummary} storageKey="calendrier.filtres">
-        <div className="cal-filters">
-          <div className="cal-chips">
-            <button type="button" className={`cal-chip${distances.size === 0 ? " active" : ""}`} onClick={() => setDistances(new Set())}>
-              Toutes distances
-            </button>
-            {CALENDAR_DISTANCES.map((d) => (
-              <button
-                key={d}
-                type="button"
-                className={`cal-chip${distances.has(d) ? " active" : ""}`}
-                onClick={() => toggleDistance(d)}
-              >
-                {d} km
-              </button>
+        {loading && (
+          <div className="gb-skel" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <span key={i} />
             ))}
           </div>
-          <select className="cal-select" value={region} onChange={(e) => setRegion(e.target.value)}>
-            <option value="">Toutes régions</option>
-            {regions.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-          <input
-            className="cal-search"
-            type="search"
-            placeholder="Rechercher une ville ou un club…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        </Disclosure>
+        )}
 
-        {loading && <p className="hint">Chargement du calendrier…</p>}
-        {!loading && !error && filtered.length === 0 && <p className="hint">Aucun BRM ne correspond à ces critères.</p>}
-
-        {!loading &&
-          groups.map(([key, items]) => (
-            <div key={key}>
-              <div className="cal-month">{monthLabel(key)}</div>
-              {items.map((ev) => (
-                <CatalogRow key={ev.id} event={ev} onChoose={(status) => choose(ev.id, status)} onClear={() => clear(ev.id)} />
-              ))}
+        {!loading && !error && (
+          <>
+            <div className="gb-stats">
+              <div className="gb-stat">
+                <CalendarDays size={18} aria-hidden="true" />
+                <div>
+                  <strong className="gb-num">{f.stats.total}</strong>
+                  <span>BRM à venir</span>
+                </div>
+              </div>
+              <div className="gb-stat gb-stat-next">
+                <CalendarClock size={18} aria-hidden="true" />
+                <div>
+                  {next ? (
+                    <>
+                      <span>Mon prochain départ</span>
+                      <strong>
+                        {dayLabel(next.date)} <span className="gb-j">{j === 0 ? "aujourd'hui" : `J-${j}`}</span>
+                      </strong>
+                      <span>
+                        <DistanceBadge distance={next.distance} /> {next.ville}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>—</strong>
+                      <span>Mon prochain départ : aucun BRM choisi</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="gb-stat">
+                <Route size={18} aria-hidden="true" />
+                <div>
+                  <strong className="gb-num">{f.stats.mine}</strong>
+                  <span>
+                    {f.stats.mine > 1 ? "BRM choisis" : "BRM choisi"} ·{" "}
+                    <button type="button" className="gb-linkbtn" onClick={() => f.setMineOnly(!f.mineOnly)}>
+                      {f.mineOnly ? "tout voir" : "voir"}
+                    </button>
+                  </span>
+                </div>
+              </div>
             </div>
-          ))}
-      </section>
-    </div>
-  );
-}
 
-function CatalogRow({
-  event,
-  onChoose,
-  onClear,
-}: {
-  event: CatalogEvent;
-  onChoose: (status: string) => void;
-  onClear: () => void;
-}) {
-  return (
-    <div className="cal-row">
-      <div className="cal-date tabular">{event.date.slice(8, 10)}/{event.date.slice(5, 7)}</div>
-      <div className="cal-main">
-        <span className="cal-dist">{event.distance}</span>
-        <span className="cal-ville">{event.ville}</span>
-        <div className="cal-sub">
-          {event.club}
-          {event.departement ? ` · ${event.departement}` : ""}
-          {event.roadMap && (
-            <>
-              {" · "}
-              <a href={event.roadMap} target="_blank" rel="noreferrer">Parcours</a>
-            </>
-          )}
-          {" · "}
-          <a href={event.siteWeb || ACP_CALENDAR_URL} target="_blank" rel="noreferrer">Inscription</a>
-        </div>
-      </div>
-      <div className="cal-participants">
-        {event.participants.map((p, i) => (
-          <span key={i} className="cal-pname">
-            {p.displayName} · {CATALOG_STATUS_LABEL[p.status as keyof typeof CATALOG_STATUS_LABEL] ?? p.status}
-          </span>
-        ))}
-      </div>
-      <select
-        value={event.myStatus ?? ""}
-        onChange={(e) => {
-          if (e.target.value === "") onClear();
-          else onChoose(e.target.value);
-        }}
-      >
-        <option value="">Non choisi</option>
-        {CATALOG_STATUS_OPTIONS.map((s) => (
-          <option key={s} value={s}>
-            {CATALOG_STATUS_LABEL[s]}
-          </option>
-        ))}
-      </select>
+            <div className="gb-cal-filters">
+              <div className="gb-bar-row gb-cal-fields">
+                <label className="gb-search">
+                  <Search size={16} aria-hidden="true" />
+                  <input
+                    type="search"
+                    placeholder="Ville, club ou département"
+                    aria-label="Rechercher une ville, un club ou un département"
+                    value={f.search}
+                    onChange={(e) => f.setSearch(e.target.value)}
+                  />
+                </label>
+                <select className="gb-select" value={f.region} onChange={(e) => f.setRegion(e.target.value)} aria-label="Filtrer par région">
+                  <option value="">Toutes les régions</option>
+                  {f.regions.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="gb-bar-row gb-cal-switches">
+                <label className="gb-switch">
+                  <input type="checkbox" checked={f.mineOnly} onChange={(e) => f.setMineOnly(e.target.checked)} />
+                  <span>Mes BRM seulement</span>
+                </label>
+                <label className="gb-switch">
+                  <input type="checkbox" checked={!f.showPast} onChange={(e) => f.setShowPast(!e.target.checked)} />
+                  <span>Masquer les passés</span>
+                </label>
+              </div>
+            </div>
+
+            <div ref={barRef} className="gb-bar-wrap">
+              <div className="gb-bar" role="region" aria-label="Filtres du calendrier">
+                <div className="gb-bar-row">
+                  <div className="gb-pills" role="group" aria-label="Distance">
+                    <button type="button" className="gb-pill" aria-pressed={f.dist === null} onClick={() => f.setDist(null)}>
+                      Tous
+                    </button>
+                    {GROUP_DISTANCES.map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        className={`gb-pill gb-pill-${d}`}
+                        aria-pressed={f.dist === d}
+                        onClick={() => f.setDist(f.dist === d ? null : d)}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="gb-bar-foot" aria-live="polite">
+                  <span>
+                    {n} BRM affiché{n > 1 ? "s" : ""}
+                  </span>
+                  {f.filtered && (
+                    <button type="button" className="gb-reset" onClick={f.reset}>
+                      <X size={13} aria-hidden="true" /> Effacer les filtres
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {n > 0 ? (
+              <TimelineView
+                events={f.visible}
+                today={f.today}
+                highlight={null}
+                renderAction={(ev) => (
+                  <StatusPicker
+                    status={ev.myStatus}
+                    label={`BRM ${ev.distance} ${ev.ville}, ${dayLabel(ev.date)}`}
+                    onChoose={(s) => choose(ev.id, s)}
+                    onClear={() => clear(ev.id)}
+                  />
+                )}
+              />
+            ) : (
+              <div className="gb-empty">
+                <SearchX size={22} aria-hidden="true" />
+                <strong>{f.mineOnly && f.stats.mine === 0 ? "Tu n'as encore choisi aucun BRM" : "Aucun BRM ne correspond"}</strong>
+                {f.filtered && (
+                  <button type="button" className="gb-reset" onClick={f.reset}>
+                    Effacer les filtres
+                  </button>
+                )}
+              </div>
+            )}
+
+            {f.hiddenPast > 0 && (
+              <p className="gb-past-note">
+                {f.hiddenPast} BRM passé{f.hiddenPast > 1 ? "s" : ""} masqué{f.hiddenPast > 1 ? "s" : ""} ·{" "}
+                <button type="button" className="gb-linkbtn" onClick={() => f.setShowPast(true)}>
+                  afficher
+                </button>
+              </p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }
