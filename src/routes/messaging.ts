@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { publicName } from "../lib/publicName.js";
+import { AVATAR_SELECT, avatarOf } from "../lib/avatar.js";
 import { broadcast, dmRoomKey, GENERAL_ROOM_KEY } from "../ws/messaging.js";
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 
@@ -12,7 +13,7 @@ const locationSchema = z.object({ lat: z.number().min(-90).max(90), lon: z.numbe
 
 type GroupMessageRow = {
   id: string;
-  user: { prenom: string };
+  user: { prenom: string; avatar: string | null; avatarKey: string | null };
   userId: string;
   text: string;
   kind: string;
@@ -27,6 +28,7 @@ function serializeGroup(m: GroupMessageRow) {
   return {
     id: m.id,
     who: publicName(m.user),
+    avatar: avatarOf(m.user),
     fromUserId: m.userId,
     text: m.text,
     kind: m.kind,
@@ -76,10 +78,10 @@ export async function messagingRoutes(app: FastifyInstance) {
     const users = await prisma.user.findMany({
       // Ni le compte système « Membre supprimé », ni les comptes suspendus.
       where: { id: { not: user.id }, isSystem: false, suspendedAt: null },
-      select: { id: true, prenom: true },
+      select: { id: true, prenom: true, ...AVATAR_SELECT },
       orderBy: { prenom: "asc" },
     });
-    return reply.send({ users });
+    return reply.send({ users: users.map((u) => ({ id: u.id, prenom: u.prenom, avatar: avatarOf(u) })) });
   });
 
   app.get("/messaging/general/messages", async (request, reply) => {
@@ -89,7 +91,7 @@ export async function messagingRoutes(app: FastifyInstance) {
     const messages = await prisma.groupMessage.findMany({
       orderBy: { createdAt: "asc" },
       take: MESSAGE_PAGE_SIZE,
-      include: { user: { select: { prenom: true } } },
+      include: { user: { select: { prenom: true, ...AVATAR_SELECT } } },
     });
     return reply.send({ messages: messages.map(serializeGroup) });
   });
@@ -108,8 +110,8 @@ export async function messagingRoutes(app: FastifyInstance) {
     const message = await prisma.groupMessage.create({
       data: { userId: user.id, text: "", kind: "location", lat: parsed.data.lat, lon: parsed.data.lon },
     });
-    broadcast(GENERAL_ROOM_KEY, { type: "message", ...serializeGroup({ ...message, user: { prenom: user.prenom } }) });
-    return reply.code(201).send({ message: serializeGroup({ ...message, user: { prenom: user.prenom } }) });
+    broadcast(GENERAL_ROOM_KEY, { type: "message", ...serializeGroup({ ...message, user: { prenom: user.prenom, avatar: user.avatar, avatarKey: user.avatarKey } }) });
+    return reply.code(201).send({ message: serializeGroup({ ...message, user: { prenom: user.prenom, avatar: user.avatar, avatarKey: user.avatarKey } }) });
   });
 
   // Pièce jointe dans le salon général : contenu stocké tel quel en base (comme les
@@ -134,8 +136,8 @@ export async function messagingRoutes(app: FastifyInstance) {
         filePath,
       },
     });
-    broadcast(GENERAL_ROOM_KEY, { type: "message", ...serializeGroup({ ...message, user: { prenom: user.prenom } }) });
-    return reply.code(201).send({ message: serializeGroup({ ...message, user: { prenom: user.prenom } }) });
+    broadcast(GENERAL_ROOM_KEY, { type: "message", ...serializeGroup({ ...message, user: { prenom: user.prenom, avatar: user.avatar, avatarKey: user.avatarKey } }) });
+    return reply.code(201).send({ message: serializeGroup({ ...message, user: { prenom: user.prenom, avatar: user.avatar, avatarKey: user.avatarKey } }) });
   });
 
   app.get("/messaging/general/files/:id", async (request, reply) => {
@@ -181,12 +183,12 @@ export async function messagingRoutes(app: FastifyInstance) {
     const messages = await prisma.directMessage.findMany({
       where: { OR: [{ senderId: user.id }, { recipientId: user.id }] },
       orderBy: { createdAt: "desc" },
-      include: { sender: { select: { id: true, prenom: true } }, recipient: { select: { id: true, prenom: true } } },
+      include: { sender: { select: { id: true, prenom: true, ...AVATAR_SELECT } }, recipient: { select: { id: true, prenom: true, ...AVATAR_SELECT } } },
     });
 
     const byPeer = new Map<
       string,
-      { peerId: string; prenom: string; lastText: string; lastAt: string; unread: number }
+      { peerId: string; prenom: string; avatar: ReturnType<typeof avatarOf>; lastText: string; lastAt: string; unread: number }
     >();
     for (const m of messages) {
       const peer = m.senderId === user.id ? m.recipient : m.sender;
@@ -196,6 +198,7 @@ export async function messagingRoutes(app: FastifyInstance) {
         byPeer.set(peer.id, {
           peerId: peer.id,
           prenom: peer.prenom,
+          avatar: avatarOf(peer),
           lastText: preview,
           lastAt: m.createdAt.toISOString(),
           unread: m.recipientId === user.id && m.readAt === null ? 1 : 0,
@@ -253,7 +256,7 @@ export async function messagingRoutes(app: FastifyInstance) {
       data: { senderId: user.id, recipientId: peerId, text: "", kind: "location", lat: parsed.data.lat, lon: parsed.data.lon },
     });
     const serialized = serializeDirect(message);
-    broadcast(dmRoomKey(user.id, peerId), { type: "message", who: publicName(user), ...serialized });
+    broadcast(dmRoomKey(user.id, peerId), { type: "message", who: publicName(user), avatar: avatarOf(user), ...serialized });
     return reply.code(201).send({ message: serialized });
   });
 
@@ -284,7 +287,7 @@ export async function messagingRoutes(app: FastifyInstance) {
       },
     });
     const serialized = serializeDirect(message);
-    broadcast(dmRoomKey(user.id, peerId), { type: "message", who: publicName(user), ...serialized });
+    broadcast(dmRoomKey(user.id, peerId), { type: "message", who: publicName(user), avatar: avatarOf(user), ...serialized });
     return reply.code(201).send({ message: serialized });
   });
 

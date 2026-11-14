@@ -10,6 +10,7 @@ import { generateOpaqueToken } from "../lib/tokens.js";
 import { createResetUrl } from "../lib/passwordReset.js";
 import { sendPasswordResetEmail } from "../lib/mailer.js";
 import { logAuthEvent } from "../lib/authEvents.js";
+import { avatarOf } from "../lib/avatar.js";
 
 const LOCKOUT_THRESHOLD = 8;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;
@@ -161,7 +162,7 @@ export async function authRoutes(app: FastifyInstance) {
   app.get("/auth/session", async (request, reply) => {
     const user = await getSessionUser(request);
     if (!user) return reply.code(401).send({ error: "unauthenticated" });
-    return reply.send({ email: user.email, prenom: user.prenom, isAdmin: user.isAdmin });
+    return reply.send({ email: user.email, prenom: user.prenom, isAdmin: user.isAdmin, avatar: avatarOf(user) });
   });
 
   app.post("/auth/logout", async (request, reply) => {

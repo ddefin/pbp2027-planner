@@ -47,7 +47,7 @@ export function useBrmCatalog() {
         return list.map((e) => {
           if (e.id !== id) return e;
           const others = e.participants.filter((p) => !p.mine);
-          return { ...e, myStatus: status, participants: [...others, { displayName: publicNameOf(user?.prenom), status, mine: true, memberKey: myKey }] };
+          return { ...e, myStatus: status, participants: [...others, { displayName: publicNameOf(user?.prenom), status, mine: true, memberKey: myKey, avatar: user?.avatar }] };
         });
       });
       try {

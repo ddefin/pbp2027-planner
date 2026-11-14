@@ -6,6 +6,7 @@ import { getSessionUser } from "../lib/session.js";
 import { fetchFranceBrmCatalog } from "../lib/acpCatalog.js";
 import { CATALOG_STATUSES, CALENDAR_DISTANCES } from "../lib/brm.js";
 import { publicName } from "../lib/publicName.js";
+import { AVATAR_SELECT, avatarOf } from "../lib/avatar.js";
 import { QUALIFYING_STEPS, qualifiedSteps, stepFor } from "../shared/qualification.js";
 import { triggerWebhooks } from "../lib/webhooks.js";
 import { fetchCityWeather } from "../lib/openWeather.js";
@@ -100,14 +101,14 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
     const participations = ids.length
       ? await prisma.brmParticipation.findMany({
           where: { catalogEventId: { in: ids } },
-          include: { user: { select: { prenom: true } } },
+          include: { user: { select: { prenom: true, ...AVATAR_SELECT } } },
         })
       : [];
 
-    const byEvent = new Map<string, { displayName: string; status: string; mine: boolean; memberKey: string }[]>();
+    const byEvent = new Map<string, { displayName: string; status: string; mine: boolean; memberKey: string; avatar: ReturnType<typeof avatarOf> }[]>();
     for (const p of participations) {
       const list = byEvent.get(p.catalogEventId) ?? [];
-      list.push({ displayName: publicName(p.user), status: p.status, mine: p.userId === user.id, memberKey: memberKeyOf(p.userId) });
+      list.push({ displayName: publicName(p.user), status: p.status, mine: p.userId === user.id, memberKey: memberKeyOf(p.userId), avatar: avatarOf(p.user) });
       byEvent.set(p.catalogEventId, list);
     }
 
@@ -116,7 +117,7 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
       const mine = participants.find((p) => p.mine);
       return {
         ...e,
-        participants: participants.map(({ displayName, status, mine: isMine, memberKey }) => ({ displayName, status, mine: isMine, memberKey })),
+        participants: participants.map(({ displayName, status, mine: isMine, memberKey, avatar }) => ({ displayName, status, mine: isMine, memberKey, avatar })),
         myStatus: mine?.status ?? null,
       };
     });

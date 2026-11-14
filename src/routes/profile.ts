@@ -6,6 +6,9 @@ import { getSessionUser } from "../lib/session.js";
 import { hashPassword, verifyPassword } from "../lib/password.js";
 import { deleteUploadedFile, readUploadedFile, saveUploadedFile } from "../lib/fileStorage.js";
 import { createTelegramLinkCode } from "../lib/telegramBot.js";
+import { randomBytes } from "node:crypto";
+import { AVATAR_COLORS, AVATAR_ICONS, MAX_AVATAR_BYTES, avatarOf, parseAvatar, sniffImage, stripImageMetadata } from "../lib/avatar.js";
+import { checkRateLimit } from "../lib/rateLimit.js";
 
 const MAX_LICENSE_FILE_BYTES = 10 * 1024 * 1024; // 10 Mo : large pour un scan/une photo
 const LICENSE_MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
@@ -53,7 +56,80 @@ export async function profileRoutes(app: FastifyInstance) {
       licenceNumero: user.licenceNumero,
       club: user.club,
       notebook: user.notebook,
+      avatar: avatarOf(user),
     });
+  });
+
+  // ─── Avatar ───
+  const presetSchema = z.object({ icon: z.enum(AVATAR_ICONS), color: z.enum(AVATAR_COLORS) });
+
+  // Efface la photo précédente du disque (changement d'avatar ou retour aux initiales).
+  async function dropPhoto(raw: string | null) {
+    const prev = parseAvatar(raw);
+    if (prev?.kind === "photo") await deleteUploadedFile(prev.path);
+  }
+
+  app.put("/profile/avatar", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    const parsed = presetSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "invalid_input" });
+    await dropPhoto(user.avatar);
+    const updated = await prisma.user.update({ where: { id: user.id }, data: { avatar: JSON.stringify({ kind: "preset", ...parsed.data }), avatarKey: null } });
+    return reply.send({ avatar: avatarOf(updated) });
+  });
+
+  app.post("/profile/avatar/photo", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    if (!checkRateLimit(`avatar:${user.id}`, 10, 3_600_000).allowed) return reply.code(429).send({ error: "too_many_requests" });
+    const file = await request.file({ limits: { fileSize: MAX_AVATAR_BYTES } }).catch(() => undefined);
+    if (!file) return reply.code(400).send({ error: "missing_file" });
+    const raw = await file.toBuffer().catch(() => null);
+    if (!raw || file.file.truncated) return reply.code(413).send({ error: "file_too_large" });
+    // Type vérifié sur le contenu réel (signature binaire), pas sur le nom ni le type déclaré.
+    const type = sniffImage(raw);
+    if (!type) return reply.code(415).send({ error: "unsupported_image" });
+    let clean: Buffer;
+    try {
+      clean = stripImageMetadata(raw, type);
+    } catch {
+      return reply.code(415).send({ error: "unsupported_image" });
+    }
+    const path = await saveUploadedFile("avatars", clean);
+    await dropPhoto(user.avatar);
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: { avatar: JSON.stringify({ kind: "photo", path, v: Date.now(), type }), avatarKey: randomBytes(12).toString("base64url") },
+    });
+    return reply.send({ avatar: avatarOf(updated) });
+  });
+
+  app.delete("/profile/avatar", async (request, reply) => {
+    const user = await getSessionUser(request);
+    if (!user) return reply.code(401).send({ error: "unauthenticated" });
+    await dropPhoto(user.avatar);
+    await prisma.user.update({ where: { id: user.id }, data: { avatar: null, avatarKey: null } });
+    return reply.send({ avatar: null });
+  });
+
+  // Photo d'un membre : réservée aux membres connectés (jamais publique).
+  app.get("/avatars/:key", async (request, reply) => {
+    const viewer = await getSessionUser(request);
+    if (!viewer) return reply.code(401).send({ error: "unauthenticated" });
+    const { key } = request.params as { key: string };
+    if (!/^[A-Za-z0-9_-]{8,40}$/.test(key)) return reply.code(404).send({ error: "not_found" });
+    const owner = await prisma.user.findUnique({ where: { avatarKey: key }, select: { avatar: true } });
+    const a = parseAvatar(owner?.avatar) as { kind: string; path?: string; type?: string } | null;
+    if (!a || a.kind !== "photo" || !a.path) return reply.code(404).send({ error: "not_found" });
+    const data = await readUploadedFile(a.path).catch(() => null);
+    if (!data) return reply.code(404).send({ error: "not_found" });
+    reply.header("content-type", sniffImage(data) ?? "application/octet-stream");
+    reply.header("x-content-type-options", "nosniff");
+    reply.header("content-security-policy", "default-src 'none'");
+    // L'adresse change à chaque nouvelle photo (?v=) : cache long, mais privé.
+    reply.header("cache-control", "private, max-age=604800, immutable");
+    return reply.send(data);
   });
 
   app.patch("/profile", async (request, reply) => {

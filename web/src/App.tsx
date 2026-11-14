@@ -13,6 +13,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 import { NotificationBell } from "./components/NotificationBell";
+import { Avatar } from "./components/Avatar";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 // Page la plus lourde de l'app (carte, profil, simulation, météo) : chargée seulement
@@ -80,7 +81,11 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
             </Link>
           ))}
           {user && <NotificationBell />}
-          {user && <span className="hint nav-greeting">Bonjour, {user.prenom}</span>}
+          {user && (
+            <span className="hint nav-greeting nav-me">
+              <Avatar name={user.prenom} avatar={user.avatar} size={26} /> Bonjour, {user.prenom}
+            </span>
+          )}
           <button
             className="ghost"
             onClick={async () => {

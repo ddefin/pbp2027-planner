@@ -5,6 +5,7 @@ import { usePersonalEvents } from "../hooks/usePersonalEvents";
 import { useLicenseDocuments } from "../hooks/useLicenseDocuments";
 import { ApiError } from "../api/auth";
 import { StravaTab } from "../components/strava/StravaTab";
+import { AvatarPicker } from "../components/AvatarPicker";
 import {
   changePassword,
   createTelegramLinkCode,
@@ -64,6 +65,9 @@ export function ProfilePage() {
         </div>
       )}
       <div role="tabpanel" id="pf-panel-compte" aria-labelledby="pf-tab-compte" hidden={tab !== "compte"}>
+      <CollapsibleSection title="Mon avatar" summary="Photo ou icône, visible des autres membres">
+        <AvatarPicker />
+      </CollapsibleSection>
       <CollapsibleSection title="Mon profil" summary="Prénom, adresse e-mail">
         <ProfileSection />
       </CollapsibleSection>

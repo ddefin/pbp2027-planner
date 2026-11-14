@@ -1,4 +1,4 @@
-import { ApiError } from "./auth";
+import { ApiError, type AvatarData } from "./auth";
 
 export interface CatalogParticipant {
   displayName: string;
@@ -6,6 +6,7 @@ export interface CatalogParticipant {
   // Identifiant opaque et stable (distingue deux homonymes) ; jamais l'email ni l'id.
   memberKey: string;
   mine: boolean;
+  avatar?: AvatarData;
 }
 
 export interface CatalogEvent {

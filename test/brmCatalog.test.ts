@@ -258,7 +258,7 @@ describe("API catalogue BRM (ACP)", () => {
     const eventForB = listB.json().events.find((e: { id: string }) => e.id === eventId);
     expect(eventForB.myStatus).toBeNull();
     // Vu par B : le choix de A, qui n'est pas le sien, avec un identifiant opaque.
-    expect(eventForB.participants).toEqual([{ displayName: eventForB.participants[0].displayName, status: "prevu", mine: false, memberKey: expect.stringMatching(/^[A-Za-z0-9_-]{12}$/) }]);
+    expect(eventForB.participants).toEqual([{ displayName: eventForB.participants[0].displayName, status: "prevu", mine: false, avatar: null, memberKey: expect.stringMatching(/^[A-Za-z0-9_-]{12}$/) }]);
 
     // A change d'avis -> "inscrit"
     await server.inject({

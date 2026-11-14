@@ -25,6 +25,10 @@ model User {
   suspendedAt            DateTime?
   suspendedReason        String?
   isSystem               Boolean               @default(false)
+  // Avatar choisi dans « Mon profil » : JSON {kind:"preset",icon,color} ou {kind:"photo",path,v}.
+  // avatarKey : jeton aléatoire qui sert d'adresse à la photo (jamais l'id du compte).
+  avatar                 String?
+  avatarKey              String?               @unique
   createdAt              DateTime              @default(now())
   sessions               Session[]
   passwordResetTokens    PasswordResetToken[]
@@ -47,6 +51,7 @@ model User {
   notifications          Notification[]
   pbpRoutes              PbpRoute[]
   roadbooks              Roadbook[]
+  brmReminders           BrmReminder[]
 }
 
 model Session {
@@ -425,6 +430,9 @@ model Roadbook {
   // Publier un résumé de situation sur le canal Telegram du groupe à chaque pointage
   // (opt-out possible : ce sont les positions de la personne).
   telegramAnnounce       Boolean           @default(true)
+  // Carte du groupe le jour J : le dernier pointage est visible des autres membres
+  // seulement si le randonneur l'a accepté (faux par défaut).
+  groupShare             Boolean           @default(false)
   lastAnnouncedAt        DateTime?
   // Résultat de la DERNIÈRE tentative de publication sur le canal : null = réussie,
   // sinon le motif renvoyé par Telegram (affiché au randonneur dans son roadbook).
@@ -593,4 +601,16 @@ model AdminAuditLog {
   @@index([createdAt])
   @@index([targetType, targetId])
   @@index([actorId, createdAt])
+}
+
+// Rappels envoyés avant un BRM choisi sur le calendrier (J-7, J-1) : jamais deux fois.
+model BrmReminder {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  catalogEventId String
+  kind           String // j7 | j1
+  sentAt         DateTime @default(now())
+
+  @@unique([userId, catalogEventId, kind])
 }

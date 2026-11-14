@@ -23,10 +23,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+// Avatar d'un membre : illustré (icône + couleur), photo, ou null (initiales).
+export type AvatarData = { kind: "preset"; icon: string; color: string } | { kind: "photo"; url: string } | null;
+
 export interface SessionInfo {
   email: string;
   prenom: string;
   isAdmin: boolean;
+  avatar?: AvatarData;
 }
 
 export type LoginResult = { status: "authenticated" };

@@ -3,6 +3,7 @@ import { prisma } from "../../db.js";
 import { actorOf } from "../../lib/adminGuard.js";
 import { periodQuery } from "../../shared/adminSchemas.js";
 import { ONLINE_MS } from "../../shared/presence.js";
+import { avatarOf } from "../../lib/avatar.js";
 
 const DAY = 86_400_000;
 const AUTH_RETENTION_DAYS = 60; // voir src/lib/authEvents.ts
@@ -82,13 +83,13 @@ export async function adminOverviewRoutes(app: FastifyInstance) {
     for (const m of msgs) { const i = idx.get(keyOf(m.createdAt)); if (i !== undefined) series[i].messages++; }
     for (const c of checkins) { const i = idx.get(keyOf(c.at)); if (i !== undefined) series[i].pointages++; }
 
-    const recentUsers = await prisma.user.findMany({ where: realUser, orderBy: { createdAt: "desc" }, take: 5, select: { id: true, prenom: true, email: true, createdAt: true } });
+    const recentUsers = await prisma.user.findMany({ where: realUser, orderBy: { createdAt: "desc" }, take: 5, select: { id: true, prenom: true, email: true, createdAt: true, avatar: true, avatarKey: true } });
     const onlineSessions = await prisma.session.findMany({
       where: { lastSeenAt: { gte: new Date(now.getTime() - ONLINE_MS) }, user: realUser },
-      select: { user: { select: { id: true, prenom: true } } },
+      select: { user: { select: { id: true, prenom: true, avatar: true, avatarKey: true } } },
       distinct: ["userId"],
     });
-    const online = onlineSessions.map((x) => x.user).sort((a, b) => a.prenom.localeCompare(b.prenom, "fr"));
+    const online = onlineSessions.map(({ user: u }) => ({ id: u.id, prenom: u.prenom, avatar: avatarOf(u) })).sort((a, b) => a.prenom.localeCompare(b.prenom, "fr"));
     const recentAudit = await prisma.adminAuditLog.findMany({ orderBy: { createdAt: "desc" }, take: 6 });
 
     return reply.send({
@@ -102,7 +103,7 @@ export async function adminOverviewRoutes(app: FastifyInstance) {
         incidents: { value: incidents, previous: authComparable ? incidentsPrev : null, change: authComparable ? change(incidents, incidentsPrev) : null, partial: !authComparable },
       },
       series,
-      recentUsers: recentUsers.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() })),
+      recentUsers: recentUsers.map(({ avatar, avatarKey, ...u }) => ({ ...u, avatar: avatarOf({ avatar, avatarKey }), createdAt: u.createdAt.toISOString() })),
       recentAudit: recentAudit.map((a) => ({ id: a.id, action: a.action, actorEmail: a.actorEmail, targetLabel: a.targetLabel, targetType: a.targetType, targetId: a.targetId, at: a.createdAt.toISOString() })),
     });
   });

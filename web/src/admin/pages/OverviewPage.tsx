@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Activity, AlertTriangle, CheckCircle2, CircleAlert, ScrollText, UserPlus, Users } from "lucide-react";
 import { PageHeader } from "../components/PageHeader";
+import { Avatar } from "../../components/Avatar";
 import { KpiCard } from "../components/KpiCard";
 import { ActivityChart } from "../components/ActivityChart";
 import { EmptyState, Skeleton } from "../components/States";
@@ -110,7 +111,9 @@ export function OverviewPage() {
             <ul className="ad-online">
               {data.online.users.map((u) => (
                 <li key={u.id}>
-                  <Link to={`/admin/utilisateurs/${u.id}`}>{u.prenom}</Link>
+                  <Link to={`/admin/utilisateurs/${u.id}`}>
+                    <Avatar name={u.prenom} avatar={u.avatar} size={20} /> {u.prenom}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -147,7 +150,7 @@ export function OverviewPage() {
               {data.recentUsers.map((u) => (
                 <li key={u.id}>
                   <Link to={`/admin/utilisateurs/${u.id}`} className="ad-list-main">
-                    <span className="ad-mini-avatar" aria-hidden="true">{u.prenom.slice(0, 1).toUpperCase()}</span>
+                    <Avatar name={u.prenom} avatar={u.avatar} size={30} />
                     <span>
                       <strong>{u.prenom}</strong>
                       <small>{u.email}</small>

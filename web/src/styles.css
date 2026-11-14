@@ -3138,3 +3138,137 @@ button.link {
     width: 100%;
   }
 }
+
+/* ───── Avatars ───── */
+.av {
+  --av: #64748b;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--av);
+  color: #fff;
+  font-family: var(--font-body);
+  font-weight: 800;
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+.av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* Fonds assez sombres pour une icône ou une initiale blanche (contraste ≥ 4,5:1). */
+.av-coral { --av: #c8324a; }
+.av-blue { --av: #1d4ed8; }
+.av-green { --av: #15803d; }
+.av-amber { --av: #b45309; }
+.av-violet { --av: #6d28d9; }
+.av-teal { --av: #0f766e; }
+.av-slate { --av: #475569; }
+.av-rose { --av: #be185d; }
+
+.avp {
+  display: grid;
+  gap: 14px;
+}
+.avp-current {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.avp-group {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.avp-group legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-weight: 700;
+  font-size: 13px;
+}
+.avp-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 6px;
+}
+.avp-icon {
+  display: grid;
+  place-items: center;
+  width: auto;
+  height: 46px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  color: var(--fg);
+  cursor: pointer;
+}
+.avp-icon.is-on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.avp-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.avp-color {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 3px solid var(--panel);
+  border-radius: 50%;
+  background: var(--av);
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.avp-color.is-on {
+  box-shadow: 0 0 0 3px var(--fg);
+}
+.avp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.avp-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+}
+.avp-ok {
+  margin: 0;
+  color: var(--ok);
+  font-weight: 700;
+}
+.avp-err {
+  margin: 0;
+  color: var(--bad);
+  font-weight: 700;
+}
+.nav-me {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.msg .who .av {
+  margin-right: 4px;
+}
+.gb-avatar {
+  background: transparent;
+  border-width: 2px;
+}
+.gb-avatar .av {
+  width: 100% !important;
+  height: 100% !important;
+}
+.sortie .title .av,
+.ad-online a .av {
+  margin-right: 4px;
+}

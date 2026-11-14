@@ -1,4 +1,5 @@
 import type { CatalogEvent } from "../../api/brmCatalog";
+import type { AvatarData } from "../../api/auth";
 import { QUALIFYING_STEPS, stepFor } from "../../../../src/shared/qualification";
 
 export const GROUP_DISTANCES = [200, 300, 400, 600, 1000] as const;
@@ -8,6 +9,7 @@ export interface Member {
   key: string;
   name: string; // prénom, suffixé d'un numéro si deux randonneurs portent le même
   mine: boolean;
+  avatar?: AvatarData;
   entries: { event: CatalogEvent; status: string }[];
 }
 
@@ -24,7 +26,7 @@ export function buildMembers(events: CatalogEvent[]): Member[] {
   const map = new Map<string, Member>();
   for (const e of events) {
     for (const p of e.participants) {
-      const m = map.get(p.memberKey) ?? { key: p.memberKey, name: p.displayName, mine: p.mine, entries: [] };
+      const m = map.get(p.memberKey) ?? { key: p.memberKey, name: p.displayName, mine: p.mine, avatar: p.avatar, entries: [] };
       m.entries.push({ event: e, status: p.status });
       map.set(p.memberKey, m);
     }

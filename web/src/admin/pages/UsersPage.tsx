@@ -6,6 +6,7 @@ import { DataTable, type Column } from "../components/DataTable";
 import { EmptyState } from "../components/States";
 import { RoleBadge, StatusBadge } from "../components/StatusBadge";
 import { PresenceDot } from "../components/PresenceDot";
+import { Avatar } from "../../components/Avatar";
 import { useUserActions } from "../components/UserActions";
 import { useToast } from "../components/Toaster";
 import { Dialog } from "../components/Dialog";
@@ -134,7 +135,7 @@ export function UsersPage() {
         sortable: true,
         render: (u) => (
           <Link to={`/admin/utilisateurs/${u.id}`} className="ad-user-cell">
-            <span className="ad-mini-avatar" aria-hidden="true">{u.prenom.slice(0, 1).toUpperCase()}</span>
+            <Avatar name={u.prenom} avatar={u.avatar} size={30} />
             <span>
               <strong>
                 {u.prenom} <PresenceDot presence={u.presence} lastSeenAt={u.lastSeenAt} compact />

@@ -1,3 +1,5 @@
+import type { AvatarData } from "../api/auth";
+
 export type UserStatus = "active" | "suspended" | "locked";
 export type Presence = "online" | "recent" | "away";
 export type Period = "7d" | "30d" | "12m";
@@ -11,7 +13,7 @@ export interface Kpi {
 export interface Overview {
   period: Period;
   totals: { members: number; admins: number; suspended: number };
-  online: { count: number; users: { id: string; prenom: string }[] };
+  online: { count: number; users: { id: string; prenom: string; avatar?: AvatarData }[] };
   kpis: {
     active: Kpi;
     newUsers: Kpi;
@@ -19,7 +21,7 @@ export interface Overview {
     incidents: Kpi & { partial: boolean };
   };
   series: { key: string; label: string; inscriptions: number; messages: number; pointages: number }[];
-  recentUsers: { id: string; prenom: string; email: string; createdAt: string }[];
+  recentUsers: { id: string; prenom: string; email: string; createdAt: string; avatar?: AvatarData }[];
   recentAudit: AuditRow[];
 }
 
@@ -40,6 +42,7 @@ export interface UserRow {
   email: string;
   club: string | null;
   isAdmin: boolean;
+  avatar?: AvatarData;
   createdAt: string;
   lastSeenAt: string | null;
   presence: Presence;
@@ -61,6 +64,7 @@ export interface UserDetail {
     email: string;
     club: string | null;
     licenceNumero: string | null;
+    avatar?: AvatarData;
     isAdmin: boolean;
     createdAt: string;
     status: UserStatus;

@@ -4,6 +4,7 @@ import { LogOut, Menu, Monitor, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun
 import { useAuth } from "../../context/AuthContext";
 import { useTheme, type ThemeChoice } from "../../hooks/useTheme";
 import { Breadcrumbs } from "./Breadcrumbs";
+import { Avatar } from "../../components/Avatar";
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
@@ -35,11 +36,10 @@ function ProfileMenu() {
       document.removeEventListener("keydown", close);
     };
   }, [open]);
-  const initial = (user?.prenom ?? "?").slice(0, 1).toUpperCase();
   return (
     <div className="ad-profile" ref={ref}>
       <button type="button" className="ad-avatar" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} aria-label="Menu du profil">
-        {initial}
+        <Avatar name={user?.prenom ?? "?"} avatar={user?.avatar} size={32} />
       </button>
       {open && (
         <div className="ad-menu" role="menu">

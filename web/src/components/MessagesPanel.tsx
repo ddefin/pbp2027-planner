@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Avatar } from "./Avatar";
 import { useAuth } from "../context/AuthContext";
 import { useGeneralChat } from "../hooks/useGeneralChat";
 import { useConversations, useDirectThread } from "../hooks/useDirectMessages";
@@ -97,7 +98,7 @@ function PrivateTab() {
           <button key={c.peerId} type="button" className={`sortie${c.peerId === active ? " active" : ""}`} onClick={() => setActive(c.peerId)}>
             <div>
               <div className="title">
-                {c.prenom}
+                <Avatar name={c.prenom} avatar={c.avatar} size={24} /> {c.prenom}
                 {c.unread > 0 && (
                   <span className="pill" style={{ marginLeft: 8, padding: "2px 8px", fontSize: 11 }}>
                     {c.unread}
@@ -114,7 +115,9 @@ function PrivateTab() {
             <div className="hint" style={{ margin: "10px 0 4px" }}>Nouveau message</div>
             {usersWithoutConversation.map((u) => (
               <button key={u.id} type="button" className={`sortie${u.id === active ? " active" : ""}`} onClick={() => setActive(u.id)}>
-                <div className="title">{u.prenom}</div>
+                <div className="title">
+                  <Avatar name={u.prenom} avatar={u.avatar} size={24} /> {u.prenom}
+                </div>
               </button>
             ))}
           </>
@@ -309,6 +312,7 @@ function ChatThread({
           return (
             <div className={`msg${mine ? " me" : ""}`} key={m.id}>
               <div className="who">
+                <Avatar name={m.who} avatar={m.avatar} size={20} />
                 {m.who}
                 {mine && (
                   <button type="button" className="msg-delete" title="Supprimer" onClick={() => onDelete(m.id)}>

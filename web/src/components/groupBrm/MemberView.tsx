@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { CATALOG_STATUS_LABEL } from "../../lib/brmMeta";
 import { DistanceBadge } from "./DistanceBadge";
+import { Avatar } from "../Avatar";
 import { dayLabel, memberSteps, type Member } from "./model";
 
 const label = (s: string) => CATALOG_STATUS_LABEL[s as keyof typeof CATALOG_STATUS_LABEL] ?? s;
@@ -17,7 +18,7 @@ export function MemberView({ members, dist, showPast, today }: { members: Member
         return (
           <li key={m.key} className={`gb-member${m.mine ? " is-me" : ""}`}>
             <div className="gb-member-head">
-              <span className="gb-member-avatar" aria-hidden="true">{m.name.slice(0, 1).toUpperCase()}</span>
+              <Avatar name={m.name} avatar={m.avatar} size={32} />
               <strong>
                 {m.name}
                 {m.mine ? " (toi)" : ""}

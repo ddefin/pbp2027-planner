@@ -12,6 +12,7 @@ import { ONLINE_MS, RECENT_MS, presenceOf } from "../../shared/presence.js";
 import { issuePasswordReset } from "../../lib/passwordReset.js";
 import { checkRateLimit } from "../../lib/rateLimit.js";
 import { logAuthEvent } from "../../lib/authEvents.js";
+import { avatarOf } from "../../lib/avatar.js";
 
 const label = (u: { prenom: string; email: string }) => `${u.prenom} (${u.email})`;
 
@@ -90,7 +91,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
     }
     if (and.length) where.AND = and;
 
-    const select = { id: true, prenom: true, email: true, club: true, isAdmin: true, createdAt: true, suspendedAt: true, suspendedReason: true, lockedUntil: true } as const;
+    const select = { id: true, prenom: true, email: true, club: true, isAdmin: true, createdAt: true, suspendedAt: true, suspendedReason: true, lockedUntil: true, avatar: true, avatarKey: true } as const;
     const total = await prisma.user.count({ where });
     let rows: Prisma.UserGetPayload<{ select: typeof select }>[];
     let lastSeen = new Map<string, Date>();
@@ -114,6 +115,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
         email: u.email,
         club: u.club,
         isAdmin: u.isAdmin,
+        avatar: avatarOf(u),
         createdAt: u.createdAt.toISOString(),
         lastSeenAt: lastSeen.get(u.id)?.toISOString() ?? null,
         presence: presenceOf(lastSeen.get(u.id), now),
@@ -150,6 +152,7 @@ export async function adminUsersRoutes(app: FastifyInstance) {
         email: u.email,
         club: u.club,
         licenceNumero: u.licenceNumero,
+        avatar: avatarOf(u),
         isAdmin: u.isAdmin,
         createdAt: u.createdAt.toISOString(),
         status: statusOf(u),

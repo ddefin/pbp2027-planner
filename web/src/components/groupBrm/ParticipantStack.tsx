@@ -3,6 +3,7 @@ import { Check, CircleDashed, ClipboardCheck, Flag } from "lucide-react";
 import type { CatalogParticipant } from "../../api/brmCatalog";
 import { CATALOG_STATUS_LABEL } from "../../lib/brmMeta";
 import { STATUS_RANK } from "./model";
+import { Avatar } from "../Avatar";
 
 const ICON = { prevu: CircleDashed, inscrit: ClipboardCheck, fait: Flag, homologue: Check } as const;
 const MAX = 4;
@@ -22,7 +23,7 @@ export function ParticipantStack({ participants, highlight }: { participants: Ca
           const Icon = ICON[p.status as keyof typeof ICON] ?? CircleDashed;
           return (
             <li key={`${p.memberKey}-${i}`} className={`gb-avatar is-${p.status}${p.mine ? " is-me" : ""}${highlight === p.memberKey ? " is-focus" : ""}`} title={`${p.displayName}${p.mine ? " (toi)" : ""} · ${label(p.status)}`}>
-              <span aria-hidden="true">{p.displayName.slice(0, 1).toUpperCase()}</span>
+              <Avatar name={p.displayName} avatar={p.avatar} size={28} />
               <Icon size={11} className="gb-avatar-status" aria-hidden="true" />
               <span className="gb-sr">
                 {p.displayName}

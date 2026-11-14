@@ -1550,3 +1550,17 @@
   overflow-wrap: anywhere;
   white-space: normal;
 }
+.ad-avatar {
+  padding: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.ad-badges-row {
+  align-items: center;
+}
+.ad-online a {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}

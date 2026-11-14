@@ -3,6 +3,7 @@ import type { RawData, WebSocket } from "ws";
 import { prisma } from "../db.js";
 import { getSessionUser } from "../lib/session.js";
 import { publicName } from "../lib/publicName.js";
+import { avatarOf } from "../lib/avatar.js";
 
 type DmRequest = FastifyRequest & { pbpUser?: Awaited<ReturnType<typeof getSessionUser>> };
 
@@ -87,6 +88,7 @@ export async function messagingWsRoutes(app: FastifyInstance) {
           type: "message",
           id: message.id,
           who: publicName(user),
+          avatar: avatarOf(user),
           fromUserId: user.id,
           text: message.text,
           kind: "text",
@@ -151,6 +153,7 @@ export async function messagingWsRoutes(app: FastifyInstance) {
           id: message.id,
           fromUserId: user.id,
           who: publicName(user),
+          avatar: avatarOf(user),
           text: message.text,
           kind: "text",
           createdAt: message.createdAt.toISOString(),

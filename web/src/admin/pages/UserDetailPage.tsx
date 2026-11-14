@@ -8,6 +8,7 @@ import { useUserActions } from "../components/UserActions";
 import { useBreadcrumbLeaf } from "../components/Breadcrumbs";
 import { errorText, getUser, sendResetLink } from "../api";
 import { PresenceDot } from "../components/PresenceDot";
+import { Avatar } from "../../components/Avatar";
 import { Dialog } from "../components/Dialog";
 import { useToast } from "../components/Toaster";
 import { ACTION_LABEL, EVENT_LABEL, fmtAgo, fmtDate, fmtDateTime } from "../format";
@@ -119,6 +120,7 @@ export function UserDetailPage() {
         }
       />
       <div className="ad-badges-row">
+        <Avatar name={u.prenom} avatar={u.avatar} size={40} />
         <StatusBadge status={u.status} />
         <RoleBadge isAdmin={u.isAdmin} />
         <PresenceDot presence={u.presence} lastSeenAt={u.lastSeenAt} />

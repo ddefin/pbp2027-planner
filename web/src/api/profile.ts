@@ -1,4 +1,4 @@
-import { ApiError } from "./auth";
+import { ApiError, type AvatarData } from "./auth";
 
 export interface Profile {
   email: string;
@@ -101,4 +101,21 @@ export function createTelegramLinkCode() {
 
 export function unlinkTelegram() {
   return request<void>("/profile/telegram", { method: "DELETE" });
+}
+
+export function setPresetAvatar(icon: string, color: string) {
+  return request<{ avatar: AvatarData }>("/profile/avatar", { method: "PUT", body: JSON.stringify({ icon, color }) }).then((r) => r.avatar);
+}
+
+export function clearAvatar() {
+  return request<{ avatar: AvatarData }>("/profile/avatar", { method: "DELETE" }).then((r) => r.avatar);
+}
+
+export async function uploadAvatarPhoto(blob: Blob): Promise<AvatarData> {
+  const form = new FormData();
+  form.append("file", blob, "avatar");
+  const res = await fetch("/api/profile/avatar/photo", { method: "POST", credentials: "include", body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? "unknown_error");
+  return body.avatar as AvatarData;
 }

@@ -1,6 +1,7 @@
 import { prisma } from "../db.js";
 import { deleteUploadedFile } from "./fileStorage.js";
 import { disconnect as disconnectStrava } from "./strava.js";
+import { parseAvatar } from "./avatar.js";
 
 // Compte système qui reprend les contributions de groupe des comptes supprimés.
 export const SYSTEM_EMAIL = "membre-supprime@system.invalid";
@@ -30,7 +31,10 @@ export async function personalFiles(userId: string): Promise<string[]> {
     prisma.licenseDocument.findMany({ where: { userId }, select: { filePath: true } }),
     prisma.parcours.findMany({ where: { brmEvent: { userId } }, select: { filePath: true } }),
   ]);
-  return [...roadbooks, ...licences, ...parcours].map((r) => r.filePath).filter((p): p is string => Boolean(p));
+  const u = await prisma.user.findUnique({ where: { id: userId }, select: { avatar: true } });
+  const avatar = parseAvatar(u?.avatar);
+  const photo = avatar?.kind === "photo" ? [avatar.path] : [];
+  return [...roadbooks, ...licences, ...parcours].map((r) => r.filePath).filter((p): p is string => Boolean(p)).concat(photo);
 }
 
 // Anonymisation : les contributions utiles au groupe (messages, conversations, traces des

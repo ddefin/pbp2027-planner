@@ -1,10 +1,11 @@
-import { ApiError } from "./auth";
+import { ApiError, type AvatarData } from "./auth";
 
 export type MessageKind = "text" | "location" | "file";
 
 export interface ChatMessage {
   id: string;
   who: string;
+  avatar?: AvatarData;
   fromUserId: string;
   text: string;
   kind: MessageKind;
@@ -32,11 +33,13 @@ export interface DmMessage {
 export interface Peer {
   id: string;
   prenom: string;
+  avatar?: AvatarData;
 }
 
 export interface Conversation {
   peerId: string;
   prenom: string;
+  avatar?: AvatarData;
   lastText: string;
   lastAt: string;
   unread: number;
