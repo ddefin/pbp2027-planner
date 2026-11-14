@@ -156,6 +156,7 @@ export interface LiveWeather {
   windFromDeg: number | null;
   relation: "dos" | "face" | "travers" | null;
   rainProbability: number;
+  rainMm: number | null;
   alerts: string[];
 }
 

@@ -1,4 +1,6 @@
 import { ExternalLink } from "lucide-react";
+import type { LiveView } from "../../api/roadbooks";
+import { OnTimeBadge } from "./OnTimeCard";
 import { StatusBadge } from "./StatusBadge";
 import { ago, when, type LiveModel } from "./model";
 
@@ -7,6 +9,7 @@ export function LiveHeader({
   author,
   title,
   model,
+  live,
   liveTrackUrl,
   beaconUrl,
   now,
@@ -14,6 +17,7 @@ export function LiveHeader({
   author: string;
   title: string;
   model: LiveModel;
+  live: LiveView | null;
   liveTrackUrl: string | null | undefined;
   beaconUrl: string | null | undefined;
   now: Date;
@@ -34,6 +38,7 @@ export function LiveHeader({
           {status && last ? (
             <>
               <StatusBadge status={status} />
+              <OnTimeBadge live={live} model={model} />
               <p className="lv-head-last">
                 Pointé à <strong>{model.lastPlace}</strong> à <strong>{when(new Date(last.at), now)}</strong>
                 <span className="lv-head-ago"> — {ago(last.at, now)}</span>

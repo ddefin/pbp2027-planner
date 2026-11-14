@@ -1,8 +1,10 @@
 import { Clock, Gauge, Mountain, Route } from "lucide-react";
+import type { LiveView } from "../../api/roadbooks";
+import { OnTimeCard } from "./OnTimeCard";
 import { duration, hhmm, km, meters, when, type LiveModel } from "./model";
 
 // Bloc 3 (haut) : progression globale et 4 indicateurs.
-export function ProgressPanel({ model, limitMinutes, now }: { model: LiveModel; limitMinutes: number; now: Date }) {
+export function ProgressPanel({ model, live, limitMinutes, now }: { model: LiveModel; live: LiveView | null; limitMinutes: number; now: Date }) {
   const pct = Math.max(0, Math.min(100, (model.lastKm / model.totalKm) * 100));
   const left = Math.max(0, model.totalKm - model.lastKm);
   const elapsedMin = model.last && model.startAt ? (new Date(model.last.at).getTime() - model.startAt.getTime()) / 60_000 : null;
@@ -16,6 +18,8 @@ export function ProgressPanel({ model, limitMinutes, now }: { model: LiveModel; 
       <div className="lv-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label="Progression sur le parcours">
         <span style={{ width: `${pct}%` }} />
       </div>
+
+      <OnTimeCard live={live} model={model} limitMinutes={limitMinutes} now={now} />
 
       <div className="lv-kpis">
         <div className="lv-kpi">

@@ -88,13 +88,13 @@ export function SharedRoadbookPage() {
 
   return (
     <div className="lv">
-      <LiveHeader author={rb.author} title={rb.title} model={model} liveTrackUrl={rb.liveTrackUrl} beaconUrl={rb.beaconUrl} now={now} />
+      <LiveHeader author={rb.author} title={rb.title} model={model} live={live} liveTrackUrl={rb.liveTrackUrl} beaconUrl={rb.beaconUrl} now={now} />
       <main className="lv-grid">
         <div className="lv-col-main">
           <section className="lv-card lv-card-flush" aria-label="Carte du parcours">
             <LiveMap points={rb.points} model={model} now={now} />
           </section>
-          <ProgressPanel model={model} limitMinutes={rb.limitMinutes} now={now} />
+          <ProgressPanel model={model} live={live} limitMinutes={rb.limitMinutes} now={now} />
           <section className="lv-card" aria-labelledby="lv-prof-title">
             <h2 id="lv-prof-title">Profil du parcours</h2>
             <p className="lv-sub">Partie déjà parcourue plus foncée, trait bleu au dernier pointage, numéros des contrôles en bas.</p>

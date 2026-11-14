@@ -4448,3 +4448,94 @@ button.link {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* Page des proches : dans les temps ? / pluie */
+.lv-ontime-badge {
+  --c: var(--lv-route);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 14%, var(--panel));
+  color: var(--fg);
+  font: 700 13.5px var(--font-body);
+}
+.lv-ontime-badge svg {
+  color: var(--c);
+  flex: none;
+}
+.lv-ontime-badge.is-tight,
+.lv-ontime.is-tight { --c: var(--lv-pause); }
+.lv-ontime-badge.is-late,
+.lv-ontime.is-late { --c: var(--lv-abandon); }
+.lv-ontime {
+  --c: var(--lv-route);
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, var(--line));
+  border-left: 5px solid var(--c);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--c) 7%, var(--panel));
+}
+.lv-ontime p {
+  margin: 0;
+}
+.lv-ontime-cap {
+  color: var(--fg-muted);
+  font: 700 12px var(--font-body);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.lv-ontime-main {
+  font-size: 15.5px;
+  font-weight: 700;
+}
+.lv-ontime-main svg {
+  color: var(--c);
+  vertical-align: -3px;
+  margin-right: 2px;
+}
+.lv-ontime-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+.lv-ontime-grid dt {
+  color: var(--fg-muted);
+  font: 700 12px var(--font-body);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.lv-ontime-grid dd {
+  margin: 0;
+  font-size: 14.5px;
+}
+.lv-ontime-grid dd.lv-muted {
+  font-size: 13px;
+}
+.lv-ontime-grid dd.is-ok { font-weight: 700; color: var(--lv-route); }
+.lv-ontime-grid dd.is-tight { font-weight: 700; color: var(--lv-pause); }
+.lv-ontime-grid dd.is-late { font-weight: 700; color: var(--lv-abandon); }
+.lv-rain.is-likely svg { color: #2563eb; }
+.lv-rain.is-maybe svg { color: #0891b2; }
+.lv-rain-sum {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #f59e0b 12%, var(--panel));
+  font-weight: 700;
+  font-size: 14.5px;
+}
+.lv-rain-sum.is-wet {
+  background: color-mix(in srgb, #2563eb 14%, var(--panel));
+}
+.lv-rain-sum svg {
+  flex: none;
+}

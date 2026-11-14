@@ -22,6 +22,7 @@ export interface LiveWeather {
   windFromDeg: number | null; // d'où vient le vent (convention météo)
   relation: "dos" | "face" | "travers" | null;
   rainProbability: number;
+  rainMm: number | null;
   alerts: string[];
 }
 
@@ -62,6 +63,7 @@ function toLiveWeather(w: WeatherPoint): LiveWeather {
     windFromDeg: w.slot.windFromDeg,
     relation: w.relation,
     rainProbability: w.slot.precipitationProbability,
+    rainMm: w.slot.rainMm ?? null,
     alerts: w.alerts,
   };
 }

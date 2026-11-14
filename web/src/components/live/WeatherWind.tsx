@@ -1,4 +1,5 @@
-import { ArrowUp, Bike, CloudRain, Moon, Sunset, Thermometer, TriangleAlert, Wind } from "lucide-react";
+import { ArrowUp, Bike, CloudRain, Moon, Sun, Sunset, Thermometer, TriangleAlert, Umbrella, Wind } from "lucide-react";
+import { rainPhrase } from "../../../../src/shared/onTime";
 import type { LiveView, LiveWeather } from "../../api/roadbooks";
 import { daylight } from "../../../../src/shared/sunTimes";
 import { duration, when } from "./model";
@@ -42,9 +43,15 @@ function Slot({ w, bearing, now }: { w: LiveWeather & { hoursAhead: number }; be
           {w.description}
         </span>
       </p>
-      <p className="lv-wx-row">
-        <CloudRain size={16} aria-hidden="true" /> Pluie : <strong>{Math.round(w.rainProbability * 100)} %</strong>
-      </p>
+      {(() => {
+        const r = rainPhrase(w.rainProbability, w.rainMm);
+        const RainIcon = r.level === "likely" ? Umbrella : CloudRain;
+        return (
+          <p className={`lv-wx-row lv-rain is-${r.level}`}>
+            <RainIcon size={16} aria-hidden="true" /> <strong>{r.text}</strong>
+          </p>
+        );
+      })()}
       <div className="lv-wx-wind">
         <WindArrow w={w} bearing={bearing} />
         <div>
@@ -67,6 +74,16 @@ function Slot({ w, bearing, now }: { w: LiveWeather & { hoursAhead: number }; be
 export function WeatherWind({ live, position, now }: { live: LiveView | null; position: { lat: number; lon: number } | null; now: Date }) {
   const day = position ? daylight(position.lat, position.lon, now) : null;
   const alerts = [...new Set((live?.outlook ?? []).flatMap((w) => w.alerts))];
+  const rains = (live?.outlook ?? []).map((w) => rainPhrase(w.rainProbability, w.rainMm).level);
+  const horizon = Math.max(0, ...(live?.outlook ?? []).map((w) => w.hoursAhead));
+  const rainSummary =
+    rains.length === 0
+      ? null
+      : rains.includes("likely")
+        ? { wet: true, text: horizon ? `Pluie attendue dans les ${horizon} prochaines heures` : "Il pleut ou il va pleuvoir là où il est" }
+        : rains.includes("maybe")
+          ? { wet: true, text: horizon ? `Averses possibles dans les ${horizon} prochaines heures` : "Averses possibles là où il est" }
+          : { wet: false, text: horizon ? `Temps sec pour les ${horizon} prochaines heures` : "Pas de pluie là où il est" };
   return (
     <section className="lv-card" aria-labelledby="lv-wx-title">
       <h2 id="lv-wx-title">Météo et vent sur son secteur</h2>
@@ -85,6 +102,11 @@ export function WeatherWind({ live, position, now }: { live: LiveView | null; po
         <p className="lv-empty">Météo indisponible pour le moment.</p>
       ) : (
         <>
+          {rainSummary && (
+            <p className={`lv-rain-sum${rainSummary.wet ? " is-wet" : ""}`}>
+              {rainSummary.wet ? <Umbrella size={18} aria-hidden="true" /> : <Sun size={18} aria-hidden="true" />} {rainSummary.text}
+            </p>
+          )}
           {alerts.length > 0 && (
             <p className="lv-alert">
               <TriangleAlert size={17} aria-hidden="true" /> Vigilance : {alerts.map((a) => ALERT[a] ?? a).join(", ")}

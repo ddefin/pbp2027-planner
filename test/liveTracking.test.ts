@@ -173,6 +173,7 @@ describe("Pointage avec statut, lien Beacon et vue en direct", () => {
     expect(now.relation).toBe("dos");
     expect(in2.km).toBeGreaterThan(70); // il aura avancé à son rythme
     expect(in2.rainProbability).toBeCloseTo(0.4);
+    expect(in2.rainMm).toBe(1);
   });
 
   it("abandon : plus de prévision devant, statut et mot transmis", async () => {
