@@ -134,7 +134,7 @@ export function LiveTracker({
         </div>
       </div>
 
-      {feedback && <div className={`live-feedback live-feedback-${feedback.kind}`}>{feedback.text}</div>}
+      {feedback && <div role="status" className={`live-feedback live-feedback-${feedback.kind}`}>{feedback.text}</div>}
 
       <p className="hint" style={{ marginBottom: 0 }}>
         Aucun suivi en continu : le GPS ne s'allume qu'au moment où tu pointes, le temps d'une localisation. Chaque pointage met

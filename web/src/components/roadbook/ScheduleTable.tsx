@@ -56,13 +56,21 @@ export function ScheduleTable({
               <tr key={`${row.km}-${i}`} className={passed ? "is-passed" : undefined} onClick={() => onSelectKm?.(row.km)}>
                 <td className="rb-cell-name">
                   {editable ? (
-                    <input className="rb-input no-print-border" value={sorted[i].name} maxLength={80} onClick={(e) => e.stopPropagation()} onChange={(e) => update(i, { name: e.target.value })} />
+                    <input className="rb-input no-print-border" aria-label={`Nom du contrôle au km ${row.km.toFixed(1)}`} value={sorted[i].name} maxLength={80} onClick={(e) => e.stopPropagation()} onChange={(e) => update(i, { name: e.target.value })} />
                   ) : (
                     <strong>{row.name}</strong>
                   )}
                   {row.legGainM !== null && row.legGainM > 0 && <div className="ctrl-note">D+ {row.legGainM} m depuis le précédent</div>}
                 </td>
-                <td className="num tabular" data-label="Km">{row.km.toFixed(1)}</td>
+                <td className="num tabular" data-label="Km">
+                  {onSelectKm ? (
+                    <button type="button" className="cell-btn" aria-label={`Montrer ${row.name}, km ${row.km.toFixed(1)}, sur la carte et le profil`} onClick={(e) => { e.stopPropagation(); onSelectKm(row.km); }}>
+                      {row.km.toFixed(1)}
+                    </button>
+                  ) : (
+                    row.km.toFixed(1)
+                  )}
+                </td>
                 <td className="num tabular" data-label="Étape" data-empty={i === 0 ? "" : undefined}>{i === 0 ? "" : row.legKm.toFixed(1)}</td>
                 <td className="tabular" data-label="Arrivée prévue">
                   <strong>{clock(startAt, row.arriveMin)}</strong>

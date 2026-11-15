@@ -77,7 +77,7 @@ export function LiveTrackCard({
           Enregistrer
         </button>
       </form>
-      {state && <div className={`live-feedback live-feedback-${state.kind}`}>{state.text}</div>}
+      {state && <div role="status" className={`live-feedback live-feedback-${state.kind}`}>{state.text}</div>}
     </Disclosure>
   );
 }
@@ -152,7 +152,7 @@ export function BeaconCard({
           Enregistrer
         </button>
       </form>
-      {state && <div className={`live-feedback live-feedback-${state.kind}`}>{state.text}</div>}
+      {state && <div role="status" className={`live-feedback live-feedback-${state.kind}`}>{state.text}</div>}
     </Disclosure>
   );
 }
@@ -234,7 +234,7 @@ export function TelegramCard({
       </label>
 
       {telegramAnnounce && announceStatus?.lastAttemptAt && (
-        <div className={`live-feedback live-feedback-${announceStatus.lastError ? "error" : "ok"}`}>
+        <div role="status" className={`live-feedback live-feedback-${announceStatus.lastError ? "error" : "ok"}`}>
           {announceStatus.lastError ? (
             <>
               ⚠️ Dernière publication ÉCHOUÉE ({hhmm(announceStatus.lastAttemptAt)}) : {announceStatus.hint}
@@ -270,7 +270,7 @@ export function TelegramCard({
           <button type="button" className="ghost" disabled={test.busy} onClick={runTest}>
             {test.busy ? "Test en cours…" : "🔧 Tester la publication sur le canal (admin)"}
           </button>
-          {test.text && <div className={`live-feedback live-feedback-${test.ok ? "ok" : "error"}`}>{test.text}</div>}
+          {test.text && <div role="status" className={`live-feedback live-feedback-${test.ok ? "ok" : "error"}`}>{test.text}</div>}
           {test.chats && (
             <div className="rb-known-chats">
               <strong>Canaux et groupes connus du bot</strong>

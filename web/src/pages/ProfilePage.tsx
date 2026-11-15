@@ -204,7 +204,7 @@ function PasswordSection() {
 
   return (
     <>
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner" role="alert">{error}</div>}
       <form onSubmit={handleSubmit}>
         <div className="field">
           <label htmlFor="current-password">Mot de passe actuel</label>
@@ -433,7 +433,7 @@ function LicenseSection() {
         Scan ou photo de ta licence FFCT/ACP (PDF, PNG ou JPEG, 10 Mo max). Chaque import garde le précédent dans
         l'archive plutôt que de l'effacer — pratique pour retrouver tes licences des années passées.
       </p>
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner" role="alert">{error}</div>}
 
       {current ? (
         <div>
@@ -565,7 +565,7 @@ function TelegramSection() {
         Reçois en message privé tes notifications personnalisées (changement de statut sur un BRM choisi), en plus de
         la cloche de l'application.
       </p>
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner" role="alert">{error}</div>}
 
       {status.linked ? (
         <div className="security-row">

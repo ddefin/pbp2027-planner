@@ -44,7 +44,7 @@ export function RoadbooksPage() {
           horaires officielles, et suivi en direct le jour J (avec un lien à partager à tes proches).
         </p>
         <GpxDropzone onFile={handleFile} busy={busy} />
-        {error && <div className="error-banner" style={{ marginTop: 10 }}>{error}</div>}
+        {error && <div className="error-banner" role="alert" style={{ marginTop: 10 }}>{error}</div>}
       </section>
 
       <section className="panel">

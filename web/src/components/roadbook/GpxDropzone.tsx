@@ -44,7 +44,7 @@ export function GpxDropzone({ onFile, busy }: { onFile: (file: File) => void; bu
       <div className="hint" style={{ margin: 0 }}>
         ou touche pour choisir un fichier · trace exportée d'OpenRunner, Komoot, RideWithGPS, Garmin… (25 Mo max)
       </div>
-      {error && <div className="error-banner" style={{ marginTop: 10 }}>{error}</div>}
+      {error && <div className="error-banner" role="alert" style={{ marginTop: 10 }}>{error}</div>}
       <input
         ref={inputRef}
         type="file"

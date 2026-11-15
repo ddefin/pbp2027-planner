@@ -105,7 +105,7 @@ export function GroupMapPage() {
         <p className="hint">
           Dernier pointage des randonneurs en brevet qui ont accepté d'apparaître ici. Pas de suivi GPS : la position est celle de leur dernier pointage.
         </p>
-        {error && <div className="error-banner">Impossible de charger la carte du groupe.</div>}
+        {error && <div className="error-banner" role="alert">Impossible de charger la carte du groupe.</div>}
         <div ref={boxRef} className="gm-map" role="application" aria-label="Carte des derniers pointages du groupe" />
 
         {riders && riders.length === 0 && (

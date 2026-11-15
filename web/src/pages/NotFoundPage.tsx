@@ -36,7 +36,7 @@ export function NotFoundPage() {
   }, []);
 
   return (
-    <div className="auth-shell">
+    <main className="auth-shell">
       <div className="auth-card">
         {checking ? (
           <>
@@ -51,6 +51,6 @@ export function NotFoundPage() {
           </>
         )}
       </div>
-    </div>
+    </main>
   );
 }

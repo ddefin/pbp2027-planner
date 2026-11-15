@@ -104,7 +104,7 @@ export function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
       {open && (
         <div style={{ marginTop: 8 }}>
           {loading && <p className="hint" style={{ margin: 0 }}>Chargement…</p>}
-          {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
 
           {!loading && track && (
             <>
@@ -171,7 +171,7 @@ export function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
               {/* Variantes de tracé (comparateur) */}
               <div style={{ marginTop: 12 }}>
                 <p className="hint" style={{ margin: 0, fontWeight: 700 }}>Variantes à comparer</p>
-                {variantError && <div className="error-banner">{variantError}</div>}
+                {variantError && <div className="error-banner" role="alert">{variantError}</div>}
                 {variants.map((v, i) => (
                   <div key={v.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, margin: "3px 0" }}>
                     <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: VARIANT_LEGEND_COLORS[i % VARIANT_LEGEND_COLORS.length] }} />

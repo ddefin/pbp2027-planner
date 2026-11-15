@@ -124,14 +124,14 @@ export function StravaTab() {
     setBusy(null);
   }
 
-  if (error && !status) return <div className="error-banner">{error}</div>;
+  if (error && !status) return <div className="error-banner" role="alert">{error}</div>;
   if (!status) return <p className="hint">Chargement…</p>;
 
   const acc = status.account;
   return (
     <div className="sv">
       {notice && <div className="sv-notice" role="status">{notice}</div>}
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner" role="alert">{error}</div>}
 
       {!status.connected && (
         <section className="panel sv-hero">

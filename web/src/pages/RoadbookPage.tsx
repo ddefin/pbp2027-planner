@@ -152,7 +152,7 @@ export function RoadbookPage() {
     [id, afterSend, flush, checkinStatus, checkinNote],
   );
 
-  if (error) return <div className="wrap"><div className="error-banner">{error}</div></div>;
+  if (error) return <div className="wrap"><div className="error-banner" role="alert">{error}</div></div>;
   if (!data) return <p className="hint" style={{ padding: 24 }}>Chargement du roadbook…</p>;
 
   const saveLabel =

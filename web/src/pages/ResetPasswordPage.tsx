@@ -39,7 +39,7 @@ export function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="auth-shell">
+      <main className="auth-shell">
         <div className="auth-card">
           <h1>Lien invalide</h1>
           <p className="hint">Ce lien de réinitialisation est incomplet. Redemande-en un nouveau.</p>
@@ -47,12 +47,12 @@ export function ResetPasswordPage() {
             Demander un nouveau lien
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="auth-shell">
+    <main className="auth-shell">
       <div className="auth-card">
         <div className="brand">
           PBP<span>2027</span>
@@ -60,7 +60,7 @@ export function ResetPasswordPage() {
         </div>
         <form onSubmit={handleSubmit}>
           <h1>Nouveau mot de passe</h1>
-          {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
           <div className="field">
             <label htmlFor="password">Nouveau mot de passe (10 caractères min.)</label>
             <input
@@ -90,6 +90,6 @@ export function ResetPasswordPage() {
           </button>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

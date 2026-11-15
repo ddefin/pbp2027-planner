@@ -35,7 +35,7 @@ export function GroupBrmSection() {
         </Link>
       </div>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner" role="alert">{error}</div>}
       {loading && (
         <div className="gb-skel" aria-hidden="true">
           {[0, 1, 2].map((i) => (

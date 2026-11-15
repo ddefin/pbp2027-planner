@@ -48,7 +48,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth-shell">
+    <main className="auth-shell">
       <div className="auth-card">
         <div className="brand">
           PBP<span>2027</span>
@@ -57,7 +57,7 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit}>
           <h1>Connexion</h1>
-          {error && <div className="error-banner">{error}</div>}
+          {error && <div className="error-banner" role="alert">{error}</div>}
           <div className="field">
             <label htmlFor="email">Email</label>
             <input
@@ -89,6 +89,6 @@ export function LoginPage() {
           </p>
         </form>
       </div>
-    </div>
+    </main>
   );
 }

@@ -25,6 +25,21 @@ function readStored(key: string | undefined): boolean | null {
 //   l'emporte alors sur `defaultOpen`.
 // Le contenu reste monté même fermé (attribut hidden) : un champ à moitié rempli ou un
 // état chargé n'est pas perdu en refermant.
+// Emoji décoratif en tête de titre (« 🏆 Mes records ») : visible, mais pas lu par VoiceOver
+// (il annoncerait « trophée, Mes records »).
+const LEADING_EMOJI = /^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)\s+/u;
+function decorativeEmoji(title: ReactNode): ReactNode {
+  if (typeof title !== "string") return title;
+  const m = title.match(LEADING_EMOJI);
+  if (!m) return title;
+  return (
+    <>
+      <span aria-hidden="true">{m[1]} </span>
+      {title.slice(m[0].length)}
+    </>
+  );
+}
+
 export function Disclosure({
   title,
   summary,
@@ -65,7 +80,7 @@ export function Disclosure({
     <div className={`disc${open ? " is-open" : ""}`}>
       <button type="button" className="disc-head" onClick={toggle} aria-expanded={open} aria-controls={bodyId}>
         <span className="disc-text">
-          <span className="disc-title">{title}</span>
+          <span className="disc-title">{decorativeEmoji(title)}</span>
           {!open && summary && <span className={`disc-summary disc-${tone}`}>{summary}</span>}
         </span>
         <span className={`disc-caret${open ? " open" : ""}`} aria-hidden="true">

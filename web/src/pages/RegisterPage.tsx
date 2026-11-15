@@ -24,7 +24,7 @@ export function RegisterPage() {
 
   if (done) {
     return (
-      <div className="auth-shell">
+      <main className="auth-shell">
         <div className="auth-card">
           <h1>Compte créé</h1>
           <p className="hint">Tu peux maintenant te connecter.</p>
@@ -32,12 +32,12 @@ export function RegisterPage() {
             Aller à la connexion
           </button>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="auth-shell">
+    <main className="auth-shell">
       <div className="auth-card">
         <div className="brand">
           PBP<span>2027</span>
@@ -79,6 +79,6 @@ export function RegisterPage() {
           Déjà un compte ? <Link to="/login">Se connecter</Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

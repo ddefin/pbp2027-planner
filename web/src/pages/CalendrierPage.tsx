@@ -41,7 +41,7 @@ export function CalendrierPage() {
           Homologué). Tes choix sont visibles par le groupe et alimentent ton compteur de qualification.
         </p>
 
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" role="alert">{error}</div>}
         {loading && (
           <div className="gb-skel" aria-hidden="true">
             {[0, 1, 2].map((i) => (

@@ -61,7 +61,7 @@ export function ForgotPasswordPage() {
 
   if (notConfigured) {
     return (
-      <div className="auth-shell">
+      <main className="auth-shell">
         <div className="auth-card">
           <h1>Non disponible</h1>
           <p className="hint">
@@ -72,13 +72,13 @@ export function ForgotPasswordPage() {
             Retour à la connexion
           </Link>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (done) {
     return (
-      <div className="auth-shell">
+      <main className="auth-shell">
         <div className="auth-card">
           <h1>Vérifie tes emails</h1>
           <p className="hint">
@@ -107,12 +107,12 @@ export function ForgotPasswordPage() {
             <Link to="/login">Retour à la connexion</Link>
           </p>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="auth-shell">
+    <main className="auth-shell">
       <div className="auth-card">
         <div className="brand">
           PBP<span>2027</span>
@@ -133,6 +133,6 @@ export function ForgotPasswordPage() {
           <Link to="/login">Retour à la connexion</Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }

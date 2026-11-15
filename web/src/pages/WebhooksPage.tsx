@@ -23,7 +23,7 @@ export function WebhooksPage() {
           groupe, pas seulement pour toi.
         </p>
 
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" role="alert">{error}</div>}
 
         {newSecret && (
           <div className="panel" style={{ background: "var(--bg)", marginBottom: 16 }}>

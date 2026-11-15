@@ -86,7 +86,7 @@ export function NewsPage() {
           . Dernière mise à jour : {formatUpdatedAt(lastUpdatedAt)}.
         </p>
 
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" role="alert">{error}</div>}
 
         <Disclosure title="Filtres" summary={filterSummary} storageKey="actualites.filtres">
         <div className="cal-filters">

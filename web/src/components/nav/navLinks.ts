@@ -30,3 +30,13 @@ export const ADMIN_LINKS: NavItem[] = [
 export function isActive(pathname: string, to: string): boolean {
   return pathname === to || (to !== "/" && pathname.startsWith(`${to}/`));
 }
+
+// Titre de chaque page (onglet du navigateur et titre lu par VoiceOver au changement de page).
+export function pageTitle(pathname: string): string {
+  const all = [...MAIN_LINKS, ...MORE_LINKS, ...ACCOUNT_LINKS, ...ADMIN_LINKS];
+  const exact = all.find((l) => l.to === pathname);
+  if (exact) return exact.label;
+  if (pathname.startsWith("/roadbooks/")) return "Roadbook";
+  const prefix = all.filter((l) => l.to !== "/" && pathname.startsWith(`${l.to}/`)).sort((a, b) => b.to.length - a.to.length)[0];
+  return prefix?.label ?? "PBP 2027";
+}

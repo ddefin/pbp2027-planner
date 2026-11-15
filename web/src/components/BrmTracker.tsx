@@ -18,7 +18,7 @@ export function BrmTracker({ brm }: { brm: ReturnType<typeof useBrmEvents> }) {
     <section className="panel">
       <h2 style={{ marginBottom: 16 }}>Suivi GPX / temps réalisé</h2>
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && <div className="error-banner" role="alert">{error}</div>}
 
       {loading && <p className="hint">Chargement…</p>}
 

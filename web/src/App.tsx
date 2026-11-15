@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, type ReactNode } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
@@ -13,6 +13,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { WebhooksPage } from "./pages/WebhooksPage";
 import { ParcoursPage } from "./pages/ParcoursPage";
 import { AppNav } from "./components/nav/AppNav";
+import { pageTitle } from "./components/nav/navLinks";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 // Page la plus lourde de l'app (carte, profil, simulation, météo) : chargée seulement
@@ -29,6 +30,22 @@ const pageFallback = <p className="hint" style={{ padding: 24 }}>Chargement…</
 function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOnly?: boolean }) {
   const { status, user } = useAuth();
   const location = useLocation();
+  const h1Ref = useRef<HTMLHeadingElement>(null);
+  const firstRender = useRef(true);
+  const title = pageTitle(location.pathname);
+
+  // Lecteurs d'écran (VoiceOver) : dans une application d'une seule page, rien n'est annoncé
+  // quand on change de page. On met à jour le titre de l'onglet et on place le focus sur le
+  // titre de la nouvelle page, que VoiceOver lit aussitôt. Pas au premier affichage (le
+  // navigateur annonce déjà la page chargée).
+  useEffect(() => {
+    document.title = `${title} — PBP 2027`;
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    h1Ref.current?.focus({ preventScroll: false });
+  }, [location.pathname, title]);
 
   // Une nouvelle version attend (voir main.tsx) : on l'applique au changement de page,
   // moment où un rechargement ne fait rien perdre.
@@ -43,8 +60,16 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
 
   return (
     <div>
+      <a className="skip-link" href="#contenu">
+        Aller au contenu
+      </a>
       <AppNav />
-      {children}
+      <main id="contenu" tabIndex={-1}>
+        <h1 ref={h1Ref} tabIndex={-1} className="sr-only">
+          {title}
+        </h1>
+        {children}
+      </main>
     </div>
   );
 }

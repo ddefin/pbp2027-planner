@@ -53,7 +53,14 @@ export function ControlsTable({
                   </div>
                 </td>
                 <td className="num tabular">
-                  {c.km === null ? "—" : `${indicative && c.officialKm === null ? "≈" : ""}${Math.round(c.km)}`}
+                  {c.km === null ? (
+                    "—"
+                  ) : (
+                    // Le clic sur la ligne (souris) a un équivalent clavier / lecteur d'écran.
+                    <button type="button" className="cell-btn" aria-label={`Montrer ${c.name}, km ${Math.round(c.km)}, sur la carte`} onClick={(e) => { e.stopPropagation(); onSelectKm(c.km!); }}>
+                      {`${indicative && c.officialKm === null ? "≈" : ""}${Math.round(c.km)}`}
+                    </button>
+                  )}
                 </td>
                 <td className="num tabular">{partial === null ? "" : Math.round(partial)}</td>
                 {!indicative && <td className="num tabular">{elev ? elev.gain : ""}</td>}

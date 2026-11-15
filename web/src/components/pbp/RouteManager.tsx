@@ -122,7 +122,7 @@ export function RouteManager({
             {busy ? "Analyse…" : "Importer"}
           </button>
         </div>
-        {error && <div className="error-banner" style={{ marginTop: 8 }}>{error}</div>}
+        {error && <div className="error-banner" role="alert" style={{ marginTop: 8 }}>{error}</div>}
         <p className="hint" style={{ marginBottom: 0 }}>
           {isAdmin
             ? "Un tracé « Officiel » devient automatiquement le tracé affiché par défaut pour tout le monde."

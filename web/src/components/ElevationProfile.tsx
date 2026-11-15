@@ -102,6 +102,18 @@ export function ElevationProfile({
   }
 
   const hover = hoverIdx !== null ? withEle[hoverIdx] : null;
+  // Résumé lu par VoiceOver (le graphique lui-même n'est pas lisible) : distance, D+,
+  // point haut, montées marquantes, et position du curseur s'il y en a une.
+  const top = withEle.reduce((m, p) => ((p.ele ?? -Infinity) > (m.ele ?? -Infinity) ? p : m), withEle[0]);
+  const profileSummary = [
+    `Profil du parcours : ${Math.round(totalKm)} km`,
+    gain.length ? `dénivelé positif ${Math.round(gain[gain.length - 1]).toLocaleString("fr-FR")} m` : null,
+    top?.ele != null ? `point le plus haut ${Math.round(top.ele)} m au km ${Math.round(top.distKm)}` : null,
+    climbs.length ? `${climbs.length} montée${climbs.length > 1 ? "s" : ""} marquante${climbs.length > 1 ? "s" : ""}` : null,
+    typeof doneKm === "number" && doneKm > 0 ? `${Math.round(doneKm)} km déjà parcourus` : typeof cursorKm === "number" ? `repère au km ${Math.round(cursorKm)}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
   const hoverGain = hoverIdx !== null ? gain[hoverIdx] : null;
 
   return (
@@ -110,6 +122,8 @@ export function ElevationProfile({
         ref={svgRef}
         viewBox={`0 0 ${VB_W} ${VB_H}`}
         style={{ width: "100%", height: VB_H, display: "block", cursor: "crosshair" }}
+        role="img"
+        aria-label={profileSummary}
         onMouseMove={(e) => handleMove(e.clientX)}
         onClick={() => hover && onSelectKm?.(hover.distKm)}
         onMouseLeave={() => setHoverIdx(null)}

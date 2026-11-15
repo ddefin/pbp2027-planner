@@ -31,7 +31,7 @@ export function ParcoursPage() {
             {event.date.slice(0, 10)} · limite {formatMinutes(event.limiteMinutes)}
           </p>
         )}
-        {error && <div className="error-banner">{error}</div>}
+        {error && <div className="error-banner" role="alert">{error}</div>}
         {loading && <p className="hint">Chargement…</p>}
 
         {!loading && (

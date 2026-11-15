@@ -71,12 +71,12 @@ export function SharedRoadbookPage() {
 
   if (notFound && !data) {
     return (
-      <div className="auth-shell">
+      <main className="auth-shell">
         <div className="auth-card">
           <h1>Lien expiré</h1>
           <p className="hint">Ce lien de suivi n'existe pas ou a été désactivé par son auteur.</p>
         </div>
-      </div>
+      </main>
     );
   }
   if (!data || !model) return <p className="hint" style={{ padding: 24 }}>Chargement du suivi…</p>;

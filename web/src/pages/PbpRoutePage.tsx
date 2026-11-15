@@ -154,8 +154,8 @@ export function PbpRoutePage() {
             )}
           </div>
         )}
-        {r.error && <div className="error-banner">{r.error}</div>}
-        {geoError && <div className="error-banner">{geoError}</div>}
+        {r.error && <div className="error-banner" role="alert">{r.error}</div>}
+        {geoError && <div className="error-banner" role="alert">{geoError}</div>}
 
         <RouteMap
           points={points}
