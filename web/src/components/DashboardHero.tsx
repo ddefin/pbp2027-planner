@@ -25,7 +25,7 @@ export function DashboardHero({ events }: { events: BrmEvent[] | null }) {
     <div className="hero">
       <div>
         <div className="label">Départ Paris-Brest-Paris 2027</div>
-        <h1 style={{ fontSize: "clamp(20px,3vw,28px)" }}>Rambouillet, dimanche 22 août 2027</h1>
+        <h2 className="hero-date" style={{ fontSize: "clamp(20px,3vw,28px)" }}>Rambouillet, dimanche 22 août 2027</h2>
         <Countdown target={PBP_DATE} />
         <div className="meta">Brevet de 1200 km homologué ACP — 4 BRM de qualification requis dans la saison précédente (un 1000 compte pour le 600).</div>
       </div>
