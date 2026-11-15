@@ -87,7 +87,7 @@ export function CalendrierPage() {
                   <strong className="gb-num">{f.stats.mine}</strong>
                   <span>
                     {f.stats.mine > 1 ? "BRM choisis" : "BRM choisi"} ·{" "}
-                    <button type="button" className="gb-linkbtn" onClick={() => f.setMineOnly(!f.mineOnly)}>
+                    <button type="button" className="gb-linkbtn" onClick={() => f.setMineOnly(!f.mineOnly)} aria-label={f.mineOnly ? "Voir tous les BRM" : "Voir seulement mes BRM choisis"}>
                       {f.mineOnly ? "tout voir" : "voir"}
                     </button>
                   </span>

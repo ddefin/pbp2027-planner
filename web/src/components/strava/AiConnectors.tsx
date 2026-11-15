@@ -35,7 +35,10 @@ function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="sv-copy">
-      <code aria-label={label}>{value}</code>
+      {/* Focalisable : la ligne peut défiler horizontalement, il faut pouvoir la lire au clavier. */}
+      <code aria-label={label} tabIndex={0} role="textbox" aria-readonly="true">
+        {value}
+      </code>
       <button
         type="button"
         className="ghost"

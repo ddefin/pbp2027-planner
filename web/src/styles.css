@@ -823,7 +823,8 @@ button.link {
 .news-pill-acp,
 .news-pill-pbp {
   background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
+  color: var(--fg); /* texte foncé : l'accent sur fond teinté passait sous 4,5:1 */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 .news-card-title {
   font-family: var(--font-display);
@@ -2168,7 +2169,7 @@ button.link {
 @media (min-width: 760px) { .sv-assistants { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .sv-assistant { border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; min-width: 0; }
 .sv-assistant header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.sv-pill { margin-left: auto; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); font-weight: 700; }
+.sv-pill { margin-left: auto; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; background: color-mix(in srgb, var(--ok) 12%, transparent); color: var(--fg); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 50%, transparent); font-weight: 700; }
 .sv-steps li, .sv-insight, .sv-advice li { overflow-wrap: anywhere; }
 .sv-steps { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 4px; }
 .sv-copy { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
@@ -4960,4 +4961,32 @@ li a:not([class]),
 .lv-footer a {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* Lien actif du menu : texte foncé et barre d'accent (l'accent seul sur fond teinté ne
+   suffisait pas en contraste) ; l'état reste aussi annoncé par aria-current. */
+.app-nav-link[aria-current="page"],
+.app-dd-btn.is-active,
+.app-drawer-link[aria-current="page"] {
+  color: var(--fg);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+.app-drawer-link[aria-current="page"] {
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+/* Élément focalisé au clavier jamais caché sous les barres collantes (WCAG 2.4.11). */
+html {
+  scroll-padding-top: 90px;
+}
+.gb {
+  scroll-padding-top: calc(var(--gb-bar-h) + 48px);
+}
+.gb-row :focus-visible {
+  scroll-margin-top: calc(var(--gb-bar-h) + 48px);
+}
+
+/* KOM : fond doré léger, liens en couleur de texte (l'accent n'y était pas assez contrasté). */
+.st-tro-row.is-kom .st-tro-seg a,
+.st-tro-row.is-kom .st-tro-date {
+  color: var(--fg);
 }

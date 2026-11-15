@@ -6,9 +6,9 @@ export function CoachCard({ coach }: { coach: Dashboard["coach"] }) {
   const items = [...coach.diagnostics, ...(coach.balance ? [coach.balance] : [])];
   return (
     <section className="panel sv-coach" aria-labelledby="sv-coach-title">
-      <h3 id="sv-coach-title" className="sv-h">
+      <h2 id="sv-coach-title" className="sv-h">
         🧠 Analyse &amp; conseils du Coach
-      </h3>
+      </h2>
       <p className={`sv-headline sv-lvl-${coach.headline.level}`}>
         {ICON[coach.headline.level]} {coach.headline.text}
       </p>
@@ -35,7 +35,7 @@ export function CoachCard({ coach }: { coach: Dashboard["coach"] }) {
           </ul>
         </details>
       )}
-      <h4 className="sv-h2">Pour les prochains jours</h4>
+      <h3 className="sv-h2">Pour les prochains jours</h3>
       <ol className="sv-advice">
         {coach.advice.map((a) => (
           <li key={a}>{a}</li>
