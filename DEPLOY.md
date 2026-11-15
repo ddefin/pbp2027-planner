@@ -157,15 +157,27 @@ purge celles de plus de 30 jours.
 Pour l'automatiser sans crontab (DSM le déconseille), utilise le
 **Planificateur de tâches** du Panneau de configuration :
 
-1. Créer → Tâche déclenchée → Script défini par l'utilisateur.
-2. Général : utilisateur `admin` (ou celui qui a accès à Docker), déclenchement
-   quotidien à une heure creuse.
-3. Paramètres de tâche → Exécuter la commande :
+1. Créer → **Tâche planifiée** → Script défini par l'utilisateur (pas « Tâche
+   déclenchée » : celle-ci ne se lance qu'au démarrage ou à l'arrêt du NAS).
+2. Général : utilisateur **root** (le script a besoin de Docker, comme `auto-deploy.sh`).
+3. Programmer : tous les jours, à une heure creuse (ex. 3 h 17).
+4. Paramètres de tâche → Exécuter la commande, avec des **chemins absolus** (sous root,
+   `~` désigne `/root`, pas ton dossier). Récupère le chemin exact avec `pwd` dans le
+   dossier du projet :
    ```bash
-   /bin/sh ~/pbp2027-planner/scripts/backup.sh
+   BACKUP_DIR=/volume1/homes/admin/pbp2027-backups /bin/sh /volume1/homes/admin/pbp2027-planner/scripts/backup.sh
    ```
+5. Optionnel : « Envoyer les détails d'exécution par e-mail… uniquement en cas d'erreur ».
+6. Clic droit sur la tâche → **Exécuter** pour tester : la console d'administration doit
+   afficher « Dernière sauvegarde il y a quelques minutes ».
 
-Vérifie ensuite que `~/pbp2027-backups/` est bien inclus dans tes sauvegardes
+Sauvegarde manuelle immédiate :
+```bash
+cd ~/pbp2027-planner
+sudo BACKUP_DIR=/volume1/homes/admin/pbp2027-backups sh scripts/backup.sh
+```
+
+Vérifie ensuite que `/volume1/homes/admin/pbp2027-backups/` est bien inclus dans tes sauvegardes
 NAS existantes (Hyper Backup), pour avoir une copie hors du NAS lui-même.
 
 ## 5. Déploiement
@@ -193,12 +205,13 @@ docker compose down
 ci-dessus. Il vérifie les derniers commits sur `main` et reconstruit seulement
 si besoin (peu coûteux à relancer souvent grâce au cache Docker).
 
-1. Créer → Tâche déclenchée → Script défini par l'utilisateur.
-2. Général : utilisateur **root** (évite les soucis de permissions Docker),
-   déclenchement toutes les 5 minutes.
-3. Paramètres de tâche → Exécuter la commande :
+1. Créer → **Tâche planifiée** → Script défini par l'utilisateur.
+2. Général : utilisateur **root** (évite les soucis de permissions Docker) ;
+   Programmer : tous les jours, toutes les 5 minutes.
+3. Paramètres de tâche → Exécuter la commande, avec le chemin absolu du projet
+   (sous root, `~` désigne `/root`) :
    ```bash
-   /bin/sh ~/pbp2027-planner/scripts/auto-deploy.sh
+   /bin/sh /volume1/homes/admin/pbp2027-planner/scripts/auto-deploy.sh
    ```
 
 Pour forcer un déploiement manuel immédiat (sans attendre le prochain passage) :
