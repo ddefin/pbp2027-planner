@@ -119,11 +119,11 @@ export function TrackMap({
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
       if (p.distKm >= nextArrow && i < points.length - 1) {
-        L.marker([p.lat, p.lon], { icon: arrowIcon(bearing(p, points[i + 1])), interactive: false }).addTo(map);
+        L.marker([p.lat, p.lon], { icon: arrowIcon(bearing(p, points[i + 1])), interactive: false, keyboard: false }).addTo(map);
         nextArrow += ARROW_INTERVAL_KM;
       }
       if (p.distKm >= nextMark) {
-        L.marker([p.lat, p.lon], { icon: kmMarkerIcon(`${nextMark} km`), interactive: false }).addTo(map);
+        L.marker([p.lat, p.lon], { icon: kmMarkerIcon(`${nextMark} km`), interactive: false, keyboard: false }).addTo(map);
         nextMark += KM_MARK_INTERVAL;
       }
     }
@@ -158,7 +158,7 @@ export function TrackMap({
         html: `<div style="font-size: 20px; transform: translate(-50%, -100%);">${CONTROL_POINT_SYMBOL[cp.kind]}</div>`,
         iconSize: [0, 0],
       });
-      const marker = L.marker([cp.lat, cp.lon], { icon });
+      const marker = L.marker([cp.lat, cp.lon], { icon, title: cp.label });
       const deleteBtn = cp.mine && onDeleteControlPointRef.current ? `<br/><button type="button" class="cp-delete-btn" style="margin-top:4px;">Supprimer</button>` : "";
       marker.bindPopup(`<b>${cp.label}</b>${deleteBtn}`);
       marker.on("popupopen", (e) => {

@@ -138,11 +138,12 @@ export function RouteMap({
           L.marker([p.lat, p.lon], {
             icon: divIcon(`<div class="rm-arrow" style="transform: translate(-50%, -50%) rotate(${b}deg)"></div>`),
             interactive: false,
+            keyboard: false, // décoratif : ni focus clavier, ni « bouton » sans nom pour VoiceOver
           }).addTo(layer);
           nextArrow += ARROW_INTERVAL_KM;
         }
         if (p.distKm >= nextMark) {
-          L.marker([p.lat, p.lon], { icon: divIcon(`<div class="rm-km">${nextMark}</div>`), interactive: false }).addTo(layer);
+          L.marker([p.lat, p.lon], { icon: divIcon(`<div class="rm-km">${nextMark}</div>`), interactive: false, keyboard: false }).addTo(layer);
           nextMark += KM_MARK_INTERVAL;
         }
       }
@@ -181,6 +182,7 @@ export function RouteMap({
       const label = group.map((g) => g.step).join("/");
       const marker = L.marker([c.lat, c.lon], {
         icon: divIcon(`<div class="rm-ctrl${isControl ? "" : " rm-ctrl-accueil"}">${label}</div>`),
+        title: group.map((g) => `${g.name}${g.km !== null ? `, km ${Math.round(g.km)}` : ""}`).join(" ; "),
       });
       const passages = group
         .map((g) => {
@@ -222,8 +224,9 @@ export function RouteMap({
       const color = f.windRelation ? RELATION_COLOR[f.windRelation] : "#334155";
       const marker = L.marker([s.lat, s.lon], {
         icon: divIcon(
-          `<div class="rm-wind" style="--wc:${color}"><span style="transform: rotate(${(f.windFromDeg + 180) % 360}deg)">➤</span>${f.windSpeedKmh}</div>`,
+          `<div class="rm-wind" style="--wc:${color}"><span style="transform: rotate(${(f.windFromDeg + 180) % 360}deg)" aria-hidden="true">➤</span>${f.windSpeedKmh}</div>`,
         ),
+        title: `Vent au km ${Math.round(s.km)} : ${f.windSpeedKmh} km/h${f.windRelation ? `, ${({ dos: "de dos", face: "de face", travers: "de travers" } as Record<string, string>)[f.windRelation] ?? ""}` : ""}`,
       });
       marker.on("click", () => onSelectKmRef.current(s.km));
       marker.addTo(layer);
