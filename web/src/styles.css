@@ -1538,8 +1538,14 @@ button.link {
   min-width: 0 !important;
   text-align: right;
 }
+/* Contrôle déjà passé : atténué mais lisible (contraste ≥ 4,5:1), et marqué par une coche
+   pour ne pas reposer sur la seule couleur. */
 .rb-table tr.is-passed td {
-  opacity: 0.55;
+  color: var(--fg-muted);
+}
+.rb-table tr.is-passed .rb-cell-name strong::before {
+  content: "✓ ";
+  color: var(--ok);
 }
 .rb-window {
   font-size: 12px;
@@ -2275,7 +2281,7 @@ button.link {
 .gb-dist small {
   font-size: 11px;
   font-weight: 600;
-  color: var(--fg-muted);
+  color: var(--fg);
 }
 .gb-dist-200 { --c: var(--d200); }
 .gb-dist-300 { --c: var(--d300); }
@@ -3780,7 +3786,7 @@ button.link {
   --lv-arrive: #1d4ed8;
   --lv-abandon: #b91c1c;
   --lv-garmin: #006dbf;
-  --lv-strava: #e34402;
+  --lv-strava: #c63b02; /* orange Strava assombri : texte blanc lisible (≥ 4,5:1) */
   min-height: 100vh;
   background: var(--bg);
 }
@@ -4887,8 +4893,7 @@ button.link {
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.02em;
-  color: var(--fg-muted);
-  opacity: 0.65;
+  color: var(--fg-muted); /* discret par la taille, mais contraste suffisant */
   white-space: nowrap;
 }
 .auth-card .brand .brand-countdown {
@@ -4946,4 +4951,13 @@ h1[tabindex="-1"]:focus {
 .cell-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* Liens au milieu d'un texte : soulignés, pour ne pas reposer sur la seule couleur. */
+p a,
+.hint a,
+li a:not([class]),
+.lv-footer a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

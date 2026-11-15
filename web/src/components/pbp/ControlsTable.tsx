@@ -25,7 +25,7 @@ export function ControlsTable({
   let prevKm: number | null = null;
 
   return (
-    <div className="ctrl-table-wrap">
+    <div className="ctrl-table-wrap" tabIndex={0} role="region" aria-label="Tableau des contrôles (défilable)">
       <table className="ctrl-table">
         <thead>
           <tr>
