@@ -65,12 +65,13 @@ export interface Volume {
   load: number;
 }
 
+// Heures à la minute près (l'interface affiche « 21 h 36 »).
 export function sumVolume(list: ActivityInput[]): Volume {
   const v = list.reduce(
     (acc, a) => ({ km: acc.km + a.distanceM / 1000, hours: acc.hours + a.movingSec / 3600, elevationM: acc.elevationM + a.elevationM, rides: acc.rides + 1, load: acc.load + a.load }),
     { km: 0, hours: 0, elevationM: 0, rides: 0, load: 0 },
   );
-  return { km: round(v.km, 1), hours: round(v.hours, 1), elevationM: Math.round(v.elevationM), rides: v.rides, load: Math.round(v.load) };
+  return { km: round(v.km, 1), hours: Math.round(v.hours * 60) / 60, elevationM: Math.round(v.elevationM), rides: v.rides, load: Math.round(v.load) };
 }
 
 const round = (n: number, d: number) => Math.round(n * 10 ** d) / 10 ** d;

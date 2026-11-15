@@ -1,6 +1,6 @@
 import { ExternalLink, Flame, Gauge, Mountain, Route, Timer, TrendingUp, Zap } from "lucide-react";
 import type { StravaRecords } from "../../api/strava";
-import { activityUrl, frDate, monthLabel, num } from "./stravaFormat";
+import { activityUrl, frDate, hoursMinutes, hoursMinutesSpoken, monthLabel, num } from "./stravaFormat";
 
 const ICON = { distance: Route, elevation: Mountain, duration: Timer, avg: Gauge, vmax: Zap, week: TrendingUp, month: TrendingUp, streak: Flame } as const;
 const UNIT = { km: "km", m: "m", h: "h", "km/h": "km/h", jours: "jours" } as const;
@@ -25,9 +25,15 @@ export function RecordsCard({ data }: { data: StravaRecords }) {
             <li key={r.key} className="st-rec">
               <Icon size={18} aria-hidden="true" />
               <span className="st-rec-label">{r.label}</span>
-              <strong className="st-rec-value">
-                {num(r.value, r.unit === "km/h" || r.unit === "h" ? 1 : 0)} <small>{UNIT[r.unit]}</small>
-              </strong>
+              {r.unit === "h" ? (
+                <strong className="st-rec-value" aria-label={hoursMinutesSpoken(r.value)}>
+                  {hoursMinutes(r.value)}
+                </strong>
+              ) : (
+                <strong className="st-rec-value">
+                  {num(r.value, r.unit === "km/h" ? 1 : 0)} <small>{UNIT[r.unit]}</small>
+                </strong>
+              )}
               <span className="st-rec-when">
                 {when(r)}
                 {r.activityId && (

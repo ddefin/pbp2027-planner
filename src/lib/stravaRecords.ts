@@ -57,7 +57,8 @@ export function personalRecords(list: RecordActivity[]): RecordItem[] {
   const climb = best(list, (a) => a.elevationM);
   push("elevation", "Plus gros dénivelé", climb, climb ? Math.round(climb.elevationM) : null, "m");
   const dur = best(list, (a) => a.movingSec);
-  push("duration", "Plus long temps en selle", dur, dur ? round1(dur.movingSec / 3600) : null, "h");
+  // À la minute près (affiché « 25 h 36 » côté interface).
+  push("duration", "Plus long temps en selle", dur, dur ? Math.round(dur.movingSec / 60) / 60 : null, "h");
   const avgPool = list.filter((a) => kmOf(a) >= MIN_KM_FOR_AVG && a.movingSec > 0);
   const fast = best(avgPool, (a) => a.distanceM / a.movingSec);
   push("avg", `Meilleure moyenne (${MIN_KM_FOR_AVG} km et plus)`, fast, fast ? round1((fast.distanceM / fast.movingSec) * 3.6) : null, "km/h");

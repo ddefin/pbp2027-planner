@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Dashboard, Share } from "../../api/strava";
+import { hoursMinutes, hoursMinutesSpoken } from "./stravaFormat";
 
 const fmt = (n: number, d = 0) => n.toLocaleString("fr-FR", { maximumFractionDigits: d });
 
@@ -14,7 +15,7 @@ export function TrendChart({ weekly }: { weekly: Dashboard["weekly"] }) {
   const bw = Math.min(28, step * 0.62);
   const x = (i: number) => PAD.l + step * i + step / 2;
   const line = weekly.map((w, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${(PAD.t + innerH - (w.load / maxLoad) * innerH).toFixed(1)}`).join(" ");
-  const label = { km: "Distance (km)", hours: "Durée (h)", elevationM: "Dénivelé (m)" }[metric];
+  const label = { km: "Distance (km)", hours: "Durée (heures et minutes)", elevationM: "Dénivelé (m)" }[metric];
   const last = weekly[weekly.length - 1];
   return (
     <div className="sv-trend">
@@ -25,7 +26,7 @@ export function TrendChart({ weekly }: { weekly: Dashboard["weekly"] }) {
           </button>
         ))}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Évolution sur 8 semaines : ${label} et charge. Semaine en cours : ${fmt(last[metric], 1)}.`} className="sv-svg">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Évolution sur 8 semaines : ${label} et charge. Semaine en cours : ${metric === "hours" ? hoursMinutesSpoken(last.hours) : fmt(last[metric], 1)}.`} className="sv-svg">
         {[0.5, 1].map((g) => (
           <line key={g} x1={PAD.l} x2={W - PAD.r} y1={PAD.t + innerH * (1 - g)} y2={PAD.t + innerH * (1 - g)} className="sv-grid" />
         ))}
@@ -35,7 +36,7 @@ export function TrendChart({ weekly }: { weekly: Dashboard["weekly"] }) {
             <g key={w.weekStart}>
               <rect x={x(i) - bw / 2} y={PAD.t + innerH - h} width={bw} height={Math.max(h, w[metric] > 0 ? 2 : 0)} rx={4} className={i === weekly.length - 1 ? "sv-bar sv-bar-now" : "sv-bar"} />
               <text x={x(i)} y={PAD.t + innerH - h - 4} textAnchor="middle" className="sv-val">
-                {w[metric] > 0 ? fmt(w[metric], metric === "hours" ? 1 : 0) : ""}
+                {w[metric] > 0 ? (metric === "hours" ? hoursMinutes(w.hours) : fmt(w[metric], 0)) : ""}
               </text>
               <text x={x(i)} y={H - 8} textAnchor="middle" className="sv-axis">
                 {new Date(`${w.weekStart}T00:00:00Z`).toLocaleDateString("fr-FR", { day: "numeric", month: "short", timeZone: "UTC" })}

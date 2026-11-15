@@ -4,6 +4,7 @@ import { Disclosure } from "../Disclosure";
 import { AiConnectors, CoachSettings } from "./AiConnectors";
 import { CoachCard } from "./CoachCard";
 import { RecordsCard } from "./RecordsCard";
+import { hoursMinutes, hoursMinutesSpoken } from "./stravaFormat";
 import { BrevetChallenges } from "./BrevetChallenges";
 import { SegmentTrophies } from "./SegmentTrophies";
 import { AcwrGauge, IntensityBar, TrendChart } from "./StravaCharts";
@@ -222,7 +223,7 @@ export function StravaTab() {
                   {fmt(v.km)} <small>km</small>
                 </div>
                 <div className="sv-sub tabular">
-                  {fmt(v.hours, 1)} h · {fmt(v.elevationM)} m D+ · {v.rides} sortie{v.rides > 1 ? "s" : ""}
+                  <span aria-label={hoursMinutesSpoken(v.hours)}>{hoursMinutes(v.hours)}</span> · {fmt(v.elevationM)} m D+ · {v.rides} sortie{v.rides > 1 ? "s" : ""}
                 </div>
               </div>
             ))}
