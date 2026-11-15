@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fr.lameteoducyclo.pbp2027",
+      "sha256_cert_fingerprints": [
+        "5B:75:1C:52:0F:B3:DC:5B:3E:E1:AF:75:B6:ED:EB:09:5C:F0:3D:18:9D:C3:09:FB:75:48:17:04:A1:F3:CA:D3"
+      ]
+    }
+  }
+]
