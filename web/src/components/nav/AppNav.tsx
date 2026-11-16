@@ -7,6 +7,14 @@ import { Dropdown } from "./Dropdown";
 import { MobileDrawer } from "./MobileDrawer";
 import { ADMIN_LINKS, isActive, MAIN_LINKS, MORE_LINKS } from "./navLinks";
 import { UserMenu, useSignOut } from "./UserMenu";
+import { preloadPage } from "../../lib/lazyPages";
+
+// Survol, focus ou toucher d'un lien du menu : la page visée est téléchargée en avance.
+function preloadFromEvent(e: { target: EventTarget | null }) {
+  const a = (e.target as Element | null)?.closest?.("a[href]");
+  const href = a?.getAttribute("href");
+  if (href?.startsWith("/")) preloadPage(href);
+}
 
 // Barre du haut. Bureau (≥ 1200 px) : liens fréquents, « Plus », « Administration »
 // (administrateur seulement), cloche, compte. Dessous : cloche + bouton « Menu » qui
@@ -26,7 +34,7 @@ export function AppNav() {
   const adminActive = ADMIN_LINKS.some((l) => isActive(pathname, l.to));
 
   return (
-    <header className="topbar app-nav">
+    <header className="topbar app-nav" onPointerOver={preloadFromEvent} onFocus={preloadFromEvent} onTouchStart={preloadFromEvent}>
       <div className="app-nav-inner">
         <Link to="/" className="brand-link app-nav-brand" aria-label="PBP 2027, tableau de bord">
           <img src="/favicon.svg" alt="" width={30} height={30} className="brand-logo" />

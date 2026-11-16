@@ -37,8 +37,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function listCatalog() {
-  return request<{ events: CatalogEvent[]; window: { from: string; to: string } }>("/brm/catalog");
+// `chosenOnly` : seulement les brevets choisis par au moins un randonneur (tableau de
+// bord), au lieu des ~400 du calendrier complet.
+export function listCatalog(chosenOnly = false) {
+  return request<{ events: CatalogEvent[]; window: { from: string; to: string } }>(`/brm/catalog${chosenOnly ? "?chosen=1" : ""}`);
 }
 
 export function setParticipation(id: string, status: string) {

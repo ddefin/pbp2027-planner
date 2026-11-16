@@ -14,6 +14,7 @@
     "demo": "tsx scripts/demo-flow.ts"
   },
   "dependencies": {
+    "@fastify/compress": "^9.3.0",
     "@fastify/cookie": "^11.1.5",
     "@fastify/multipart": "^10.1.6",
     "@fastify/static": "^10.1.7",

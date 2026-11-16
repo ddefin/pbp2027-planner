@@ -120,7 +120,8 @@ export async function brmCatalogRoutes(app: FastifyInstance) {
       };
     });
 
-    return reply.send({ events: enriched, window: { from: CATALOG_FROM, to: CATALOG_TO } });
+    const chosenOnly = (request.query as { chosen?: string }).chosen === "1";
+    return reply.send({ events: chosenOnly ? enriched.filter((e) => e.participants.length > 0) : enriched, window: { from: CATALOG_FROM, to: CATALOG_TO } });
   });
 
   app.put("/brm/catalog/:id/participation", async (request, reply) => {

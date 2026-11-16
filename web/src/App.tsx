@@ -6,18 +6,18 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { DashboardPage } from "./pages/DashboardPage";
-import { MessagesPage } from "./pages/MessagesPage";
-import { CalendrierPage } from "./pages/CalendrierPage";
-import { NewsPage } from "./pages/NewsPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { WebhooksPage } from "./pages/WebhooksPage";
-import { ParcoursPage } from "./pages/ParcoursPage";
 import { AppNav } from "./components/nav/AppNav";
 import { pageTitle } from "./components/nav/navLinks";
 import { NotFoundPage } from "./pages/NotFoundPage";
 
 // Page la plus lourde de l'app (carte, profil, simulation, météo) : chargée seulement
 // quand on l'ouvre, pour que le reste de l'app démarre aussi vite qu'avant sur mobile.
+const MessagesPage = lazy(() => import("./pages/MessagesPage").then((m) => ({ default: m.MessagesPage })));
+const CalendrierPage = lazy(() => import("./pages/CalendrierPage").then((m) => ({ default: m.CalendrierPage })));
+const NewsPage = lazy(() => import("./pages/NewsPage").then((m) => ({ default: m.NewsPage })));
+const ProfilePage = lazy(() => import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })));
+const WebhooksPage = lazy(() => import("./pages/WebhooksPage").then((m) => ({ default: m.WebhooksPage })));
+const ParcoursPage = lazy(() => import("./pages/ParcoursPage").then((m) => ({ default: m.ParcoursPage })));
 const PbpRoutePage = lazy(() => import("./pages/PbpRoutePage").then((m) => ({ default: m.PbpRoutePage })));
 const RoadbooksPage = lazy(() => import("./pages/RoadbooksPage").then((m) => ({ default: m.RoadbooksPage })));
 const RoadbookPage = lazy(() => import("./pages/RoadbookPage").then((m) => ({ default: m.RoadbookPage })));
@@ -68,7 +68,7 @@ function ProtectedLayout({ children, adminOnly }: { children: ReactNode; adminOn
         <h1 ref={h1Ref} tabIndex={-1} className="sr-only">
           {title}
         </h1>
-        {children}
+        <Suspense fallback={pageFallback}>{children}</Suspense>
       </main>
     </div>
   );

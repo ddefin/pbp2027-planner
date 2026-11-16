@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { compression } from "vite-plugin-compression2";
 
 // En dev, le front (5173) et l'API (3001) sont deux origines distinctes :
 // le proxy évite le CORS et garde les requêtes same-origin pour le cookie de session.
@@ -8,8 +9,24 @@ import { VitePWA } from "vite-plugin-pwa";
 // en collision avec une route côté client (ex. /messagerie existe des deux côtés).
 // En prod, même logique via le reverse proxy (voir web/README.md).
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        // Lots stables d'une version à l'autre (gardés en cache par le navigateur) :
+        // React + routeur d'un côté, la carte Leaflet de l'autre.
+        manualChunks(id) {
+          if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) return "vendor";
+          if (/node_modules\/leaflet\//.test(id)) return "leaflet";
+          return undefined;
+        },
+      },
+    },
+  },
   plugins: [
     react(),
+    // Versions .br et .gz prêtes à servir (voir preCompressed dans src/server.ts) : le
+    // NAS ne compresse pas les fichiers à chaque requête.
+    compression({ algorithms: ["brotliCompress", "gzip"], threshold: 1024, exclude: [/\.(png|woff2|br|gz)$/] }),
     VitePWA({
       registerType: "autoUpdate",
       // Enregistré à la main dans main.tsx (registerSW) plutôt que par le script
@@ -26,7 +43,11 @@ export default defineConfig({
         // ouvert : après un déploiement on gardait l'ancien site, même en rechargeant.
         skipWaiting: true,
         clientsClaim: true,
-        globPatterns: ["**/*.{js,css,html,png,svg,ico}"],
+        globPatterns: ["**/*.{js,css,html,png,svg,ico,woff2}"],
+        // Pas de téléchargement d'avance pour les gros lots rarement utiles (aperçu PDF,
+        // console d'administration) : ils ralentissaient la première visite. Ils restent
+        // chargés normalement quand on ouvre ces écrans.
+        globIgnores: ["**/PdfPreview-*", "**/pdf.worker*", "**/AdminApp-*", "**/adminSchemas-*"],
         // Par défaut, le service worker traite toute navigation (y compris une
         // <iframe src="...">, qui EST une navigation pour le navigateur, pas une
         // simple requête fetch) comme une route de l'app React et la renvoie vers

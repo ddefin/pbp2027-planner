@@ -4,7 +4,6 @@ import { useProfile } from "../hooks/useProfile";
 import { usePersonalEvents } from "../hooks/usePersonalEvents";
 import { useLicenseDocuments } from "../hooks/useLicenseDocuments";
 import { ApiError } from "../api/auth";
-import { StravaTab } from "../components/strava/StravaTab";
 import { AvatarPicker } from "../components/AvatarPicker";
 import {
   changePassword,
@@ -18,6 +17,7 @@ import {
 // pdf.js (~350 Ko) n'a aucune raison d'alourdir le chargement initial de toute
 // l'app pour tout le monde — chargé à la demande seulement quand une licence PDF
 // est effectivement affichée (voir Suspense dans LicensePreview ci-dessous).
+const StravaTab = lazy(() => import("../components/strava/StravaTab").then((m) => ({ default: m.StravaTab })));
 const PdfPreview = lazy(() => import("../components/PdfPreview").then((m) => ({ default: m.PdfPreview })));
 
 // Replié par défaut (sauf la première section) : quatre blocs complets l'un sous
@@ -61,7 +61,9 @@ export function ProfilePage() {
       </nav>
       {tab === "strava" && (
         <div role="tabpanel" id="pf-panel-strava" aria-labelledby="pf-tab-strava">
-          <StravaTab />
+          <Suspense fallback={<p className="hint">Chargement de Strava…</p>}>
+            <StravaTab />
+          </Suspense>
         </div>
       )}
       <div role="tabpanel" id="pf-panel-compte" aria-labelledby="pf-tab-compte" hidden={tab !== "compte"}>

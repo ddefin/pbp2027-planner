@@ -11,7 +11,7 @@ import { useGroupBrmFilters } from "./useGroupBrmFilters";
 // « BRM choisis par le groupe » (tableau de bord) : indicateurs, filtres collants,
 // vue chronologique ou par randonneur. Données : choix faits sur le calendrier.
 export function GroupBrmSection() {
-  const { events, loading, error } = useBrmCatalog();
+  const { events, loading, error } = useBrmCatalog(true);
   const f = useGroupBrmFilters(events);
   const barRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);

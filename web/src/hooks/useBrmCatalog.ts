@@ -6,7 +6,7 @@ function publicNameOf(prenom: string | undefined): string {
   return prenom ?? "Moi";
 }
 
-export function useBrmCatalog() {
+export function useBrmCatalog(chosenOnly = false) {
   const { user } = useAuth();
   const [events, setEvents] = useState<CatalogEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -14,7 +14,7 @@ export function useBrmCatalog() {
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      const res = await listCatalog();
+      const res = await listCatalog(chosenOnly);
       // Le calendrier ACP source liste parfois deux fois le même brevet (entrée
       // strictement identique côté ACP) — même id stable des deux côtés (voir
       // stableId() dans src/lib/acpCatalog.ts). Sans dédoublonnage, deux éléments
@@ -31,7 +31,7 @@ export function useBrmCatalog() {
     } catch {
       setError("Impossible de charger le calendrier des BRM.");
     }
-  }, []);
+  }, [chosenOnly]);
 
   useEffect(() => {
     refresh();

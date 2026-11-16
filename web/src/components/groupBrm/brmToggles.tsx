@@ -1,14 +1,16 @@
-import { useRef, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 import { useCatalogMeteo } from "../../hooks/useCatalogMeteo";
 import { useCatalogTrack } from "../../hooks/useCatalogTrack";
 import { useControlPoints } from "../../hooks/useControlPoints";
 import { useTrackVariants } from "../../hooks/useTrackVariants";
 import { WeatherPanel } from "../WeatherPanel";
-import { TrackMap } from "../TrackMap";
 import { ElevationProfile } from "../ElevationProfile";
 import { compassToDeg, overallBearing, windRelation, WIND_RELATION_LABEL } from "../../lib/gpxAnalysis";
 import { buildEnrichedGpx, downloadGpx } from "../../lib/gpxExport";
 import type { ControlPointKind, TrackPoint } from "../../api/brmCatalog";
+
+// Carte (Leaflet) chargée seulement quand on déplie « Voir la carte ».
+const TrackMap = lazy(() => import("../TrackMap").then((m) => ({ default: m.TrackMap })));
 
 // Météo et carte d'un BRM du calendrier, déplacées telles quelles depuis l'ancienne
 // section « BRM choisis par le groupe » (logique inchangée : chargement au clic).
@@ -108,15 +110,17 @@ export function TrackToggle({ catalogEventId }: { catalogEventId: string }) {
 
           {!loading && track && (
             <>
-              <TrackMap
-                points={track.points}
-                highlight={hoverPoint}
-                controlPoints={controlPoints}
-                onDeleteControlPoint={removeControlPoint}
-                addControlPointMode={addingPoint}
-                onMapClick={handleMapClick}
-                variants={variants}
-              />
+              <Suspense fallback={<p className="hint" style={{ margin: 0 }}>Chargement de la carte…</p>}>
+                <TrackMap
+                  points={track.points}
+                  highlight={hoverPoint}
+                  controlPoints={controlPoints}
+                  onDeleteControlPoint={removeControlPoint}
+                  addControlPointMode={addingPoint}
+                  onMapClick={handleMapClick}
+                  variants={variants}
+                />
+              </Suspense>
               <p className="hint" style={{ marginTop: 8, marginBottom: 6 }}>
                 {track.fileName}
                 {track.distanceKm != null && ` · ${track.distanceKm} km`}

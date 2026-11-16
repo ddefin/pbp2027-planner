@@ -5,6 +5,8 @@ import Fastify from "fastify";
 import cookie from "@fastify/cookie";
 import multipart from "@fastify/multipart";
 import staticFiles from "@fastify/static";
+import compress from "@fastify/compress";
+import { constants as zlibConstants } from "node:zlib";
 import websocket from "@fastify/websocket";
 import { prisma } from "./db.js";
 import { config } from "./config.js";
@@ -41,6 +43,15 @@ const NEWS_SCRAPE_INTERVAL_MS = config.newsScrapeIntervalHours * 60 * 60 * 1000;
 export function buildServer() {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test", trustProxy: true });
 
+  // Réponses texte (JSON de l'API, HTML) compressées : 70 à 80 % de moins sur le réseau.
+  // Brotli en qualité 4 : presque aussi compact que le maximum, mais peu coûteux pour le
+  // processeur du NAS. Les fichiers déjà compressés (images, PDF) ne sont pas touchés.
+  app.register(compress, {
+    global: true,
+    threshold: 1024,
+    encodings: ["br", "gzip"],
+    brotliOptions: { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 4 } },
+  });
   app.register(cookie);
   app.register(websocket);
   app.register(multipart);
@@ -101,7 +112,21 @@ export function buildServer() {
   // Absent en dev courant (Vite tourne à part) : rien ne se branche, aucun effet de bord.
   const webDistDir = process.env.WEB_DIST_PATH ?? path.resolve(process.cwd(), "web/dist");
   if (existsSync(webDistDir)) {
-    app.register(staticFiles, { root: webDistDir });
+    // Fichiers construits : versions .br / .gz déjà prêtes (vite-plugin-compression2), servies
+    // telles quelles. Les lots d'/assets portent une empreinte dans leur nom : gardés un an
+    // par le navigateur. index.html, le service worker et le manifeste sont toujours
+    // revalidés, sinon une mise à jour n'arriverait pas.
+    app.register(staticFiles, {
+      root: webDistDir,
+      preCompressed: true,
+      cacheControl: false,
+      setHeaders: (res, filePath) => {
+        const rel = path.relative(webDistDir, filePath).split(path.sep).join("/");
+        if (rel.startsWith("assets/") || rel.startsWith("fonts/")) res.header("cache-control", "public, max-age=31536000, immutable");
+        else if (/\.(png|svg|ico)(\.(br|gz))?$/.test(rel)) res.header("cache-control", "public, max-age=86400");
+        else res.header("cache-control", "no-cache");
+      },
+    });
     app.setNotFoundHandler((request, reply) => {
       if (request.raw.url?.startsWith("/api") || request.raw.url === "/health") {
         return reply.code(404).send({ error: "not_found" });
