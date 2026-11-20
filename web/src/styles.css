@@ -956,6 +956,22 @@ button.link {
   color: var(--fg-muted);
   margin-top: 2px;
 }
+/* Téléphone : aligné sur la cloche (loin du bord droit, le bouton Menu est à côté), le
+   panneau de 320 px débordait à gauche de l'écran. Il est accroché à toute la barre du
+   haut (.topbar, en position relative), avec 12 px de marge de chaque côté. */
+@media (max-width: 760px) {
+  .notif-bell-wrap {
+    position: static;
+  }
+  .notif-dropdown {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    max-height: min(70vh, 520px);
+    overscroll-behavior: contain;
+  }
+}
 
 /* ===== Page Parcours PBP ===== */
 .pbp-head {
